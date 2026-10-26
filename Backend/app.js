@@ -20,11 +20,10 @@ connectDB().catch((err) =>
   console.warn("Initial DB connection attempt notice:", err.message)
 );
 
-if (!process.env.VERCEL) {
-  initWhatsApp().catch((err) =>
-    console.warn("WhatsApp initialization notice:", err.message)
-  );
-}
+// Auto-init WhatsApp on startup to keep session alive
+initWhatsApp().catch((err) =>
+  console.warn("WhatsApp initialization notice:", err.message)
+);
 
 const app = express();
 const PORT = process.env.PORT || 5000;

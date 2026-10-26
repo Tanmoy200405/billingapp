@@ -14,8 +14,11 @@ import {
 } from "react-native";
 import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { api } from "../config/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { shareBillAsPdf, printBill } from "../utils/receiptPdfGenerator";
 
-export default function InvoiceScreen({ onBack, onInvoiceSaved }) {
+
+export default function InvoiceScreen({ user, onBack, onInvoiceSaved }) {
   const [parties, setParties] = useState([]);
   const [items, setItems] = useState([]);
   const [selectedParty, setSelectedParty] = useState(null);
@@ -33,10 +36,21 @@ export default function InvoiceScreen({ onBack, onInvoiceSaved }) {
   const [createdInvoice, setCreatedInvoice] = useState(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [whatsappUrl, setWhatsappUrl] = useState("");
+  const [billFormatOptions, setBillFormatOptions] = useState({});
+  const [sharingPdf, setSharingPdf] = useState(false);
+
 
   useEffect(() => {
     loadPartiesAndItems();
+    loadBillFormat();
   }, []);
+
+  const loadBillFormat = async () => {
+    try {
+      const stored = await AsyncStorage.getItem("billFormatOptions");
+      if (stored) setBillFormatOptions(JSON.parse(stored));
+    } catch {}
+  };
 
   const loadPartiesAndItems = async () => {
     const [pRes, iRes] = await Promise.all([
@@ -671,6 +685,58 @@ export default function InvoiceScreen({ onBack, onInvoiceSaved }) {
                 </Text>
               </TouchableOpacity>
             ) : null}
+
+            {/* Share as PDF */}
+            <TouchableOpacity
+              onPress={async () => {
+                setSharingPdf(true);
+                const storeInfo = {
+                  businessName: user?.businessName || "",
+                  address: user?.address || "",
+                  phone: user?.phone || "",
+                  email: user?.email || "",
+                  logo: user?.logo || "",
+                  gstin: user?.gstin || "",
+                };
+                const result = await shareBillAsPdf(createdInvoice, storeInfo, billFormatOptions);
+                setSharingPdf(false);
+                if (!result.success) {
+                  Alert.alert("Error", result.error || "Could not generate PDF");
+                }
+              }}
+              disabled={sharingPdf}
+              className="w-full bg-blue-600 py-3 rounded-xl flex-row items-center justify-center mb-3 shadow"
+            >
+              {sharingPdf ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="share-outline" size={18} color="#FFFFFF" />
+                  <Text className="text-white font-bold text-xs ml-2">
+                    Share Bill as PDF
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Print Bill */}
+            <TouchableOpacity
+              onPress={async () => {
+                const storeInfo = {
+                  businessName: user?.businessName || "",
+                  address: user?.address || "",
+                  phone: user?.phone || "",
+                  email: user?.email || "",
+                  logo: user?.logo || "",
+                  gstin: user?.gstin || "",
+                };
+                await printBill(createdInvoice, storeInfo, billFormatOptions);
+              }}
+              className="w-full bg-gray-700 py-3 rounded-xl flex-row items-center justify-center mb-3"
+            >
+              <Ionicons name="print-outline" size={18} color="#FFFFFF" />
+              <Text className="text-white font-bold text-xs ml-2">Print Bill</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => {

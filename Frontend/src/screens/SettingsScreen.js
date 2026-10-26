@@ -8,11 +8,14 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Switch,
   Platform,
+  Modal,
 } from "react-native";
 import { Ionicons, FontAwesome, FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Updates from "expo-updates";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api, setApiBaseUrl, getApiBaseUrl } from "../config/api";
 import {
   checkForAppUpdates,
@@ -23,6 +26,7 @@ import {
 
 export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, onProfileUpdated }) {
   const [businessName, setBusinessName] = useState(user?.businessName || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [gstin, setGstin] = useState(user?.gstin || "");
   const [address, setAddress] = useState(user?.address || "");
   const [upiId, setUpiId] = useState(user?.upiId || "");
@@ -35,6 +39,17 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [waQr, setWaQr] = useState(null);
   const [waPhone, setWaPhone] = useState(null);
   const [waLoading, setWaLoading] = useState(false);
+
+  // Bill Format Settings
+  const [billShowLogo, setBillShowLogo] = useState(true);
+  const [billShowToken, setBillShowToken] = useState(true);
+  const [billShowPhone, setBillShowPhone] = useState(true);
+  const [billShowEmail, setBillShowEmail] = useState(true);
+  const [billShowGstin, setBillShowGstin] = useState(true);
+  const [billShowType, setBillShowType] = useState(true);
+  const [billFooter, setBillFooter] = useState("Thank you! Visit again.");
+  const [showPreview, setShowPreview] = useState(false);
+  const [savingBillFormat, setSavingBillFormat] = useState(false);
 
   const fetchWaStatus = async () => {
     try {
@@ -49,7 +64,46 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
 
   useEffect(() => {
     fetchWaStatus();
+    loadBillFormatSettings();
   }, []);
+
+  const loadBillFormatSettings = async () => {
+    try {
+      const stored = await AsyncStorage.getItem("billFormatOptions");
+      if (stored) {
+        const opts = JSON.parse(stored);
+        if (opts.showLogo !== undefined) setBillShowLogo(opts.showLogo);
+        if (opts.showTokenNumber !== undefined) setBillShowToken(opts.showTokenNumber);
+        if (opts.showCustomerPhone !== undefined) setBillShowPhone(opts.showCustomerPhone);
+        if (opts.showEmail !== undefined) setBillShowEmail(opts.showEmail);
+        if (opts.showGstin !== undefined) setBillShowGstin(opts.showGstin);
+        if (opts.showBillType !== undefined) setBillShowType(opts.showBillType);
+        if (opts.footerNote) setBillFooter(opts.footerNote);
+      }
+    } catch {}
+  };
+
+  const saveBillFormatSettings = async () => {
+    setSavingBillFormat(true);
+    try {
+      const opts = {
+        paperWidth: printerSize,
+        showLogo: billShowLogo,
+        showTokenNumber: billShowToken,
+        showCustomerPhone: billShowPhone,
+        showEmail: billShowEmail,
+        showGstin: billShowGstin,
+        showBillType: billShowType,
+        footerNote: billFooter,
+      };
+      await AsyncStorage.setItem("billFormatOptions", JSON.stringify(opts));
+      Alert.alert("Saved", "Bill format settings saved!");
+    } catch {
+      Alert.alert("Error", "Could not save bill format settings");
+    } finally {
+      setSavingBillFormat(false);
+    }
+  };
 
   useEffect(() => {
     let interval = null;
@@ -168,6 +222,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
 
     const res = await api.auth.updateProfile({
       businessName: businessName.trim(),
+      email: email.trim() || undefined,
       gstin: gstin.trim() || undefined,
       address: address.trim() || undefined,
       upiId: upiId.trim() || undefined,
@@ -268,6 +323,23 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
 
           <View className="mb-3">
             <Text className="text-xs font-bold text-gray-700 mb-1">
+              Store Email Address
+            </Text>
+            <TextInput
+              className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
+              placeholder="e.g. store@example.com"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <Text className="text-[11px] text-gray-400 mt-1">
+              Shown on bills & receipts sent to customers.
+            </Text>
+          </View>
+
+          <View className="mb-3">
+            <Text className="text-xs font-bold text-gray-700 mb-1">
               GSTIN Tax Number
             </Text>
             <TextInput
@@ -304,11 +376,28 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
           </View>
         </View>
 
+        {/* BILL FORMAT SETTINGS */}
         <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
-          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-            Thermal Printer & Bill Format
-          </Text>
-          <View className="flex-row gap-2">
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Bill & Receipt Format
+            </Text>
+            <TouchableOpacity
+              onPress={saveBillFormatSettings}
+              disabled={savingBillFormat}
+              className="bg-blue-600 px-3 py-1.5 rounded-lg"
+            >
+              {savingBillFormat ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text className="text-white text-xs font-bold">Save Format</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Paper Size */}
+          <Text className="text-xs font-bold text-gray-700 mb-2">Paper / Print Size</Text>
+          <View className="flex-row gap-2 mb-4">
             {["2inch", "3inch", "A4", "A5"].map((size) => (
               <TouchableOpacity
                 key={size}
@@ -329,7 +418,137 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Toggle Options */}
+          <Text className="text-xs font-bold text-gray-700 mb-2">Bill Header & Content</Text>
+          {[
+            { label: "Show Store Logo", state: billShowLogo, set: setBillShowLogo },
+            { label: "Show Bill / Token Number", state: billShowToken, set: setBillShowToken },
+            { label: "Show Customer Phone on Bill", state: billShowPhone, set: setBillShowPhone },
+            { label: "Show Store Email in Header", state: billShowEmail, set: setBillShowEmail },
+            { label: "Show GSTIN in Header", state: billShowGstin, set: setBillShowGstin },
+            { label: "Show Bill Type (Cash Sale / Credit)", state: billShowType, set: setBillShowType },
+          ].map(({ label, state, set }) => (
+            <View key={label} className="flex-row items-center justify-between py-2.5 border-b border-gray-100">
+              <Text className="text-xs text-gray-800 font-medium flex-1 pr-2">{label}</Text>
+              <Switch
+                value={state}
+                onValueChange={set}
+                trackColor={{ false: "#D1D5DB", true: "#2563EB" }}
+                thumbColor={state ? "#FFFFFF" : "#9CA3AF"}
+              />
+            </View>
+          ))}
+
+          {/* Footer Note */}
+          <View className="mt-3">
+            <Text className="text-xs font-bold text-gray-700 mb-1">Bill Footer Message</Text>
+            <TextInput
+              className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
+              placeholder="Thank you! Visit again."
+              value={billFooter}
+              onChangeText={setBillFooter}
+            />
+            <Text className="text-[11px] text-gray-400 mt-1">
+              Printed at the bottom of every bill / receipt.
+            </Text>
+          </View>
+
+          {/* Preview Button */}
+          <TouchableOpacity
+            onPress={() => setShowPreview(true)}
+            className="mt-4 bg-gray-800 py-2.5 rounded-xl flex-row items-center justify-center"
+          >
+            <Ionicons name="receipt-outline" size={16} color="#FFFFFF" />
+            <Text className="text-white text-xs font-bold ml-2">Preview Bill Format</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Preview Modal */}
+        <Modal visible={showPreview} animationType="slide" transparent={true}>
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}>
+            <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: "90%" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <Text style={{ fontSize: 14, fontWeight: "800", color: "#111" }}>Bill Format Preview</Text>
+                <TouchableOpacity onPress={() => setShowPreview(false)}>
+                  <Ionicons name="close" size={22} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Compact receipt preview rendered in RN */}
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={{ backgroundColor: "#f9fafb", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "dashed" }}>
+                  {/* Header */}
+                  <View style={{ alignItems: "center", marginBottom: 8 }}>
+                    {billShowLogo && user?.logo ? (
+                      <Image source={{ uri: user.logo }} style={{ width: 60, height: 60, borderRadius: 8, marginBottom: 4 }} />
+                    ) : null}
+                    <Text style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 1, textTransform: "uppercase" }}>
+                      {user?.businessName || "MY STORE"}
+                    </Text>
+                    {user?.address ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555", marginTop: 2 }}>{user.address}</Text> : null}
+                    {user?.phone ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>Phone: {user.phone}</Text> : null}
+                    {billShowEmail && user?.email ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>@: {user.email}</Text> : null}
+                    {billShowGstin && user?.gstin ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>GSTIN: {user.gstin}</Text> : null}
+                  </View>
+
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+
+                  {billShowToken ? (
+                    <Text style={{ fontFamily: "monospace", fontSize: 24, fontWeight: "900", textAlign: "center", letterSpacing: 2 }}>21</Text>
+                  ) : null}
+
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+
+                  <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill No: 21</Text>
+                  <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Created On: 25/07/25 12:03 AM</Text>
+                  {billShowType ? <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill To: Cash Sale</Text> : null}
+                  {billShowPhone ? <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill To: Customer | 9999999999</Text> : null}
+
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+
+                  <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#333", paddingBottom: 3, marginBottom: 4 }}>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", flex: 3 }}>Item Name</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 28, textAlign: "center" }}>Qty</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 36, textAlign: "right" }}>Rate</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 36, textAlign: "right" }}>Total</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", paddingVertical: 2 }}>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, flex: 3 }}>Coffee Cappuccino</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, width: 28, textAlign: "center" }}>1</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, width: 36, textAlign: "right" }}>159</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, width: 36, textAlign: "right", fontWeight: "700" }}>159</Text>
+                  </View>
+
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Grand Total</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "900" }}>Rs. 159</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Payment</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700" }}>CASH</Text>
+                  </View>
+
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+                  <Text style={{ fontFamily: "monospace", fontSize: 10, textAlign: "center", color: "#555" }}>{billFooter}</Text>
+                </View>
+
+                <Text style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 8 }}>
+                  Paper size: {printerSize} · This is a live preview
+                </Text>
+              </ScrollView>
+
+              <TouchableOpacity
+                onPress={() => setShowPreview(false)}
+                style={{ backgroundColor: "#1D4ED8", borderRadius: 12, paddingVertical: 12, alignItems: "center", marginTop: 12 }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Close Preview</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
         <View className="bg-white rounded-xl p-4 mb-6 border border-gray-200 shadow-sm">
           <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">

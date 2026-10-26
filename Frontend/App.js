@@ -122,6 +122,7 @@ export default function App() {
         <SafeAreaView style={{ flex: 1, backgroundColor: "#2563EB" }}>
           {isCreatingInvoice ? (
             <InvoiceScreen
+              user={user}
               onBack={() => setIsCreatingInvoice(false)}
               onInvoiceSaved={() => {
                 setIsCreatingInvoice(false);
