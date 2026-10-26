@@ -671,14 +671,63 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
           </Text>
           <TextInput
             className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
-            placeholder="http://192.168.1.X:5000/api"
+            placeholder="http://10.212.56.136:5000/api"
             value={customApiUrl}
             onChangeText={setCustomApiUrl}
             autoCapitalize="none"
           />
-          <Text className="text-[11px] text-gray-400 mt-1">
-            Use your computer's local IP if testing with Expo Go on a physical phone.
-          </Text>
+
+          <View className="flex-row flex-wrap gap-2 mt-2">
+            <TouchableOpacity
+              onPress={() => {
+                const url = "http://localhost:5000/api";
+                setCustomApiUrl(url);
+                setApiBaseUrl(url);
+                fetchWaStatus();
+                Alert.alert("API Endpoint Changed", "Switched to Localhost (http://localhost:5000/api)");
+              }}
+              className="bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded-lg"
+            >
+              <Text className="text-[11px] font-bold text-blue-700">Local (localhost:5000)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                const url = "http://10.212.56.136:5000/api";
+                setCustomApiUrl(url);
+                setApiBaseUrl(url);
+                fetchWaStatus();
+                Alert.alert("API Endpoint Changed", "Switched to Local Wi-Fi (http://10.212.56.136:5000/api)");
+              }}
+              className="bg-purple-50 border border-purple-200 px-2.5 py-1.5 rounded-lg"
+            >
+              <Text className="text-[11px] font-bold text-purple-700">Local Wi-Fi (10.212.56.136)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                const url = "https://billing-app-backend-lake.vercel.app/api";
+                setCustomApiUrl(url);
+                setApiBaseUrl(url);
+                fetchWaStatus();
+                Alert.alert("API Endpoint Changed", "Switched to Vercel Cloud");
+              }}
+              className="bg-gray-100 border border-gray-300 px-2.5 py-1.5 rounded-lg"
+            >
+              <Text className="text-[11px] font-bold text-gray-700">Vercel Cloud</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => {
+              setApiBaseUrl(customApiUrl.trim());
+              fetchWaStatus();
+              Alert.alert("Saved", `API Endpoint saved: ${customApiUrl.trim()}`);
+            }}
+            className="mt-3 bg-gray-900 py-2 rounded-xl items-center"
+          >
+            <Text className="text-white text-xs font-bold">Apply & Connect Endpoint</Text>
+          </TouchableOpacity>
         </View>
 
         <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
@@ -714,9 +763,15 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
             </View>
           </View>
 
-          <Text className="text-xs text-gray-600 mb-3">
+          <Text className="text-xs text-gray-600 mb-2">
             Send bills and marketing automatically from your WhatsApp without GST, Meta approval, or clicking Send.
           </Text>
+
+          <View className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3">
+            <Text className="text-[11px] text-amber-800 font-medium">
+              💡 <Text className="font-bold">Tip:</Text> WhatsApp Linked Devices requires a persistent server (like your Local Server or Render/Railway). If using Vercel Serverless, WebSockets may reset. You can also share bills directly to WhatsApp using the green WhatsApp button or PDF Share on every invoice!
+            </Text>
+          </View>
 
           {waStatus === "connected" ? (
             <View className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-2">
