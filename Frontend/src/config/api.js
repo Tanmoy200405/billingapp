@@ -6,6 +6,19 @@ const USER_KEY = "billing_user_data";
 let authToken = null;
 export const DEFAULT_API_URL = "https://billing-app-backend-lake.vercel.app/api";
 let currentBaseUrl = DEFAULT_API_URL;
+const API_URL_KEY = "billing_api_url";
+
+if (typeof localStorage !== "undefined") {
+  try {
+    const saved = localStorage.getItem(API_URL_KEY);
+    if (saved) currentBaseUrl = saved;
+  } catch {}
+}
+AsyncStorage.getItem(API_URL_KEY)
+  .then((saved) => {
+    if (saved) currentBaseUrl = saved;
+  })
+  .catch(() => {});
 
 export const setAuthToken = (token, user = null) => {
   authToken = token;
@@ -87,6 +100,12 @@ export const clearAuthToken = async () => {
 export const setApiBaseUrl = (url) => {
   if (url) {
     currentBaseUrl = url.endsWith("/api") ? url : `${url.replace(/\/$/, "")}/api`;
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.setItem(API_URL_KEY, currentBaseUrl);
+      } catch {}
+    }
+    AsyncStorage.setItem(API_URL_KEY, currentBaseUrl).catch(() => {});
   }
 };
 
@@ -102,7 +121,24 @@ const request = async (endpoint, options = {}) => {
 
   try {
     const response = await fetch(url, { ...options, headers });
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      data = {
+        success: false,
+        message: `Server returned HTTP ${response.status}`,
+      };
+    }
+
+    if (!response.ok && data && !data.message) {
+      data.message = `Request failed with status ${response.status}`;
+    }
+
+    if (data && data.error && data.message && !data.message.includes(data.error)) {
+      data.message = `${data.message} (${data.error})`;
+    }
+
     return data;
   } catch (error) {
     return {

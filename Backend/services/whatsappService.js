@@ -11,7 +11,9 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const SESSION_DIR = path.join(__dirname, "../whatsapp_session");
+const SESSION_DIR = process.env.VERCEL
+  ? path.join("/tmp", "whatsapp_session")
+  : path.join(__dirname, "../whatsapp_session");
 
 let sock = null;
 let qrCodeData = null;

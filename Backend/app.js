@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 
 dotenv.config();
 
+import mongoose from "mongoose";
 import connectDB from "./config/dbConnect.js";
 import authRoutes from "./routes/authRoutes.js";
 import partyRoutes from "./routes/partyRoutes.js";
@@ -14,8 +15,16 @@ import dashboardRoutes from "./routes/dashboardRoutes.js";
 import whatsappRoutes from "./routes/whatsappRoutes.js";
 import { initWhatsApp } from "./services/whatsappService.js";
 
-connectDB();
-initWhatsApp();
+// Attempt initial connection in background
+connectDB().catch((err) =>
+  console.warn("Initial DB connection attempt notice:", err.message)
+);
+
+if (!process.env.VERCEL) {
+  initWhatsApp().catch((err) =>
+    console.warn("WhatsApp initialization notice:", err.message)
+  );
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,8 +50,15 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
+  const states = ["disconnected", "connected", "connecting", "disconnecting"];
+  const dbState = states[mongoose.connection.readyState] || "unknown";
   res.status(200).json({
     status: "healthy",
+    database: {
+      status: dbState,
+      readyState: mongoose.connection.readyState,
+      hasUri: Boolean(process.env.MONGODB_URI),
+    },
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
@@ -64,6 +80,22 @@ app.get("/api/app-version", (req, res) => {
   });
 });
 
+// Database connection middleware for all API data routes
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Database connection failure:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Database connection failed",
+      error: error.message,
+      hint: "Verify MONGODB_URI in environment variables and ensure MongoDB Atlas Network Access allows 0.0.0.0/0.",
+    });
+  }
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/parties", partyRoutes);
 app.use("/api/items", itemRoutes);
@@ -79,6 +111,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Ezo Billing API server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    console.log(`Ezo Billing API server running on port ${PORT}`);
+  });
+}
+
+export default app;
