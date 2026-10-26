@@ -39,6 +39,10 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [waQr, setWaQr] = useState(null);
   const [waPhone, setWaPhone] = useState(null);
   const [waLoading, setWaLoading] = useState(false);
+  const [showPairingInput, setShowPairingInput] = useState(false);
+  const [pairingPhone, setPairingPhone] = useState(whatsappNumber || phone || "");
+  const [pairingCode, setPairingCode] = useState(null);
+  const [pairingLoading, setPairingLoading] = useState(false);
 
   // Bill Format Settings
   const [billShowLogo, setBillShowLogo] = useState(true);
@@ -49,6 +53,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [billShowType, setBillShowType] = useState(true);
   const [billFooter, setBillFooter] = useState("Thank you! Visit again.");
   const [showPreview, setShowPreview] = useState(false);
+  const [previewTab, setPreviewTab] = useState("customer");
   const [savingBillFormat, setSavingBillFormat] = useState(false);
 
   const fetchWaStatus = async () => {
@@ -117,10 +122,11 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
     };
   }, [waStatus, waLoading]);
 
-  const handleStartWaLink = async () => {
+  const handleStartWaLink = async (force = false) => {
     setWaLoading(true);
+    setPairingCode(null);
     try {
-      const res = await api.whatsapp.init();
+      const res = await api.whatsapp.init(force);
       if (res && res.success) {
         setWaStatus(res.status);
         setWaQr(res.qrCode);
@@ -130,6 +136,29 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       Alert.alert("Error", "Could not start WhatsApp linking");
     } finally {
       setWaLoading(false);
+    }
+  };
+
+  const handleGetPairingCode = async () => {
+    const raw = (pairingPhone || whatsappNumber || phone || "").replace(/[^0-9]/g, "");
+    if (!raw) {
+      Alert.alert("Phone Required", "Please enter your WhatsApp phone number with country code (e.g. 919876543210)");
+      return;
+    }
+    const fullNumber = raw.length === 10 ? `91${raw}` : raw;
+    setPairingLoading(true);
+    setPairingCode(null);
+    try {
+      const res = await api.whatsapp.getPairingCode(fullNumber);
+      if (res && res.success && res.code) {
+        setPairingCode(res.code);
+      } else {
+        Alert.alert("Error", res?.message || "Could not generate pairing code. Please try refreshing QR.");
+      }
+    } catch (err) {
+      Alert.alert("Error", err.message || "Failed to generate pairing code");
+    } finally {
+      setPairingLoading(false);
     }
   };
 
@@ -475,68 +504,154 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 </TouchableOpacity>
               </View>
 
+              {/* Tabs for Customer vs Cooker */}
+              <View style={{ flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 10, padding: 3, marginBottom: 10 }}>
+                <TouchableOpacity
+                  onPress={() => setPreviewTab("customer")}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    alignItems: "center",
+                    backgroundColor: previewTab === "customer" ? "#FFFFFF" : "transparent",
+                    shadowColor: previewTab === "customer" ? "#000" : "transparent",
+                    shadowOpacity: 0.05,
+                    shadowRadius: 2,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: previewTab === "customer" ? "#1D4ED8" : "#6B7280" }}>
+                    Customer Bill (2 Copies)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setPreviewTab("cooker")}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    alignItems: "center",
+                    backgroundColor: previewTab === "cooker" ? "#FFFFFF" : "transparent",
+                    shadowColor: previewTab === "cooker" ? "#000" : "transparent",
+                    shadowOpacity: 0.05,
+                    shadowRadius: 2,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: previewTab === "cooker" ? "#B45309" : "#6B7280" }}>
+                    Cooker Slip (Short KOT)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Compact receipt preview rendered in RN */}
               <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={{ backgroundColor: "#f9fafb", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "dashed" }}>
-                  {/* Header */}
-                  <View style={{ alignItems: "center", marginBottom: 8 }}>
-                    {billShowLogo && user?.logo ? (
-                      <Image source={{ uri: user.logo }} style={{ width: 60, height: 60, borderRadius: 8, marginBottom: 4 }} />
+                {previewTab === "customer" ? (
+                  <View style={{ backgroundColor: "#f9fafb", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "dashed" }}>
+                    <View style={{ alignItems: "center", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 9, fontWeight: "800", color: "#666", textTransform: "uppercase", letterSpacing: 1, borderWidth: 1, borderColor: "#ccc", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 3 }}>
+                        CUSTOMER COPY - 1 & 2
+                      </Text>
+                    </View>
+                    {/* Header */}
+                    <View style={{ alignItems: "center", marginBottom: 8 }}>
+                      {billShowLogo && user?.logo ? (
+                        <Image source={{ uri: user.logo }} style={{ width: 60, height: 60, borderRadius: 8, marginBottom: 4 }} />
+                      ) : null}
+                      <Text style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 1, textTransform: "uppercase" }}>
+                        {user?.businessName || "MY STORE"}
+                      </Text>
+                      {user?.address ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555", marginTop: 2 }}>{user.address}</Text> : null}
+                      {user?.phone ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>Phone: {user.phone}</Text> : null}
+                      {billShowEmail && user?.email ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>@: {user.email}</Text> : null}
+                      {billShowGstin && user?.gstin ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>GSTIN: {user.gstin}</Text> : null}
+                    </View>
+
+                    <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+
+                    {billShowToken ? (
+                      <Text style={{ fontFamily: "monospace", fontSize: 24, fontWeight: "900", textAlign: "center", letterSpacing: 2 }}>1</Text>
                     ) : null}
-                    <Text style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 1, textTransform: "uppercase" }}>
-                      {user?.businessName || "MY STORE"}
+
+                    <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+
+                    <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill No: 1</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Created On: 26/10/26 02:40 PM</Text>
+                    {billShowType ? <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill To: Cash Sale</Text> : null}
+                    {billShowPhone ? <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill To: Customer | 9876543210</Text> : null}
+
+                    <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+
+                    <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#333", paddingBottom: 3, marginBottom: 4 }}>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", flex: 3 }}>Item Name</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 28, textAlign: "center" }}>Qty</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 36, textAlign: "right" }}>Rate</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 36, textAlign: "right" }}>Total</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", paddingVertical: 2 }}>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, flex: 3 }}>Coffee Cappuccino</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, width: 28, textAlign: "center" }}>1</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, width: 36, textAlign: "right" }}>159</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, width: 36, textAlign: "right", fontWeight: "700" }}>159</Text>
+                    </View>
+
+                    <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Grand Total</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "900" }}>Rs. 159</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Payment</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700" }}>CASH</Text>
+                    </View>
+
+                    <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
+                    <Text style={{ fontFamily: "monospace", fontSize: 10, textAlign: "center", color: "#555" }}>{billFooter}</Text>
+                  </View>
+                ) : (
+                  <View style={{ backgroundColor: "#FFFBEB", borderRadius: 12, padding: 12, borderWidth: 2, borderColor: "#B45309" }}>
+                    <View style={{ alignItems: "center", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "900", color: "#B45309", textTransform: "uppercase", letterSpacing: 1 }}>
+                        *** COOKER / KITCHEN KOT ***
+                      </Text>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#333", marginTop: 2 }}>
+                        {user?.businessName || "MY STORE"}
+                      </Text>
+                    </View>
+
+                    <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#B45309", marginVertical: 6 }} />
+                    <Text style={{ fontFamily: "monospace", fontSize: 32, fontWeight: "900", textAlign: "center", letterSpacing: 2, color: "#92400E" }}>
+                      TOKEN: #1
                     </Text>
-                    {user?.address ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555", marginTop: 2 }}>{user.address}</Text> : null}
-                    {user?.phone ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>Phone: {user.phone}</Text> : null}
-                    {billShowEmail && user?.email ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>@: {user.email}</Text> : null}
-                    {billShowGstin && user?.gstin ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>GSTIN: {user.gstin}</Text> : null}
+                    <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#B45309", marginVertical: 6 }} />
+
+                    <Text style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "700" }}>Bill No: #1</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 11 }}>Time: 26/10/26 02:40 PM</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 11 }}>Customer: Cash Customer</Text>
+
+                    <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#B45309", marginVertical: 6 }} />
+
+                    <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#000", paddingBottom: 3, marginBottom: 4 }}>
+                      <Text style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "900", flex: 3 }}>ORDERED ITEM</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "900", width: 40, textAlign: "right" }}>QTY</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", paddingVertical: 3 }}>
+                      <Text style={{ fontFamily: "monospace", fontSize: 12, fontWeight: "700", flex: 3 }}>1. Coffee Cappuccino</Text>
+                      <Text style={{ fontFamily: "monospace", fontSize: 15, fontWeight: "900", width: 40, textAlign: "right" }}>x 1</Text>
+                    </View>
+
+                    <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#B45309", marginVertical: 6 }} />
+                    <Text style={{ fontFamily: "monospace", fontSize: 12, fontWeight: "900", textAlign: "center" }}>
+                      TOTAL QUANTITY: 1
+                    </Text>
+                    <Text style={{ fontSize: 10, color: "#666", textAlign: "center", marginTop: 3 }}>
+                      [ Kitchen Copy - Prepare Order ]
+                    </Text>
                   </View>
-
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-
-                  {billShowToken ? (
-                    <Text style={{ fontFamily: "monospace", fontSize: 24, fontWeight: "900", textAlign: "center", letterSpacing: 2 }}>21</Text>
-                  ) : null}
-
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-
-                  <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill No: 21</Text>
-                  <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Created On: 25/07/25 12:03 AM</Text>
-                  {billShowType ? <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill To: Cash Sale</Text> : null}
-                  {billShowPhone ? <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill To: Customer | 9999999999</Text> : null}
-
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-
-                  <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#333", paddingBottom: 3, marginBottom: 4 }}>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", flex: 3 }}>Item Name</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 28, textAlign: "center" }}>Qty</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 36, textAlign: "right" }}>Rate</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 36, textAlign: "right" }}>Total</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", paddingVertical: 2 }}>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, flex: 3 }}>Coffee Cappuccino</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, width: 28, textAlign: "center" }}>1</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, width: 36, textAlign: "right" }}>159</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, width: 36, textAlign: "right", fontWeight: "700" }}>159</Text>
-                  </View>
-
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Grand Total</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "900" }}>Rs. 159</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Payment</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700" }}>CASH</Text>
-                  </View>
-
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-                  <Text style={{ fontFamily: "monospace", fontSize: 10, textAlign: "center", color: "#555" }}>{billFooter}</Text>
-                </View>
+                )}
 
                 <Text style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 8 }}>
-                  Paper size: {printerSize} · This is a live preview
+                  Paper size: {printerSize} · 2 Customer Bills + 1 Cooker KOT
                 </Text>
               </ScrollView>
 
@@ -637,26 +752,84 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   1. Open WhatsApp on your phone
                 </Text>
                 <Text className="text-[11px] text-gray-700 font-medium mt-1">
-                  2. Tap Settings (or 3 dots) - Linked Devices
+                  2. Tap Settings (or 3 dots) → Linked Devices
                 </Text>
                 <Text className="text-[11px] text-gray-700 font-medium mt-1">
                   3. Tap Link a Device and point your camera here
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={handleStartWaLink}
-                disabled={waLoading}
-                className="mt-3 flex-row items-center"
-              >
-                <Ionicons name="refresh" size={14} color="#2563EB" />
-                <Text className="text-xs font-bold text-blue-600 ml-1">
-                  Refresh QR Code
-                </Text>
-              </TouchableOpacity>
+
+              <View className="flex-row items-center justify-between w-full mt-3">
+                <TouchableOpacity
+                  onPress={() => handleStartWaLink(true)}
+                  disabled={waLoading}
+                  className="flex-row items-center bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg"
+                >
+                  <Ionicons name="refresh" size={13} color="#2563EB" />
+                  <Text className="text-[11px] font-bold text-blue-600 ml-1">
+                    Refresh QR
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setShowPairingInput(!showPairingInput)}
+                  className="flex-row items-center bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg"
+                >
+                  <Ionicons name="keypad-outline" size={13} color="#059669" />
+                  <Text className="text-[11px] font-bold text-emerald-700 ml-1">
+                    {showPairingInput ? "Hide Pairing Code" : "Or use Phone Code"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {showPairingInput && (
+                <View className="mt-3 w-full bg-white p-3 rounded-lg border border-gray-200">
+                  <Text className="text-xs font-bold text-gray-800 mb-1">
+                    Link with Phone Number:
+                  </Text>
+                  <Text className="text-[11px] text-gray-500 mb-2">
+                    Enter WhatsApp number with country code:
+                  </Text>
+                  <View className="flex-row items-center">
+                    <TextInput
+                      className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs"
+                      placeholder="e.g. 919876543210"
+                      value={pairingPhone}
+                      onChangeText={setPairingPhone}
+                      keyboardType="phone-pad"
+                    />
+                    <TouchableOpacity
+                      onPress={handleGetPairingCode}
+                      disabled={pairingLoading}
+                      className="ml-2 bg-emerald-600 px-3 py-2 rounded-lg"
+                    >
+                      {pairingLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text className="text-white text-xs font-bold">Get Code</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  {pairingCode ? (
+                    <View className="mt-3 bg-emerald-50 border border-emerald-300 rounded-lg p-3 items-center">
+                      <Text className="text-[11px] text-emerald-800 font-bold mb-1">
+                        Your WhatsApp Pairing Code:
+                      </Text>
+                      <Text className="text-xl font-mono font-extrabold text-emerald-900 tracking-widest my-1">
+                        {pairingCode}
+                      </Text>
+                      <Text className="text-[10px] text-emerald-700 text-center mt-1">
+                        WhatsApp → Linked Devices → Link with phone number instead → Enter this code.
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              )}
             </View>
           ) : (
             <TouchableOpacity
-              onPress={handleStartWaLink}
+              onPress={() => handleStartWaLink(true)}
               disabled={waLoading}
               className="bg-emerald-600 py-2.5 rounded-xl flex-row items-center justify-center shadow-sm"
             >

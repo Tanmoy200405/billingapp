@@ -17,9 +17,24 @@ router.get("/status", (req, res) => {
 });
 
 router.post("/init", async (req, res) => {
-  await initWhatsApp();
+  const force = req.body?.force === true;
+  await initWhatsApp(force);
   const status = getWhatsAppStatus();
   return res.status(200).json({ success: true, ...status });
+});
+
+router.post("/pairing-code", async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) {
+    return res.status(400).json({ success: false, message: "Phone number is required" });
+  }
+  try {
+    const { requestPairingCodeForNumber } = await import("../services/whatsappService.js");
+    const code = await requestPairingCodeForNumber(phone);
+    return res.status(200).json({ success: true, code });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 router.post("/disconnect", async (req, res) => {

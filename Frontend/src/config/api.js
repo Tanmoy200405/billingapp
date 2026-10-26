@@ -220,7 +220,8 @@ export const api = {
   },
   whatsapp: {
     getStatus: () => request("/whatsapp/status"),
-    init: () => request("/whatsapp/init", { method: "POST" }),
+    init: (force = false) => request("/whatsapp/init", { method: "POST", body: JSON.stringify({ force }) }),
     disconnect: () => request("/whatsapp/disconnect", { method: "POST" }),
+    getPairingCode: (phone) => request("/whatsapp/pairing-code", { method: "POST", body: JSON.stringify({ phone }) }),
   },
 };

@@ -217,8 +217,23 @@ router.post("/", async (req, res) => {
     const grandTotal = Math.round(totalBeforeRound);
     const roundOff = Math.round((grandTotal - totalBeforeRound) * 100) / 100;
 
-    const invoiceCount = await Invoice.countDocuments({ userId: req.user._id });
-    const invoiceNumber = `INV-${(1001 + invoiceCount).toString()}`;
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+
+    const todayInvoices = await Invoice.find({
+      userId: req.user._id,
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+    }).select("invoiceNumber");
+
+    let maxNumber = 0;
+    for (const inv of todayInvoices) {
+      const num = parseInt(inv.invoiceNumber, 10);
+      if (!isNaN(num) && num > maxNumber) {
+        maxNumber = num;
+      }
+    }
+    const invoiceNumber = (maxNumber + 1).toString();
 
     const mode = paymentMode.toUpperCase();
     const isCredit = mode === "CREDIT";
@@ -247,7 +262,7 @@ router.post("/", async (req, res) => {
       .join("\n");
 
     let whatsappText =
-      `INVOICE: ${invoiceNumber}\n` +
+      `BILL NO: ${invoiceNumber}\n` +
       `STORE: ${business.businessName}\n` +
       `Date: ${new Date().toLocaleDateString()}\n` +
       `Customer: ${customer ? customer.name : (partyName || "Cash Customer")}\n` +

@@ -1,8 +1,8 @@
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  makeCacheableSignalKeyStore,
+  Browsers,
+  fetchLatestWaWebVersion,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
 import QRCode from "qrcode";
@@ -52,38 +52,88 @@ function stopKeepAlive() {
   }
 }
 
+function safelyCloseSocket() {
+  if (sock) {
+    try {
+      sock.ev?.removeAllListeners?.();
+      sock.end?.();
+      if (sock.ws) {
+        sock.ws.close();
+      }
+    } catch {}
+    sock = null;
+  }
+}
+
 export const getWhatsAppStatus = () => ({
   status: connectionStatus,
   qrCode: qrCodeData,
   phoneNumber: connectedNumber,
 });
 
-export const initWhatsApp = async () => {
-  if (isInitializing || connectionStatus === "connected") return;
+export const initWhatsApp = async (forceRestart = false) => {
+  // If already connected, do not reinitialize
+  if (connectionStatus === "connected") {
+    return;
+  }
+
+  // If already initializing, wait
+  if (isInitializing) {
+    return;
+  }
+
+  // If already waiting for QR scan and we have a valid QR code, don't recreate socket
+  if (!forceRestart && connectionStatus === "scan_qr" && qrCodeData && sock) {
+    return;
+  }
+
   isInitializing = true;
-  qrCodeData = null;
 
   try {
+    // If forcing restart or starting fresh, close previous socket cleanly
+    if (forceRestart) {
+      safelyCloseSocket();
+    }
+
     if (!fs.existsSync(SESSION_DIR)) {
       fs.mkdirSync(SESSION_DIR, { recursive: true });
     }
 
+    // Check for corrupt un-registered state
+    const credsPath = path.join(SESSION_DIR, "creds.json");
+    if (fs.existsSync(credsPath)) {
+      try {
+        const raw = fs.readFileSync(credsPath, "utf8");
+        const creds = JSON.parse(raw);
+        if (creds?.me && creds.registered === false) {
+          console.log("[WhatsApp] Found incomplete registration in session. Clearing stale files...");
+          fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+          fs.mkdirSync(SESSION_DIR, { recursive: true });
+        }
+      } catch {}
+    }
+
     const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
-    const { version } = await fetchLatestBaileysVersion();
+
+    let waVersion = undefined;
+    try {
+      const v = await fetchLatestWaWebVersion();
+      if (v?.version) waVersion = v.version;
+    } catch {
+      // Fallback to baileys default if fetch fails
+    }
 
     sock = makeWASocket({
-      version,
-      auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
-      },
+      version: waVersion,
+      auth: state,
       printQRInTerminal: false,
       logger: pino({ level: "silent" }),
-      browser: ["Billing App", "Chrome", "125.0.0"],
+      browser: Browsers.macOS("Desktop"),
       syncFullHistory: false,
       markOnlineOnConnect: true,
       connectTimeoutMs: 60000,
       keepAliveIntervalMs: 25000,
+      defaultQueryTimeoutMs: 60000,
     });
 
     sock.ev.on("creds.update", saveCreds);
@@ -95,6 +145,7 @@ export const initWhatsApp = async () => {
         try {
           qrCodeData = await QRCode.toDataURL(qr, { margin: 2, scale: 6 });
           connectionStatus = "scan_qr";
+          isInitializing = false;
         } catch {
           qrCodeData = null;
         }
@@ -104,10 +155,10 @@ export const initWhatsApp = async () => {
         connectionStatus = "connected";
         qrCodeData = null;
         reconnectAttempts = 0;
-        connectedNumber = sock.user?.id ? sock.user.id.split(":")[0] : null;
+        connectedNumber = sock.user?.id ? sock.user.id.split(":")[0].replace(/[^0-9]/g, "") : null;
         isInitializing = false;
         startKeepAlive();
-        console.log(`[WhatsApp] Connected: +${connectedNumber}`);
+        console.log(`[WhatsApp] Successfully connected: +${connectedNumber}`);
       }
 
       if (connection === "close") {
@@ -120,14 +171,16 @@ export const initWhatsApp = async () => {
         isInitializing = false;
 
         if (isLoggedOut) {
-          console.log("[WhatsApp] Logged out remotely. Clearing session...");
-          try { fs.rmSync(SESSION_DIR, { recursive: true, force: true }); } catch {}
+          console.log("[WhatsApp] Logged out from device. Clearing session...");
+          try {
+            fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+          } catch {}
           reconnectAttempts = 0;
-          setTimeout(() => initWhatsApp(), 2000);
+          setTimeout(() => initWhatsApp(true), 2000);
         } else {
           const delay = getReconnectDelay();
-          console.log(`[WhatsApp] Reconnecting in ${Math.round(delay/1000)}s (attempt ${reconnectAttempts})...`);
-          setTimeout(() => initWhatsApp(), delay);
+          console.log(`[WhatsApp] Connection closed (code: ${statusCode}). Reconnecting in ${Math.round(delay / 1000)}s...`);
+          setTimeout(() => initWhatsApp(false), delay);
         }
       }
     });
@@ -136,21 +189,43 @@ export const initWhatsApp = async () => {
     connectionStatus = "disconnected";
     isInitializing = false;
     const delay = getReconnectDelay();
-    setTimeout(() => initWhatsApp(), delay);
+    setTimeout(() => initWhatsApp(false), delay);
   }
+};
+
+export const requestPairingCodeForNumber = async (phoneNumber) => {
+  if (!sock || connectionStatus !== "scan_qr") {
+    await initWhatsApp(true);
+    // wait for socket ready
+    let attempts = 0;
+    while (!sock && attempts < 10) {
+      await new Promise((r) => setTimeout(r, 500));
+      attempts++;
+    }
+  }
+  const clean = phoneNumber.toString().replace(/[^0-9]/g, "");
+  if (!clean) throw new Error("Invalid phone number");
+  const fullNumber = clean.length === 10 ? `91${clean}` : clean;
+  const code = await sock.requestPairingCode(fullNumber);
+  return code;
 };
 
 export const disconnectWhatsApp = async () => {
   stopKeepAlive();
-  try { if (sock) await sock.logout(); } catch {}
-  try { fs.rmSync(SESSION_DIR, { recursive: true, force: true }); } catch {}
-  sock = null;
+  try {
+    if (sock) await sock.logout();
+  } catch {}
+  safelyCloseSocket();
+  try {
+    fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+  } catch {}
   qrCodeData = null;
   connectionStatus = "disconnected";
   connectedNumber = null;
   isInitializing = false;
   reconnectAttempts = 0;
-  setTimeout(() => initWhatsApp(), 1000);
+  // Start fresh QR generation after 1s
+  setTimeout(() => initWhatsApp(true), 1000);
   return { success: true };
 };
 
@@ -158,6 +233,7 @@ export const sendWhatsAppMessage = async (recipientPhone, textMessage) => {
   if (!sock || connectionStatus !== "connected") {
     return { success: false, message: "WhatsApp not linked via QR code" };
   }
+
   try {
     const clean = recipientPhone.toString().replace(/[^0-9]/g, "");
     if (!clean) return { success: false, message: "Invalid phone number" };

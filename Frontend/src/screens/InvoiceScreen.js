@@ -719,7 +719,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved }) {
               )}
             </TouchableOpacity>
 
-            {/* Print Bill */}
+            {/* Print All (2 Customer + 1 Cooker) */}
             <TouchableOpacity
               onPress={async () => {
                 const storeInfo = {
@@ -730,13 +730,53 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved }) {
                   logo: user?.logo || "",
                   gstin: user?.gstin || "",
                 };
-                await printBill(createdInvoice, storeInfo, billFormatOptions);
+                await printBill(createdInvoice, storeInfo, billFormatOptions, "all");
               }}
-              className="w-full bg-gray-700 py-3 rounded-xl flex-row items-center justify-center mb-3"
+              className="w-full bg-gray-900 py-3 rounded-xl flex-row items-center justify-center mb-2 shadow-sm"
             >
-              <Ionicons name="print-outline" size={18} color="#FFFFFF" />
-              <Text className="text-white font-bold text-xs ml-2">Print Bill</Text>
+              <Ionicons name="print" size={18} color="#FFFFFF" />
+              <Text className="text-white font-bold text-xs ml-2">
+                Print All (2 Customer + 1 Cooker)
+              </Text>
             </TouchableOpacity>
+
+            {/* Individual Print Options */}
+            <View className="flex-row justify-between mb-3">
+              <TouchableOpacity
+                onPress={async () => {
+                  const storeInfo = {
+                    businessName: user?.businessName || "",
+                    address: user?.address || "",
+                    phone: user?.phone || "",
+                    email: user?.email || "",
+                    logo: user?.logo || "",
+                    gstin: user?.gstin || "",
+                  };
+                  await printBill(createdInvoice, storeInfo, billFormatOptions, "customer");
+                }}
+                className="flex-1 bg-gray-100 border border-gray-300 py-2.5 rounded-xl flex-row items-center justify-center mr-1.5"
+              >
+                <Ionicons name="receipt-outline" size={15} color="#374151" />
+                <Text className="text-gray-800 font-bold text-xs ml-1.5">
+                  Customer Bills (2)
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  const storeInfo = {
+                    businessName: user?.businessName || "",
+                  };
+                  await printBill(createdInvoice, storeInfo, billFormatOptions, "cooker");
+                }}
+                className="flex-1 bg-amber-50 border border-amber-300 py-2.5 rounded-xl flex-row items-center justify-center ml-1.5"
+              >
+                <Ionicons name="restaurant-outline" size={15} color="#B45309" />
+                <Text className="text-amber-800 font-bold text-xs ml-1.5">
+                  Cooker Slip (KOT)
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               onPress={() => {
