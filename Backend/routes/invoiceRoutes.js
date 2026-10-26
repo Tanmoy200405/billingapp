@@ -290,7 +290,7 @@ router.post("/", async (req, res) => {
       `Grand Total: Rs.${grandTotal}\n` +
       paymentLine +
       `Thank you for shopping with us!\n` +
-      `Contact: ${business.phone}`;
+      `Contact: ${business.phone || business.whatsappNumber || process.env.STORE_PHONE || "7003317615"}`;
 
     let autoSent = false;
     if (destinationPhone) {

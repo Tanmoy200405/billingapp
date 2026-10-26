@@ -40,7 +40,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [waPhone, setWaPhone] = useState(null);
   const [waLoading, setWaLoading] = useState(false);
   const [showPairingInput, setShowPairingInput] = useState(false);
-  const [pairingPhone, setPairingPhone] = useState(user?.whatsappNumber || user?.phone || "");
+  const [pairingPhone, setPairingPhone] = useState(user?.whatsappNumber || user?.phone || "7003317615");
   const [pairingCode, setPairingCode] = useState(null);
   const [pairingLoading, setPairingLoading] = useState(false);
 
@@ -140,7 +140,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   };
 
   const handleGetPairingCode = async () => {
-    const raw = (pairingPhone || user?.whatsappNumber || user?.phone || "").replace(/[^0-9]/g, "");
+    const raw = (pairingPhone || user?.whatsappNumber || user?.phone || "7003317615").replace(/[^0-9]/g, "");
     if (!raw) {
       Alert.alert("Phone Required", "Please enter your WhatsApp phone number with country code (e.g. 919876543210)");
       return;
@@ -848,7 +848,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   <View className="flex-row items-center">
                     <TextInput
                       className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs"
-                      placeholder="e.g. 919876543210"
+                      placeholder="e.g. 917003317615"
                       value={pairingPhone}
                       onChangeText={setPairingPhone}
                       keyboardType="phone-pad"

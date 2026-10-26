@@ -120,7 +120,7 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
   const {
     businessName = "My Store",
     address = "",
-    phone = "",
+    phone = "7003317615",
     email = "",
     logo = "",
     gstin = "",
