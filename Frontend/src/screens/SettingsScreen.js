@@ -706,6 +706,19 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
 
             <TouchableOpacity
               onPress={() => {
+                const url = "https://thousand-clay-dogs-catherine.trycloudflare.com/api";
+                setCustomApiUrl(url);
+                setApiBaseUrl(url);
+                fetchWaStatus();
+                Alert.alert("API Endpoint Changed", "Switched to Cloudflare Tunnel (https://thousand-clay-dogs-catherine.trycloudflare.com/api)");
+              }}
+              className="bg-emerald-50 border border-emerald-300 px-2.5 py-1.5 rounded-lg"
+            >
+              <Text className="text-[11px] font-bold text-emerald-800">Cloudflare Tunnel (Active)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
                 const url = "https://billing-app-backend-lake.vercel.app/api";
                 setCustomApiUrl(url);
                 setApiBaseUrl(url);
