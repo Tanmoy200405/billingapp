@@ -674,26 +674,14 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved }) {
               ) : null}
             </View>
 
-            {whatsappUrl ? (
-              <TouchableOpacity
-                onPress={() => Linking.openURL(whatsappUrl)}
-                className="w-full bg-emerald-600 py-3 rounded-xl flex-row items-center justify-center mb-3 shadow"
-              >
-                <FontAwesome5 name="whatsapp" size={18} color="#FFFFFF" />
-                <Text className="text-white font-bold text-xs ml-2">
-                  Send Bill on WhatsApp
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
-            {/* Share as PDF */}
+            {/* Share as PDF (Primary) */}
             <TouchableOpacity
               onPress={async () => {
                 setSharingPdf(true);
                 const storeInfo = {
                   businessName: user?.businessName || "",
                   address: user?.address || "",
-                  phone: user?.phone || "",
+                  phone: user?.phone || "7003317615",
                   email: user?.email || "",
                   logo: user?.logo || "",
                   gstin: user?.gstin || "",
@@ -705,19 +693,31 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved }) {
                 }
               }}
               disabled={sharingPdf}
-              className="w-full bg-blue-600 py-3 rounded-xl flex-row items-center justify-center mb-3 shadow"
+              className="w-full bg-emerald-700 py-3 rounded-xl flex-row items-center justify-center mb-2.5 shadow"
             >
               {sharingPdf ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <Ionicons name="share-outline" size={18} color="#FFFFFF" />
-                  <Text className="text-white font-bold text-xs ml-2">
-                    Share Bill as PDF
+                  <Ionicons name="document-text" size={18} color="#FFFFFF" />
+                  <Text className="text-white font-extrabold text-xs ml-2">
+                    Share PDF Invoice (WhatsApp)
                   </Text>
                 </>
               )}
             </TouchableOpacity>
+
+            {whatsappUrl ? (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(whatsappUrl)}
+                className="w-full bg-gray-100 border border-emerald-300 py-2.5 rounded-xl flex-row items-center justify-center mb-2.5"
+              >
+                <FontAwesome5 name="whatsapp" size={16} color="#059669" />
+                <Text className="text-emerald-800 font-bold text-xs ml-2">
+                  Send WhatsApp Text Copy
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             {/* Print All (2 Customer + 1 Cooker) */}
             <TouchableOpacity

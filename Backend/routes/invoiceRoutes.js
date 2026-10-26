@@ -3,13 +3,36 @@ import Invoice from "../models/Invoice.js";
 import Item from "../models/Item.js";
 import Party from "../models/Party.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { sendWhatsAppMessage } from "../services/whatsappService.js";
+import { sendWhatsAppMessage, sendWhatsAppDocument } from "../services/whatsappService.js";
+import { generateInvoicePdfBuffer } from "../services/pdfService.js";
 
 const router = express.Router();
 
 router.use(protect);
 
-const sendAutomaticWhatsAppBill = async (phone, message) => {
+const sendAutomaticWhatsAppBill = async (
+  phone,
+  message,
+  pdfBuffer = null,
+  invoiceNumber = "1",
+  storeName = "THE A POP JAKO BITES"
+) => {
+  // 1. Try sending the PDF document directly if available
+  if (pdfBuffer) {
+    try {
+      const docResult = await sendWhatsAppDocument(
+        phone,
+        pdfBuffer,
+        `Invoice_${invoiceNumber}.pdf`,
+        `Invoice #${invoiceNumber} from ${storeName}`
+      );
+      if (docResult.success) {
+        return true;
+      }
+    } catch {}
+  }
+
+  // 2. Fall back to direct WhatsApp text message
   try {
     const directResult = await sendWhatsAppMessage(phone, message);
     if (directResult.success) {
@@ -292,9 +315,38 @@ router.post("/", async (req, res) => {
       `Thank you for shopping with us!\n` +
       `Contact: ${business.phone || business.whatsappNumber || process.env.STORE_PHONE || "7003317615"}`;
 
+    let pdfBuffer = null;
+    try {
+      pdfBuffer = await generateInvoicePdfBuffer(
+        {
+          invoiceNumber,
+          createdAt: new Date(),
+          partyName: customer ? customer.name : (partyName || "Cash Customer"),
+          partyPhone: destinationPhone,
+          paymentMode: mode,
+          paymentStatus,
+          items: processedItems,
+          subtotal: calculatedSubtotal,
+          taxTotal: calculatedTaxTotal,
+          discountTotal: discountAmount,
+          regularDiscountAmount,
+          grandTotal,
+        },
+        business
+      );
+    } catch (pdfErr) {
+      console.warn("PDF generation warning:", pdfErr.message);
+    }
+
     let autoSent = false;
     if (destinationPhone) {
-      autoSent = await sendAutomaticWhatsAppBill(destinationPhone, whatsappText);
+      autoSent = await sendAutomaticWhatsAppBill(
+        destinationPhone,
+        whatsappText,
+        pdfBuffer,
+        invoiceNumber,
+        business.businessName || "THE A POP JAKO BITES"
+      );
     }
 
     const invoice = await Invoice.create({
@@ -362,6 +414,21 @@ router.post("/", async (req, res) => {
       message: "Failed to create invoice",
       error: error.message,
     });
+  }
+});
+
+router.get("/:id/pdf", async (req, res) => {
+  try {
+    const invoice = await Invoice.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found" });
+    }
+    const pdfBuffer = await generateInvoicePdfBuffer(invoice, req.user);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="Invoice_${invoice.invoiceNumber}.pdf"`);
+    return res.send(pdfBuffer);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to generate PDF", error: error.message });
   }
 });
 

@@ -245,3 +245,26 @@ export const sendWhatsAppMessage = async (recipientPhone, textMessage) => {
     return { success: false, message: error.message };
   }
 };
+
+export const sendWhatsAppDocument = async (recipientPhone, documentBuffer, fileName = "Invoice.pdf", caption = "") => {
+  if (!sock || connectionStatus !== "connected") {
+    return { success: false, message: "WhatsApp not linked via QR code" };
+  }
+
+  try {
+    const clean = recipientPhone.toString().replace(/[^0-9]/g, "");
+    if (!clean) return { success: false, message: "Invalid phone number" };
+    const fullNumber = clean.length === 10 ? `91${clean}` : clean;
+    const jid = `${fullNumber}@s.whatsapp.net`;
+    await sock.sendMessage(jid, {
+      document: documentBuffer,
+      mimetype: "application/pdf",
+      fileName,
+      caption,
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+};
+
