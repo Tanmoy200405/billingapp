@@ -14,6 +14,12 @@ import { Ionicons, FontAwesome, FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Updates from "expo-updates";
 import { api, setApiBaseUrl, getApiBaseUrl } from "../config/api";
+import {
+  checkForAppUpdates,
+  applyOtaUpdate,
+  openApkDownload,
+  CURRENT_APP_VERSION,
+} from "../services/updateService";
 
 export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, onProfileUpdated }) {
   const [businessName, setBusinessName] = useState(user?.businessName || "");
@@ -103,27 +109,32 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
     try {
-      if (Platform.OS === "web" || __DEV__) {
-        Alert.alert("Notice", "In-app updates are enabled for production standalone Android APK builds.");
-        setCheckingUpdate(false);
-        return;
-      }
-      const update = await Updates.checkForUpdateAsync();
-      if (update.isAvailable) {
-        await Updates.fetchUpdateAsync();
-        Alert.alert(
-          "Update Ready",
-          "Restart app to apply latest version?",
-          [
-            { text: "Later", style: "cancel" },
-            { text: "Restart", onPress: async () => await Updates.reloadAsync() }
-          ]
-        );
+      const update = await checkForAppUpdates(true);
+      if (update && update.hasUpdate) {
+        if (update.type === "ota") {
+          Alert.alert(
+            "Update Ready",
+            "A new in-app update is downloaded! Restart to apply changes now?",
+            [
+              { text: "Later", style: "cancel" },
+              { text: "Restart Now", onPress: applyOtaUpdate },
+            ]
+          );
+        } else {
+          Alert.alert(
+            `New Version ${update.version || ""} Available`,
+            update.notes || "A new update is ready for download.",
+            [
+              { text: "Later", style: "cancel" },
+              { text: "Download & Install", onPress: () => openApkDownload(update.apkUrl) },
+            ]
+          );
+        }
       } else {
-        Alert.alert("Up to Date", "You are using the latest version.");
+        Alert.alert("Up to Date", `You are on the latest version (v${CURRENT_APP_VERSION}).`);
       }
     } catch {
-      Alert.alert("Update Status", "You are running the latest version.");
+      Alert.alert("Update Status", `You are running the latest version (v${CURRENT_APP_VERSION}).`);
     } finally {
       setCheckingUpdate(false);
     }
@@ -445,11 +456,18 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         </View>
 
         <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
-          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
-            In-App Updates
-          </Text>
+          <View className="flex-row items-center justify-between mb-1">
+            <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              In-App Updates
+            </Text>
+            <View className="bg-blue-100 px-2.5 py-0.5 rounded-full">
+              <Text className="text-[11px] text-blue-700 font-extrabold">
+                v{CURRENT_APP_VERSION}
+              </Text>
+            </View>
+          </View>
           <Text className="text-xs text-gray-600 mb-3">
-            OTA updates are configured. Get new features without reinstalling the APK.
+            In-app OTA and APK updates enabled. The app updates automatically so you don't need to reinstall manually.
           </Text>
           <TouchableOpacity
             onPress={handleCheckForUpdates}

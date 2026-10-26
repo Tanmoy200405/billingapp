@@ -48,6 +48,22 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.get("/api/app-version", (req, res) => {
+  res.status(200).json({
+    success: true,
+    latestVersion: process.env.APP_LATEST_VERSION || "1.0.0",
+    minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
+    apkUrl:
+      process.env.APP_APK_URL ||
+      "https://github.com/Tanmoy200405/billingapp/releases/latest",
+    releaseNotes:
+      process.env.APP_RELEASE_NOTES ||
+      "Updated with latest improvements, faster billing, and fixes.",
+    forceUpdate: false,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/parties", partyRoutes);
 app.use("/api/items", itemRoutes);

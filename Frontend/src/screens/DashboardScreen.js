@@ -215,8 +215,8 @@ export default function DashboardScreen({
         )}
       </ScrollView>
 
-      {/* Floating Action Button: + Sale Invoice matching Screen-1 */}
-      <View className="absolute bottom-16 left-0 right-0 items-center">
+      {/* Floating Action Button: + Sale Invoice */}
+      <View className="absolute bottom-4 left-0 right-0 items-center">
         <TouchableOpacity
           onPress={onCreateInvoice}
           activeOpacity={0.85}
@@ -225,49 +225,6 @@ export default function DashboardScreen({
           <Ionicons name="add" size={20} color="#FFFFFF" />
           <Text className="text-white font-extrabold text-sm ml-1 uppercase tracking-wider">
             Sale Invoice
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom Navigation Bar matching Screen-1 wireframe */}
-      <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex-row justify-around py-2">
-        <TouchableOpacity
-          onPress={() => onNavigateTab("dashboard")}
-          className="items-center py-1"
-        >
-          <Ionicons name="home" size={20} color="#2563EB" />
-          <Text className="text-[10px] font-bold text-blue-600 mt-0.5">
-            Dashboard
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => onNavigateTab("party")}
-          className="items-center py-1"
-        >
-          <MaterialIcons name="people" size={20} color="#6B7280" />
-          <Text className="text-[10px] font-bold text-gray-500 mt-0.5">
-            Party
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => onNavigateTab("inventory")}
-          className="items-center py-1"
-        >
-          <MaterialIcons name="inventory" size={20} color="#6B7280" />
-          <Text className="text-[10px] font-bold text-gray-500 mt-0.5">
-            Inventory
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => onNavigateTab("setting")}
-          className="items-center py-1"
-        >
-          <Ionicons name="settings" size={20} color="#6B7280" />
-          <Text className="text-[10px] font-bold text-gray-500 mt-0.5">
-            Setting
           </Text>
         </TouchableOpacity>
       </View>

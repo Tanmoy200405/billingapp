@@ -4,10 +4,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const TOKEN_KEY = "billing_auth_token";
 const USER_KEY = "billing_user_data";
 let authToken = null;
-let currentBaseUrl =
-  Platform.OS === "android"
-    ? "http://10.0.2.2:5000/api"
-    : "http://localhost:5000/api";
+export const DEFAULT_API_URL = "https://billing-app-backend-lake.vercel.app/api";
+let currentBaseUrl = DEFAULT_API_URL;
 
 export const setAuthToken = (token, user = null) => {
   authToken = token;

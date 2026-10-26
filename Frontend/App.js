@@ -15,6 +15,12 @@ import InventoryScreen from "./src/screens/InventoryScreen";
 import InvoiceScreen from "./src/screens/InvoiceScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import SideDrawerModal from "./src/screens/SideDrawerModal";
+import {
+  checkForAppUpdates,
+  applyOtaUpdate,
+  openApkDownload,
+} from "./src/services/updateService";
+import UpdateModal from "./src/components/UpdateModal";
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState("loading");
@@ -22,6 +28,8 @@ export default function App() {
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [user, setUser] = useState(null);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -47,6 +55,18 @@ export default function App() {
       setCurrentScreen("welcome");
     };
     initAuth();
+
+    // Silently check for in-app updates on launch
+    const checkUpdates = async () => {
+      try {
+        const update = await checkForAppUpdates(false);
+        if (update && update.hasUpdate) {
+          setUpdateInfo(update);
+          setShowUpdateModal(true);
+        }
+      } catch {}
+    };
+    checkUpdates();
   }, []);
 
   const handleLoginSuccess = (userData) => {
@@ -232,6 +252,17 @@ export default function App() {
           />
         </SafeAreaView>
       )}
+
+      <UpdateModal
+        visible={showUpdateModal}
+        updateInfo={updateInfo}
+        onApplyOta={applyOtaUpdate}
+        onDownloadApk={(url) => {
+          setShowUpdateModal(false);
+          openApkDownload(url);
+        }}
+        onDismiss={() => setShowUpdateModal(false)}
+      />
     </SafeAreaProvider>
   );
 }
