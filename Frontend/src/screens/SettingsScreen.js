@@ -40,7 +40,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [waPhone, setWaPhone] = useState(null);
   const [waLoading, setWaLoading] = useState(false);
   const [showPairingInput, setShowPairingInput] = useState(false);
-  const [pairingPhone, setPairingPhone] = useState(whatsappNumber || phone || "");
+  const [pairingPhone, setPairingPhone] = useState(user?.whatsappNumber || user?.phone || "");
   const [pairingCode, setPairingCode] = useState(null);
   const [pairingLoading, setPairingLoading] = useState(false);
 
@@ -140,7 +140,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   };
 
   const handleGetPairingCode = async () => {
-    const raw = (pairingPhone || whatsappNumber || phone || "").replace(/[^0-9]/g, "");
+    const raw = (pairingPhone || user?.whatsappNumber || user?.phone || "").replace(/[^0-9]/g, "");
     if (!raw) {
       Alert.alert("Phone Required", "Please enter your WhatsApp phone number with country code (e.g. 919876543210)");
       return;
