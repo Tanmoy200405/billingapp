@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   ScrollView,
   Alert,
   Image,
+  ActivityIndicator,
+  Platform,
 } from "react-native";
-import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
+import { Ionicons, FontAwesome, FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Updates from "expo-updates";
 import { api, setApiBaseUrl, getApiBaseUrl } from "../config/api";
@@ -101,8 +103,8 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
     try {
-      if (__DEV__) {
-        Alert.alert("Development Mode", "In-app updates are enabled for production APK builds.");
+      if (Platform.OS === "web" || __DEV__) {
+        Alert.alert("Notice", "In-app updates are enabled for production standalone Android APK builds.");
         setCheckingUpdate(false);
         return;
       }
@@ -432,7 +434,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <FontAwesome5 name="whatsapp" size={16} color="#FFFFFF" />
+                  <FontAwesome name="whatsapp" size={18} color="#FFFFFF" />
                   <Text className="text-white font-bold text-xs ml-2">
                     Link WhatsApp (Scan QR)
                   </Text>
