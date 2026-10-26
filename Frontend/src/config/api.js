@@ -184,4 +184,9 @@ export const api = {
         body: JSON.stringify(payload),
       }),
   },
+  whatsapp: {
+    getStatus: () => request("/whatsapp/status"),
+    init: () => request("/whatsapp/init", { method: "POST" }),
+    disconnect: () => request("/whatsapp/disconnect", { method: "POST" }),
+  },
 };

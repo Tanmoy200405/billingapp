@@ -23,6 +23,80 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [customApiUrl, setCustomApiUrl] = useState(getApiBaseUrl());
   const [saving, setSaving] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [waStatus, setWaStatus] = useState("disconnected");
+  const [waQr, setWaQr] = useState(null);
+  const [waPhone, setWaPhone] = useState(null);
+  const [waLoading, setWaLoading] = useState(false);
+
+  const fetchWaStatus = async () => {
+    try {
+      const res = await api.whatsapp.getStatus();
+      if (res && res.success) {
+        setWaStatus(res.status);
+        setWaQr(res.qrCode);
+        setWaPhone(res.phoneNumber);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchWaStatus();
+  }, []);
+
+  useEffect(() => {
+    let interval = null;
+    if (waStatus === "scan_qr" || waLoading) {
+      interval = setInterval(() => {
+        fetchWaStatus();
+      }, 3000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [waStatus, waLoading]);
+
+  const handleStartWaLink = async () => {
+    setWaLoading(true);
+    try {
+      const res = await api.whatsapp.init();
+      if (res && res.success) {
+        setWaStatus(res.status);
+        setWaQr(res.qrCode);
+        setWaPhone(res.phoneNumber);
+      }
+    } catch {
+      Alert.alert("Error", "Could not start WhatsApp linking");
+    } finally {
+      setWaLoading(false);
+    }
+  };
+
+  const handleDisconnectWa = async () => {
+    Alert.alert(
+      "Unlink WhatsApp",
+      "Are you sure you want to unlink WhatsApp from this device?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Unlink",
+          style: "destructive",
+          onPress: async () => {
+            setWaLoading(true);
+            try {
+              await api.whatsapp.disconnect();
+              setWaStatus("disconnected");
+              setWaQr(null);
+              setWaPhone(null);
+            } catch {
+              Alert.alert("Error", "Could not unlink WhatsApp");
+            } finally {
+              setWaLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
@@ -258,6 +332,114 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
           <Text className="text-[11px] text-gray-400 mt-1">
             Use your computer's local IP if testing with Expo Go on a physical phone.
           </Text>
+        </View>
+
+        <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Automatic WhatsApp (Linked Devices)
+            </Text>
+            <View className="flex-row items-center">
+              <View
+                className={`w-2.5 h-2.5 rounded-full mr-1.5 ${
+                  waStatus === "connected"
+                    ? "bg-emerald-500"
+                    : waStatus === "scan_qr"
+                    ? "bg-amber-500"
+                    : "bg-gray-400"
+                }`}
+              />
+              <Text
+                className={`text-xs font-bold ${
+                  waStatus === "connected"
+                    ? "text-emerald-700"
+                    : waStatus === "scan_qr"
+                    ? "text-amber-700"
+                    : "text-gray-500"
+                }`}
+              >
+                {waStatus === "connected"
+                  ? "Connected"
+                  : waStatus === "scan_qr"
+                  ? "Waiting for Scan"
+                  : "Not Linked"}
+              </Text>
+            </View>
+          </View>
+
+          <Text className="text-xs text-gray-600 mb-3">
+            Send bills and marketing automatically from your WhatsApp without GST, Meta approval, or clicking Send.
+          </Text>
+
+          {waStatus === "connected" ? (
+            <View className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-2">
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <Text className="text-xs font-bold text-emerald-900">
+                    Linked Phone: +{waPhone || user?.whatsappNumber || user?.phone}
+                  </Text>
+                  <Text className="text-[11px] text-emerald-700 mt-0.5">
+                    Bills are sent automatically from this number.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleDisconnectWa}
+                  disabled={waLoading}
+                  className="bg-red-100 border border-red-300 px-3 py-1.5 rounded-lg"
+                >
+                  <Text className="text-red-700 text-xs font-bold">Unlink</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : waStatus === "scan_qr" && waQr ? (
+            <View className="items-center bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <Text className="text-xs font-bold text-gray-800 mb-2">
+                Scan this QR code with WhatsApp:
+              </Text>
+              <Image
+                source={{ uri: waQr }}
+                style={{ width: 220, height: 220, borderRadius: 12, backgroundColor: "#FFFFFF" }}
+              />
+              <View className="mt-3 bg-white p-3 rounded-lg border border-gray-200 w-full">
+                <Text className="text-[11px] text-gray-700 font-medium">
+                  1. Open WhatsApp on your phone
+                </Text>
+                <Text className="text-[11px] text-gray-700 font-medium mt-1">
+                  2. Tap Settings (or 3 dots) - Linked Devices
+                </Text>
+                <Text className="text-[11px] text-gray-700 font-medium mt-1">
+                  3. Tap Link a Device and point your camera here
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleStartWaLink}
+                disabled={waLoading}
+                className="mt-3 flex-row items-center"
+              >
+                <Ionicons name="refresh" size={14} color="#2563EB" />
+                <Text className="text-xs font-bold text-blue-600 ml-1">
+                  Refresh QR Code
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={handleStartWaLink}
+              disabled={waLoading}
+              className="bg-emerald-600 py-2.5 rounded-xl flex-row items-center justify-center shadow-sm"
+            >
+              {waLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <FontAwesome5 name="whatsapp" size={16} color="#FFFFFF" />
+                  <Text className="text-white font-bold text-xs ml-2">
+                    Link WhatsApp (Scan QR)
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">

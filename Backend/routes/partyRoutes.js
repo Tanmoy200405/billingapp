@@ -1,6 +1,7 @@
 import express from "express";
 import Party from "../models/Party.js";
 import { protect } from "../middleware/authMiddleware.js";
+import { sendWhatsAppMessage } from "../services/whatsappService.js";
 
 const router = express.Router();
 
@@ -63,10 +64,21 @@ router.post("/send-bulk-vip-offer", async (req, res) => {
       if (!phone) continue;
       const message = buildWhatsAppMessage(party, business);
       const whatsappUrl = `https://wa.me/91${phone}?text=${encodeURIComponent(message)}`;
-      results.push({ name: party.name, phone, whatsappUrl, message });
+      let sentDirectly = false;
+      try {
+        const direct = await sendWhatsAppMessage(phone, message);
+        if (direct.success) sentDirectly = true;
+      } catch {}
+      results.push({ name: party.name, phone, whatsappUrl, message, sentDirectly });
     }
 
-    return res.status(200).json({ success: true, sent: results.length, vips: results });
+    const autoSentCount = results.filter((r) => r.sentDirectly).length;
+    return res.status(200).json({
+      success: true,
+      sent: results.length,
+      autoSentCount,
+      vips: results,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to prepare VIP offers", error: error.message });
   }

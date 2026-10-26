@@ -11,8 +11,11 @@ import partyRoutes from "./routes/partyRoutes.js";
 import itemRoutes from "./routes/itemRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import whatsappRoutes from "./routes/whatsappRoutes.js";
+import { initWhatsApp } from "./services/whatsappService.js";
 
 connectDB();
+initWhatsApp();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +53,7 @@ app.use("/api/parties", partyRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/whatsapp", whatsappRoutes);
 
 app.use((err, req, res, next) => {
   console.error("Server Error:", err.stack || err.message);

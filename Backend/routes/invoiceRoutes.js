@@ -3,12 +3,20 @@ import Invoice from "../models/Invoice.js";
 import Item from "../models/Item.js";
 import Party from "../models/Party.js";
 import { protect } from "../middleware/authMiddleware.js";
+import { sendWhatsAppMessage } from "../services/whatsappService.js";
 
 const router = express.Router();
 
 router.use(protect);
 
 const sendAutomaticWhatsAppBill = async (phone, message) => {
+  try {
+    const directResult = await sendWhatsAppMessage(phone, message);
+    if (directResult.success) {
+      return true;
+    }
+  } catch {}
+
   if (!process.env.WHATSAPP_API_TOKEN || !process.env.WHATSAPP_PHONE_NUMBER_ID) {
     return false;
   }
@@ -34,8 +42,7 @@ const sendAutomaticWhatsAppBill = async (phone, message) => {
     );
     const data = await response.json();
     return Boolean(data.messages && data.messages.length > 0);
-  } catch (err) {
-    console.error("Automated WhatsApp dispatch error:", err.message);
+  } catch {
     return false;
   }
 };

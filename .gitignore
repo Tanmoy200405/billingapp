@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 */node_modules/
 .env
 */.env
@@ -9,3 +9,5 @@ web-build/
 *.log
 temp_build/
 .DS_Store
+whatsapp_session/
+*/whatsapp_session/
