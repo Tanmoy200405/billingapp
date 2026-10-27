@@ -15,6 +15,7 @@ import {
   FontAwesome5,
 } from "@expo/vector-icons";
 import { api } from "../config/api";
+import { shareBackendPdf } from "../utils/receiptPdfGenerator";
 
 export default function DashboardScreen({
   user,
@@ -207,9 +208,20 @@ export default function DashboardScreen({
                 </View>
               </View>
 
-              <Text className="text-base font-extrabold text-gray-900">
-                Rs. {tx.grandTotal}
-              </Text>
+              <View className="items-end">
+                <Text className="text-base font-extrabold text-gray-900 mb-1">
+                  Rs. {tx.grandTotal}
+                </Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    await shareBackendPdf(tx, `Invoice_${tx.invoiceNumber || tx._id}.pdf`);
+                  }}
+                  className="bg-emerald-50 border border-emerald-300 px-2 py-1 rounded-lg flex-row items-center active:bg-emerald-100"
+                >
+                  <FontAwesome5 name="whatsapp" size={11} color="#059669" />
+                  <Text className="text-emerald-800 text-[10px] font-bold ml-1">Share Bill</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))
         )}

@@ -10,33 +10,14 @@ export const DEFAULT_API_URL = VERCEL_API_URL;
 let currentBaseUrl = DEFAULT_API_URL;
 const API_URL_KEY = "billing_api_url";
 
-const isInvalidOrStale = (url) =>
-  !url ||
-  url.includes("thousand-clay-dogs-catherine") ||
-  url.includes("trycloudflare.com") ||
-  url.includes("localhost");
-
+// ALWAYS FORCE VERCEL API URL - completely clears out any old Cloudflare or localhost cache
+currentBaseUrl = DEFAULT_API_URL;
 if (typeof localStorage !== "undefined") {
   try {
-    const saved = localStorage.getItem(API_URL_KEY);
-    if (saved && !isInvalidOrStale(saved)) {
-      currentBaseUrl = saved;
-    } else {
-      currentBaseUrl = DEFAULT_API_URL;
-      localStorage.setItem(API_URL_KEY, DEFAULT_API_URL);
-    }
+    localStorage.setItem(API_URL_KEY, DEFAULT_API_URL);
   } catch {}
 }
-AsyncStorage.getItem(API_URL_KEY)
-  .then((saved) => {
-    if (saved && !isInvalidOrStale(saved)) {
-      currentBaseUrl = saved;
-    } else {
-      currentBaseUrl = DEFAULT_API_URL;
-      AsyncStorage.setItem(API_URL_KEY, DEFAULT_API_URL).catch(() => {});
-    }
-  })
-  .catch(() => {});
+AsyncStorage.setItem(API_URL_KEY, DEFAULT_API_URL).catch(() => {});
 
 export const setAuthToken = (token, user = null) => {
   authToken = token;

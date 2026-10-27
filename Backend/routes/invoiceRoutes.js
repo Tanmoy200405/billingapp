@@ -521,8 +521,10 @@ router.post("/", async (req, res) => {
       }
     }
 
-    const whatsappUrl = destinationPhone
-      ? `https://wa.me/91${destinationPhone}?text=${encodeURIComponent(whatsappText)}`
+    const cleanDigits = (destinationPhone || "").replace(/[^0-9]/g, "");
+    const waPhone = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+    const whatsappUrl = waPhone
+      ? `https://wa.me/${waPhone}?text=${encodeURIComponent(whatsappText)}`
       : "";
 
     return res.status(201).json({

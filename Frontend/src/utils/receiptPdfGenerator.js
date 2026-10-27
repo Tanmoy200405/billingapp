@@ -22,7 +22,7 @@ export async function shareBackendPdf(invoice, fileName = null) {
   if (!invoiceId) return { success: false, error: "Invoice ID missing" };
 
   const token = getAuthToken();
-  const baseUrl = getApiBaseUrl(); // e.g. https://xxx.trycloudflare.com/api
+  const baseUrl = getApiBaseUrl(); // e.g. https://billing-app-backend-lake.vercel.app/api
   const pdfUrl = `${baseUrl}/invoices/${invoiceId}/pdf`;
   const safeFileName = fileName || `Invoice_${invoice.invoiceNumber || invoiceId}.pdf`;
 

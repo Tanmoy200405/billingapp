@@ -16,7 +16,7 @@ import { Ionicons, FontAwesome, FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Updates from "expo-updates";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api, setApiBaseUrl, getApiBaseUrl, CLOUDFLARE_API_URL } from "../config/api";
+import { api, setApiBaseUrl, getApiBaseUrl, VERCEL_API_URL } from "../config/api";
 import {
   checkForAppUpdates,
   applyOtaUpdate,
@@ -32,7 +32,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [upiId, setUpiId] = useState(user?.upiId || "");
   const [logo, setLogo] = useState(user?.logo || "");
   const [printerSize, setPrinterSize] = useState(user?.thermalPrinterSize || "3inch");
-  const [customApiUrl, setCustomApiUrl] = useState(getApiBaseUrl());
+  const [customApiUrl, setCustomApiUrl] = useState(VERCEL_API_URL);
   const [saving, setSaving] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [waStatus, setWaStatus] = useState("disconnected");
@@ -698,8 +698,8 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
           <View className="flex-row gap-2 mt-3">
             <TouchableOpacity
               onPress={() => {
-                setCustomApiUrl(CLOUDFLARE_API_URL);
-                setApiBaseUrl(CLOUDFLARE_API_URL);
+                setCustomApiUrl(VERCEL_API_URL);
+                setApiBaseUrl(VERCEL_API_URL);
                 fetchWaStatus();
                 Alert.alert("Vercel Cloud Set", "API endpoint updated to Vercel Cloud Server.");
               }}
