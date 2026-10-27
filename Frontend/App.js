@@ -14,6 +14,7 @@ import PartyScreen from "./src/screens/PartyScreen";
 import InventoryScreen from "./src/screens/InventoryScreen";
 import InvoiceScreen from "./src/screens/InvoiceScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
+import ReportsScreen from "./src/screens/ReportsScreen";
 import SideDrawerModal from "./src/screens/SideDrawerModal";
 import {
   checkForAppUpdates,
@@ -140,6 +141,8 @@ export default function App() {
             <PartyScreen onOpenDrawer={() => setDrawerVisible(true)} onBack={() => setActiveTab("dashboard")} />
           ) : activeTab === "inventory" ? (
             <InventoryScreen onOpenDrawer={() => setDrawerVisible(true)} onBack={() => setActiveTab("dashboard")} />
+          ) : activeTab === "reports" ? (
+            <ReportsScreen onOpenDrawer={() => setDrawerVisible(true)} onBack={() => setActiveTab("dashboard")} />
           ) : (
             <SettingsScreen
               user={user}

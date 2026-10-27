@@ -2,6 +2,7 @@ import express from "express";
 import { protect } from "../middleware/authMiddleware.js";
 import {
   getWhatsAppStatus,
+  waitForWhatsAppQrOrReady,
   initWhatsApp,
   disconnectWhatsApp,
   sendWhatsAppMessage,
@@ -19,7 +20,7 @@ router.get("/status", (req, res) => {
 router.post("/init", async (req, res) => {
   const force = req.body?.force === true;
   await initWhatsApp(force);
-  const status = getWhatsAppStatus();
+  const status = await waitForWhatsAppQrOrReady(7000);
   return res.status(200).json({ success: true, ...status });
 });
 

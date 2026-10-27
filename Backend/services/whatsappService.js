@@ -71,6 +71,20 @@ export const getWhatsAppStatus = () => ({
   phoneNumber: connectedNumber,
 });
 
+export const waitForWhatsAppQrOrReady = async (timeoutMs = 7000) => {
+  if (connectionStatus === "connected" || (connectionStatus === "scan_qr" && qrCodeData)) {
+    return getWhatsAppStatus();
+  }
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeoutMs) {
+    if (connectionStatus === "connected" || (connectionStatus === "scan_qr" && qrCodeData)) {
+      return getWhatsAppStatus();
+    }
+    await new Promise((r) => setTimeout(r, 350));
+  }
+  return getWhatsAppStatus();
+};
+
 export const initWhatsApp = async (forceRestart = false) => {
   // If already connected, do not reinitialize
   if (connectionStatus === "connected") {
@@ -126,9 +140,9 @@ export const initWhatsApp = async (forceRestart = false) => {
     sock = makeWASocket({
       version: waVersion,
       auth: state,
-      printQRInTerminal: false,
-      logger: pino({ level: "silent" }),
-      browser: Browsers.macOS("Desktop"),
+      printQRInTerminal: true,
+      logger: pino({ level: "warn" }),
+      browser: Browsers.ubuntu("Chrome"),
       syncFullHistory: false,
       markOnlineOnConnect: true,
       connectTimeoutMs: 60000,
@@ -176,9 +190,13 @@ export const initWhatsApp = async (forceRestart = false) => {
             fs.rmSync(SESSION_DIR, { recursive: true, force: true });
           } catch {}
           reconnectAttempts = 0;
-          setTimeout(() => initWhatsApp(true), 2000);
+          setTimeout(() => initWhatsApp(true), 1500);
+        } else if (statusCode === DisconnectReason.restartRequired) {
+          console.log("[WhatsApp] Restart required during device linking. Reconnecting immediately...");
+          reconnectAttempts = 0;
+          initWhatsApp(false);
         } else {
-          const delay = getReconnectDelay();
+          const delay = Math.min(2500, getReconnectDelay());
           console.log(`[WhatsApp] Connection closed (code: ${statusCode}). Reconnecting in ${Math.round(delay / 1000)}s...`);
           setTimeout(() => initWhatsApp(false), delay);
         }
@@ -248,6 +266,7 @@ export const sendWhatsAppMessage = async (recipientPhone, textMessage) => {
 
 export const sendWhatsAppDocument = async (recipientPhone, documentBuffer, fileName = "Invoice.pdf", caption = "") => {
   if (!sock || connectionStatus !== "connected") {
+    console.warn("[WhatsApp] Cannot send PDF: WhatsApp socket not connected");
     return { success: false, message: "WhatsApp not linked via QR code" };
   }
 
@@ -256,14 +275,19 @@ export const sendWhatsAppDocument = async (recipientPhone, documentBuffer, fileN
     if (!clean) return { success: false, message: "Invalid phone number" };
     const fullNumber = clean.length === 10 ? `91${clean}` : clean;
     const jid = `${fullNumber}@s.whatsapp.net`;
+    const finalBuffer = Buffer.isBuffer(documentBuffer) ? documentBuffer : Buffer.from(documentBuffer);
+    
+    console.log(`[WhatsApp] Sending PDF document (${finalBuffer.length} bytes) to +${fullNumber}...`);
     await sock.sendMessage(jid, {
-      document: documentBuffer,
+      document: finalBuffer,
       mimetype: "application/pdf",
-      fileName,
-      caption,
+      fileName: fileName || "Invoice.pdf",
+      caption: caption || "",
     });
+    console.log(`[WhatsApp] PDF document successfully delivered to +${fullNumber}`);
     return { success: true };
   } catch (error) {
+    console.error(`[WhatsApp] Failed to send PDF document to ${recipientPhone}:`, error.message);
     return { success: false, message: error.message };
   }
 };

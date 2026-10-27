@@ -5,7 +5,91 @@
  * - 1 Short Bill for Cookers (Kitchen Order Ticket / KOT)
  * Uses expo-print + expo-sharing on native, window.print on web.
  */
-import { Platform } from "react-native";
+import { Platform, Linking } from "react-native";
+import { getApiBaseUrl, getAuthToken } from "../config/api";
+
+/**
+ * Downloads the backend-generated PDF invoice (Zudio / Petpooja style) and
+ * opens the native share sheet so the user can send it directly via WhatsApp.
+ * On Web, it triggers a browser download.
+ *
+ * @param {Object} invoice  - Invoice object (must have _id)
+ * @param {string} fileName - Optional custom file name
+ * @returns {Promise<{success:boolean, error?:string}>}
+ */
+export async function shareBackendPdf(invoice, fileName = null) {
+  const invoiceId = invoice?._id;
+  if (!invoiceId) return { success: false, error: "Invoice ID missing" };
+
+  const token = getAuthToken();
+  const baseUrl = getApiBaseUrl(); // e.g. https://xxx.trycloudflare.com/api
+  const pdfUrl = `${baseUrl}/invoices/${invoiceId}/pdf`;
+  const safeFileName = fileName || `Invoice_${invoice.invoiceNumber || invoiceId}.pdf`;
+
+  // ─── WEB ────────────────────────────────────────────────────────────────────
+  if (Platform.OS === "web") {
+    try {
+      const response = await fetch(pdfUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = safeFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+      return { success: true };
+    } catch (err) {
+      console.warn("[PDF] Web download fallback:", err.message);
+      try { Linking.openURL(pdfUrl); } catch {}
+      return { success: true };
+    }
+  }
+
+  // ─── NATIVE (Android / iOS) ─────────────────────────────────────────────────
+  try {
+    const FileSystem = await import("expo-file-system");
+    const Sharing = await import("expo-sharing");
+
+    const destUri = `${FileSystem.documentDirectory}${safeFileName}`;
+
+    const downloadResult = await FileSystem.downloadAsync(pdfUrl, destUri, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    if (downloadResult.status !== 200) {
+      throw new Error(`Server returned HTTP ${downloadResult.status}`);
+    }
+
+    const canShare = await Sharing.isAvailableAsync();
+    if (canShare) {
+      await Sharing.shareAsync(downloadResult.uri, {
+        mimeType: "application/pdf",
+        dialogTitle: `Share Bill #${invoice.invoiceNumber || ""}`,
+        UTI: "com.adobe.pdf",
+      });
+    } else {
+      // Fallback: open the public URL in browser
+      const publicUrl = `${baseUrl.replace(/\/api$/, "")}/api/invoices/public/${invoiceId}/pdf`;
+      Linking.openURL(publicUrl);
+    }
+    return { success: true, uri: downloadResult.uri };
+  } catch (err) {
+    console.error("[PDF] Native share error:", err.message);
+    // Last resort — open public (no-auth) view URL
+    try {
+      const publicUrl = `${getApiBaseUrl().replace(/\/api$/, "")}/api/invoices/public/${invoiceId}/pdf`;
+      Linking.openURL(publicUrl);
+      return { success: true };
+    } catch {
+      return { success: false, error: err.message };
+    }
+  }
+}
 
 function formatReceiptDate(dateStr) {
   const d = dateStr ? new Date(dateStr) : new Date();

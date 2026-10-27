@@ -15,7 +15,7 @@ import {
 import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { shareBillAsPdf, printBill } from "../utils/receiptPdfGenerator";
+import { shareBillAsPdf, shareBackendPdf, printBill } from "../utils/receiptPdfGenerator";
 
 
 export default function InvoiceScreen({ user, onBack, onInvoiceSaved }) {
@@ -674,22 +674,20 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved }) {
               ) : null}
             </View>
 
-            {/* Share as PDF (Primary) */}
+            {/* Share Official Backend PDF (Zudio / Petpooja style — Primary) */}
             <TouchableOpacity
               onPress={async () => {
                 setSharingPdf(true);
-                const storeInfo = {
-                  businessName: user?.businessName || "",
-                  address: user?.address || "",
-                  phone: user?.phone || "7003317615",
-                  email: user?.email || "",
-                  logo: user?.logo || "",
-                  gstin: user?.gstin || "",
-                };
-                const result = await shareBillAsPdf(createdInvoice, storeInfo, billFormatOptions);
+                const result = await shareBackendPdf(
+                  createdInvoice,
+                  `Invoice_${createdInvoice?.invoiceNumber || "bill"}.pdf`
+                );
                 setSharingPdf(false);
                 if (!result.success) {
-                  Alert.alert("Error", result.error || "Could not generate PDF");
+                  Alert.alert(
+                    "PDF Share Failed",
+                    result.error || "Could not download PDF. Try the WhatsApp button below."
+                  );
                 }
               }}
               disabled={sharingPdf}
@@ -699,22 +697,23 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved }) {
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <Ionicons name="document-text" size={18} color="#FFFFFF" />
+                  <Ionicons name="document-attach" size={18} color="#FFFFFF" />
                   <Text className="text-white font-extrabold text-xs ml-2">
-                    Share PDF Invoice (WhatsApp)
+                    📎 Share PDF Invoice (WhatsApp)
                   </Text>
                 </>
               )}
             </TouchableOpacity>
 
+            {/* WhatsApp pre-filled text message with PDF link */}
             {whatsappUrl ? (
               <TouchableOpacity
                 onPress={() => Linking.openURL(whatsappUrl)}
-                className="w-full bg-gray-100 border border-emerald-300 py-2.5 rounded-xl flex-row items-center justify-center mb-2.5"
+                className="w-full bg-emerald-50 border border-emerald-400 py-3 rounded-xl flex-row items-center justify-center mb-2.5 shadow-sm"
               >
-                <FontAwesome5 name="whatsapp" size={16} color="#059669" />
-                <Text className="text-emerald-800 font-bold text-xs ml-2">
-                  Send WhatsApp Text Copy
+                <FontAwesome5 name="whatsapp" size={18} color="#059669" />
+                <Text className="text-emerald-900 font-extrabold text-xs ml-2">
+                  Open WhatsApp with Bill & PDF Link
                 </Text>
               </TouchableOpacity>
             ) : null}

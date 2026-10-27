@@ -4,19 +4,36 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const TOKEN_KEY = "billing_auth_token";
 const USER_KEY = "billing_user_data";
 let authToken = null;
-export const DEFAULT_API_URL = "https://billing-app-backend-lake.vercel.app/api";
+export const CLOUDFLARE_API_URL = "https://ended-conclusions-breeding-planner.trycloudflare.com/api";
+export const DEFAULT_API_URL = CLOUDFLARE_API_URL;
 let currentBaseUrl = DEFAULT_API_URL;
 const API_URL_KEY = "billing_api_url";
+
+const isInvalidOrStale = (url) =>
+  !url ||
+  url.includes("thousand-clay-dogs-catherine") ||
+  url.includes("vercel.app") ||
+  url.includes("localhost");
 
 if (typeof localStorage !== "undefined") {
   try {
     const saved = localStorage.getItem(API_URL_KEY);
-    if (saved) currentBaseUrl = saved;
+    if (saved && !isInvalidOrStale(saved)) {
+      currentBaseUrl = saved;
+    } else {
+      currentBaseUrl = DEFAULT_API_URL;
+      localStorage.setItem(API_URL_KEY, DEFAULT_API_URL);
+    }
   } catch {}
 }
 AsyncStorage.getItem(API_URL_KEY)
   .then((saved) => {
-    if (saved) currentBaseUrl = saved;
+    if (saved && !isInvalidOrStale(saved)) {
+      currentBaseUrl = saved;
+    } else {
+      currentBaseUrl = DEFAULT_API_URL;
+      AsyncStorage.setItem(API_URL_KEY, DEFAULT_API_URL).catch(() => {});
+    }
   })
   .catch(() => {});
 
@@ -223,5 +240,14 @@ export const api = {
     init: (force = false) => request("/whatsapp/init", { method: "POST", body: JSON.stringify({ force }) }),
     disconnect: () => request("/whatsapp/disconnect", { method: "POST" }),
     getPairingCode: (phone) => request("/whatsapp/pairing-code", { method: "POST", body: JSON.stringify({ phone }) }),
+  },
+  reports: {
+    getSales: (params = "") => request(`/reports/sales${params ? `?${params}` : ""}`),
+    getSalesPdfUrl: (params = "") => `${currentBaseUrl}/reports/sales/pdf${params ? `?${params}` : ""}`,
+    getSalesCsvUrl: (params = "") => `${currentBaseUrl}/reports/sales/csv${params ? `?${params}` : ""}`,
+    getInventoryPdfUrl: () => `${currentBaseUrl}/reports/inventory/pdf`,
+    getInventoryCsvUrl: () => `${currentBaseUrl}/reports/inventory/csv`,
+    getPartiesPdfUrl: () => `${currentBaseUrl}/reports/parties/pdf`,
+    getPartiesCsvUrl: () => `${currentBaseUrl}/reports/parties/csv`,
   },
 };

@@ -81,7 +81,7 @@ export default function DashboardScreen({
       >
         {/* Reports Banner matching Screen-1 */}
         <TouchableOpacity
-          onPress={() => onRefresh()}
+          onPress={() => (onNavigateTab ? onNavigateTab("reports") : onRefresh())}
           activeOpacity={0.85}
           className="bg-white rounded-2xl p-4 mb-4 border border-blue-200 shadow-sm"
         >

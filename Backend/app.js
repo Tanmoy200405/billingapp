@@ -13,6 +13,7 @@ import itemRoutes from "./routes/itemRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import whatsappRoutes from "./routes/whatsappRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
 import { initWhatsApp } from "./services/whatsappService.js";
 
 // Attempt initial connection in background
@@ -103,6 +104,7 @@ app.use("/api/items", itemRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
+app.use("/api/reports", reportRoutes);
 
 app.use((err, req, res, next) => {
   console.error("Server Error:", err.stack || err.message);
@@ -113,8 +115,8 @@ app.use((err, req, res, next) => {
 });
 
 if (process.env.NODE_ENV !== "test") {
-  app.listen(PORT, () => {
-    console.log(`Ezo Billing API server running on port ${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Ezo Billing API server running on port ${PORT} (0.0.0.0)`);
   });
 }
 

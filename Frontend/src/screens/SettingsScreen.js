@@ -16,7 +16,7 @@ import { Ionicons, FontAwesome, FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Updates from "expo-updates";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api, setApiBaseUrl, getApiBaseUrl } from "../config/api";
+import { api, setApiBaseUrl, getApiBaseUrl, CLOUDFLARE_API_URL } from "../config/api";
 import {
   checkForAppUpdates,
   applyOtaUpdate,
@@ -129,11 +129,20 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       const res = await api.whatsapp.init(force);
       if (res && res.success) {
         setWaStatus(res.status);
-        setWaQr(res.qrCode);
-        setWaPhone(res.phoneNumber);
+        setWaQr(res.qrCode || null);
+        setWaPhone(res.phoneNumber || null);
+        if (!res.qrCode && res.status !== "connected") {
+          // Socket initializing, trigger scan_qr state so polling picks up the newly created QR
+          setWaStatus("scan_qr");
+        }
+      } else {
+        Alert.alert(
+          "WhatsApp Notice",
+          res?.message || "Could not connect to WhatsApp backend server. Please check your backend connection."
+        );
       }
-    } catch {
-      Alert.alert("Error", "Could not start WhatsApp linking");
+    } catch (err) {
+      Alert.alert("Error", err.message || "Could not start WhatsApp linking");
     } finally {
       setWaLoading(false);
     }
@@ -665,82 +674,51 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
           </View>
         </Modal>
 
-        <View className="bg-white rounded-xl p-4 mb-6 border border-gray-200 shadow-sm">
-          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-            Backend API Endpoint
+        <View className="bg-white rounded-xl p-4 mb-6 border border-emerald-300 bg-emerald-50/20 shadow-sm">
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+              Cloudflare Server Endpoint
+            </Text>
+            <View className="bg-emerald-100 px-2.5 py-0.5 rounded-full flex-row items-center">
+              <View className="w-2 h-2 rounded-full bg-emerald-600 mr-1.5" />
+              <Text className="text-[10px] font-bold text-emerald-800">Cloudflare Tunnel Active</Text>
+            </View>
+          </View>
+          <Text className="text-xs text-gray-500 mb-2">
+            All app requests, WhatsApp PDF bills, and reports are routed through this Cloudflare Server tunnel.
           </Text>
           <TextInput
-            className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
-            placeholder="http://10.212.56.136:5000/api"
+            className="bg-white border border-emerald-300 rounded-xl px-4 py-2.5 text-sm text-gray-800 font-medium"
+            placeholder="https://ended-conclusions-breeding-planner.trycloudflare.com/api"
             value={customApiUrl}
             onChangeText={setCustomApiUrl}
             autoCapitalize="none"
           />
 
-          <View className="flex-row flex-wrap gap-2 mt-2">
+          <View className="flex-row gap-2 mt-3">
             <TouchableOpacity
               onPress={() => {
-                const url = "http://localhost:5000/api";
-                setCustomApiUrl(url);
-                setApiBaseUrl(url);
+                setCustomApiUrl(CLOUDFLARE_API_URL);
+                setApiBaseUrl(CLOUDFLARE_API_URL);
                 fetchWaStatus();
-                Alert.alert("API Endpoint Changed", "Switched to Localhost (http://localhost:5000/api)");
+                Alert.alert("Cloudflare Tunnel Set", "API endpoint updated to Cloudflare Tunnel.");
               }}
-              className="bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded-lg"
+              className="flex-1 bg-emerald-600 py-2.5 rounded-xl items-center shadow-sm"
             >
-              <Text className="text-[11px] font-bold text-blue-700">Local (localhost:5000)</Text>
+              <Text className="text-white text-xs font-bold">Use Cloudflare Tunnel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => {
-                const url = "http://10.212.56.136:5000/api";
-                setCustomApiUrl(url);
-                setApiBaseUrl(url);
+                setApiBaseUrl(customApiUrl.trim());
                 fetchWaStatus();
-                Alert.alert("API Endpoint Changed", "Switched to Local Wi-Fi (http://10.212.56.136:5000/api)");
+                Alert.alert("Saved", `Connected to: ${customApiUrl.trim()}`);
               }}
-              className="bg-purple-50 border border-purple-200 px-2.5 py-1.5 rounded-lg"
+              className="flex-1 bg-gray-900 py-2.5 rounded-xl items-center shadow-sm"
             >
-              <Text className="text-[11px] font-bold text-purple-700">Local Wi-Fi (10.212.56.136)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                const url = "https://thousand-clay-dogs-catherine.trycloudflare.com/api";
-                setCustomApiUrl(url);
-                setApiBaseUrl(url);
-                fetchWaStatus();
-                Alert.alert("API Endpoint Changed", "Switched to Cloudflare Tunnel (https://thousand-clay-dogs-catherine.trycloudflare.com/api)");
-              }}
-              className="bg-emerald-50 border border-emerald-300 px-2.5 py-1.5 rounded-lg"
-            >
-              <Text className="text-[11px] font-bold text-emerald-800">Cloudflare Tunnel (Active)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                const url = "https://billing-app-backend-lake.vercel.app/api";
-                setCustomApiUrl(url);
-                setApiBaseUrl(url);
-                fetchWaStatus();
-                Alert.alert("API Endpoint Changed", "Switched to Vercel Cloud");
-              }}
-              className="bg-gray-100 border border-gray-300 px-2.5 py-1.5 rounded-lg"
-            >
-              <Text className="text-[11px] font-bold text-gray-700">Vercel Cloud</Text>
+              <Text className="text-white text-xs font-bold">Save Endpoint</Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            onPress={() => {
-              setApiBaseUrl(customApiUrl.trim());
-              fetchWaStatus();
-              Alert.alert("Saved", `API Endpoint saved: ${customApiUrl.trim()}`);
-            }}
-            className="mt-3 bg-gray-900 py-2 rounded-xl items-center"
-          >
-            <Text className="text-white text-xs font-bold">Apply & Connect Endpoint</Text>
-          </TouchableOpacity>
         </View>
 
         <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">

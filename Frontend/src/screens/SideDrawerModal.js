@@ -57,7 +57,9 @@ export default function SideDrawerModal({
                 key={item.id}
                 onPress={() => {
                   onClose();
-                  if (item.id === "reports" || item.id === "sales") {
+                  if (item.id === "reports") {
+                    onNavigateTab("reports");
+                  } else if (item.id === "sales") {
                     onNavigateTab("dashboard");
                   } else {
                     onNavigateTab(item.id);
