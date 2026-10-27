@@ -4,15 +4,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const TOKEN_KEY = "billing_auth_token";
 const USER_KEY = "billing_user_data";
 let authToken = null;
-export const CLOUDFLARE_API_URL = "https://ended-conclusions-breeding-planner.trycloudflare.com/api";
-export const DEFAULT_API_URL = CLOUDFLARE_API_URL;
+export const VERCEL_API_URL = "https://billing-app-backend-lake.vercel.app/api";
+export const CLOUDFLARE_API_URL = VERCEL_API_URL;
+export const DEFAULT_API_URL = VERCEL_API_URL;
 let currentBaseUrl = DEFAULT_API_URL;
 const API_URL_KEY = "billing_api_url";
 
 const isInvalidOrStale = (url) =>
   !url ||
   url.includes("thousand-clay-dogs-catherine") ||
-  url.includes("vercel.app") ||
+  url.includes("trycloudflare.com") ||
   url.includes("localhost");
 
 if (typeof localStorage !== "undefined") {

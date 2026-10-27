@@ -677,19 +677,19 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         <View className="bg-white rounded-xl p-4 mb-6 border border-emerald-300 bg-emerald-50/20 shadow-sm">
           <View className="flex-row items-center justify-between mb-2">
             <Text className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-              Cloudflare Server Endpoint
+              Backend Server Endpoint (Vercel)
             </Text>
             <View className="bg-emerald-100 px-2.5 py-0.5 rounded-full flex-row items-center">
               <View className="w-2 h-2 rounded-full bg-emerald-600 mr-1.5" />
-              <Text className="text-[10px] font-bold text-emerald-800">Cloudflare Tunnel Active</Text>
+              <Text className="text-[10px] font-bold text-emerald-800">Vercel Cloud Active</Text>
             </View>
           </View>
           <Text className="text-xs text-gray-500 mb-2">
-            All app requests, WhatsApp PDF bills, and reports are routed through this Cloudflare Server tunnel.
+            All app requests, WhatsApp PDF bills, and reports are routed through this 24/7 Vercel cloud server.
           </Text>
           <TextInput
             className="bg-white border border-emerald-300 rounded-xl px-4 py-2.5 text-sm text-gray-800 font-medium"
-            placeholder="https://ended-conclusions-breeding-planner.trycloudflare.com/api"
+            placeholder="https://billing-app-backend-lake.vercel.app/api"
             value={customApiUrl}
             onChangeText={setCustomApiUrl}
             autoCapitalize="none"
@@ -701,11 +701,11 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 setCustomApiUrl(CLOUDFLARE_API_URL);
                 setApiBaseUrl(CLOUDFLARE_API_URL);
                 fetchWaStatus();
-                Alert.alert("Cloudflare Tunnel Set", "API endpoint updated to Cloudflare Tunnel.");
+                Alert.alert("Vercel Cloud Set", "API endpoint updated to Vercel Cloud Server.");
               }}
               className="flex-1 bg-emerald-600 py-2.5 rounded-xl items-center shadow-sm"
             >
-              <Text className="text-white text-xs font-bold">Use Cloudflare Tunnel</Text>
+              <Text className="text-white text-xs font-bold">Use Vercel Cloud Server</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
