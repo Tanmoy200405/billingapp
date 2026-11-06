@@ -134,7 +134,15 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       api.items.getAll(),
     ]);
     if (pRes.success) setParties(pRes.parties || []);
-    if (iRes.success) setItems(iRes.items || []);
+    if (iRes.success && Array.isArray(iRes.items)) {
+      const sorted = [...iRes.items].sort((a, b) =>
+        String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        })
+      );
+      setItems(sorted);
+    }
   };
 
   const addItemToCart = (item) => {
@@ -442,14 +450,21 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
 
   const categories = ["All", ...new Set(items.map((i) => i.category || "General").filter(Boolean))];
 
-  const filteredItems = items.filter((i) => {
-    const matchSearch = itemSearch
-      ? i.name?.toLowerCase().includes(itemSearch.toLowerCase()) ||
-        (i.barcode || "").toLowerCase().includes(itemSearch.toLowerCase())
-      : true;
-    const matchCategory = selectedCategory === "All" || (i.category || "General") === selectedCategory;
-    return matchSearch && matchCategory;
-  });
+  const filteredItems = items
+    .filter((i) => {
+      const matchSearch = itemSearch
+        ? i.name?.toLowerCase().includes(itemSearch.toLowerCase()) ||
+          (i.barcode || "").toLowerCase().includes(itemSearch.toLowerCase())
+        : true;
+      const matchCategory = selectedCategory === "All" || (i.category || "General") === selectedCategory;
+      return matchSearch && matchCategory;
+    })
+    .sort((a, b) =>
+      String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+    );
 
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
@@ -550,6 +565,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
           <FlatList
             data={filteredItems}
             keyExtractor={(i) => i._id}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             contentContainerStyle={{ padding: 12, paddingBottom: 110 }}
             ListEmptyComponent={
               <View className="items-center justify-center py-16">

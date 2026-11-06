@@ -32,7 +32,17 @@ router.get("/", async (req, res) => {
       filter.$expr = { $lte: ["$stock", "$lowStockThreshold"] };
     }
 
-    const items = await Item.find(filter).sort({ name: 1 }).lean();
+    const items = await Item.find(filter)
+      .collation({ locale: "en", numericOrdering: true })
+      .sort({ name: 1 })
+      .lean();
+
+    items.sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+    );
 
     return res.status(200).json({
       success: true,

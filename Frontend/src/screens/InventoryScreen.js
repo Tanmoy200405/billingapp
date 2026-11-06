@@ -12,6 +12,9 @@ import {
   Image,
   RefreshControl,
   Platform,
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -61,6 +64,16 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
   const [formUnit, setFormUnit] = useState("PCS");
   const [formImageUrl, setFormImageUrl] = useState("");
 
+  const sortItemsNaturally = (list) => {
+    if (!Array.isArray(list)) return [];
+    return [...list].sort((a, b) =>
+      String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+    );
+  };
+
   const loadItems = useCallback(async () => {
     try {
       setLoading(true);
@@ -70,7 +83,7 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
       }
       const res = await api.items.getAll(query);
       if (res && res.success && Array.isArray(res.items)) {
-        setItems(res.items);
+        setItems(sortItemsNaturally(res.items));
       } else {
         setItems([]);
       }
@@ -254,6 +267,7 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
   };
 
   const handleSaveItem = async () => {
+    Keyboard.dismiss();
     if (!formName.trim() || !formSellingPrice.trim()) {
       Alert.alert("Required Fields", "Please enter Item Name and Selling Price");
       return;
@@ -436,6 +450,7 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
           keyExtractor={(item, index) => item?._id || `item-${index}`}
           contentContainerStyle={{ padding: 12, paddingBottom: 120, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           nestedScrollEnabled={true}
           scrollEnabled={true}
           showsVerticalScrollIndicator={true}
@@ -532,156 +547,185 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
         />
       )}
 
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View className="flex-1 bg-black/50 justify-end sm:justify-center items-center p-0 sm:p-4">
-          <View className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[90%] shadow-2xl">
-            <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-lg font-bold text-gray-900">
-                {editingItem ? "Edit Item" : "Add Item"}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setModalVisible(false);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+        >
+          <View className="flex-1 bg-black/50 justify-end sm:justify-center items-center p-0 sm:p-4">
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+            </TouchableWithoutFeedback>
 
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <View className="items-center mb-4">
-                {formImageUrl ? (
-                  <View className="items-center">
-                    <TouchableOpacity onPress={handlePickImage} className="relative">
-                      <Image
-                        source={{ uri: formImageUrl }}
-                        style={{ width: 84, height: 84, borderRadius: 12 }}
-                      />
-                      <View className="absolute bottom-0 right-0 bg-blue-600 w-6 h-6 rounded-full items-center justify-center border-2 border-white">
-                        <Ionicons name="camera" size={12} color="#FFFFFF" />
-                      </View>
+            <View className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[85%] sm:max-h-[90%] shadow-2xl">
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-lg font-bold text-gray-900">
+                  {editingItem ? "Edit Item" : "Add Item"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setModalVisible(false);
+                  }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                contentContainerStyle={{ paddingBottom: 60 }}
+              >
+                <View className="items-center mb-4">
+                  {formImageUrl ? (
+                    <View className="items-center">
+                      <TouchableOpacity onPress={handlePickImage} className="relative">
+                        <Image
+                          source={{ uri: formImageUrl }}
+                          style={{ width: 84, height: 84, borderRadius: 12 }}
+                        />
+                        <View className="absolute bottom-0 right-0 bg-blue-600 w-6 h-6 rounded-full items-center justify-center border-2 border-white">
+                          <Ionicons name="camera" size={12} color="#FFFFFF" />
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setFormImageUrl("")} className="mt-1.5">
+                        <Text className="text-xs text-red-500 font-medium">Remove Image</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={handlePickImage}
+                      className="w-20 h-20 rounded-xl bg-blue-50 border-2 border-dashed border-blue-300 items-center justify-center"
+                    >
+                      <Ionicons name="camera" size={24} color="#2563EB" />
+                      <Text className="text-[10px] text-blue-600 font-bold mt-1">Product Photo</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setFormImageUrl("")} className="mt-1.5">
-                      <Text className="text-xs text-red-500 font-medium">Remove Image</Text>
-                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View className="mb-3">
+                  <Text className="text-xs font-bold text-gray-700 mb-1">Product / Item Name</Text>
+                  <TextInput
+                    className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
+                    placeholder="Enter item name"
+                    value={formName}
+                    onChangeText={setFormName}
+                  />
+                </View>
+
+                <View className="flex-row gap-3 mb-3">
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">Selling Price (Rs)</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
+                      placeholder="0.00"
+                      keyboardType="numeric"
+                      value={formSellingPrice}
+                      onChangeText={setFormSellingPrice}
+                    />
                   </View>
-                ) : (
-                  <TouchableOpacity
-                    onPress={handlePickImage}
-                    className="w-20 h-20 rounded-xl bg-blue-50 border-2 border-dashed border-blue-300 items-center justify-center"
-                  >
-                    <Ionicons name="camera" size={24} color="#2563EB" />
-                    <Text className="text-[10px] text-blue-600 font-bold mt-1">Product Photo</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">Purchase / Cost (Rs)</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
+                      placeholder="0.00"
+                      keyboardType="numeric"
+                      value={formCostPrice}
+                      onChangeText={setFormCostPrice}
+                    />
+                  </View>
+                </View>
 
-              <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-700 mb-1">Product / Item Name</Text>
-                <TextInput
-                  className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
-                  placeholder="Enter item name"
-                  value={formName}
-                  onChangeText={setFormName}
-                />
-              </View>
+                <View className="flex-row gap-3 mb-3">
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">Category</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
+                      placeholder="General, Food, etc"
+                      value={formCategory}
+                      onChangeText={setFormCategory}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">Tax Rate (GST %)</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
+                      placeholder="0"
+                      keyboardType="numeric"
+                      value={formTaxRate}
+                      onChangeText={setFormTaxRate}
+                    />
+                  </View>
+                </View>
 
-              <View className="flex-row gap-3 mb-3">
-                <View className="flex-1">
-                  <Text className="text-xs font-bold text-gray-700 mb-1">Selling Price (Rs)</Text>
-                  <TextInput
-                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
-                    placeholder="0.00"
-                    keyboardType="numeric"
-                    value={formSellingPrice}
-                    onChangeText={setFormSellingPrice}
-                  />
+                <View className="flex-row gap-3 mb-4">
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">Current Stock</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
+                      placeholder="0"
+                      keyboardType="numeric"
+                      value={formStock}
+                      onChangeText={setFormStock}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">Barcode / SKU</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
+                      placeholder="Scanner code"
+                      value={formBarcode}
+                      onChangeText={setFormBarcode}
+                    />
+                  </View>
                 </View>
-                <View className="flex-1">
-                  <Text className="text-xs font-bold text-gray-700 mb-1">Purchase / Cost (Rs)</Text>
-                  <TextInput
-                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
-                    placeholder="0.00"
-                    keyboardType="numeric"
-                    value={formCostPrice}
-                    onChangeText={setFormCostPrice}
-                  />
-                </View>
-              </View>
 
-              <View className="flex-row gap-3 mb-3">
-                <View className="flex-1">
-                  <Text className="text-xs font-bold text-gray-700 mb-1">Category</Text>
-                  <TextInput
-                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
-                    placeholder="General, Food, etc"
-                    value={formCategory}
-                    onChangeText={setFormCategory}
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-xs font-bold text-gray-700 mb-1">Tax Rate (GST %)</Text>
-                  <TextInput
-                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
-                    placeholder="0"
-                    keyboardType="numeric"
-                    value={formTaxRate}
-                    onChangeText={setFormTaxRate}
-                  />
-                </View>
-              </View>
-
-              <View className="flex-row gap-3 mb-4">
-                <View className="flex-1">
-                  <Text className="text-xs font-bold text-gray-700 mb-1">Current Stock</Text>
-                  <TextInput
-                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
-                    placeholder="0"
-                    keyboardType="numeric"
-                    value={formStock}
-                    onChangeText={setFormStock}
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-xs font-bold text-gray-700 mb-1">Barcode / SKU</Text>
-                  <TextInput
-                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
-                    placeholder="Scanner code"
-                    value={formBarcode}
-                    onChangeText={setFormBarcode}
-                  />
-                </View>
-              </View>
-
-              <View className="flex-row gap-2 mb-6">
-                {["PCS", "KG", "LTR", "BOX", "PACK"].map((u) => (
-                  <TouchableOpacity
-                    key={u}
-                    onPress={() => setFormUnit(u)}
-                    className={`flex-1 py-2 rounded-lg border items-center ${
-                      formUnit === u
-                        ? "bg-blue-600 border-blue-600"
-                        : "bg-gray-100 border-gray-300"
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs font-bold ${
-                        formUnit === u ? "text-white" : "text-gray-700"
+                <View className="flex-row gap-2 mb-6">
+                  {["PCS", "KG", "LTR", "BOX", "PACK"].map((u) => (
+                    <TouchableOpacity
+                      key={u}
+                      onPress={() => setFormUnit(u)}
+                      className={`flex-1 py-2 rounded-lg border items-center ${
+                        formUnit === u
+                          ? "bg-blue-600 border-blue-600"
+                          : "bg-gray-100 border-gray-300"
                       }`}
                     >
-                      {u}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text
+                        className={`text-xs font-bold ${
+                          formUnit === u ? "text-white" : "text-gray-700"
+                        }`}
+                      >
+                        {u}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-              <TouchableOpacity
-                onPress={handleSaveItem}
-                className="w-full bg-blue-600 py-3.5 rounded-xl items-center shadow mb-6"
-              >
-                <Text className="text-white font-bold text-sm">
-                  {editingItem ? "Update Item" : "Save Item"}
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
+                <TouchableOpacity
+                  onPress={handleSaveItem}
+                  className="w-full bg-blue-600 py-3.5 rounded-xl items-center shadow mb-6"
+                >
+                  <Text className="text-white font-bold text-sm">
+                    {editingItem ? "Update Item" : "Save Item"}
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

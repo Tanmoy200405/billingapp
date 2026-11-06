@@ -147,7 +147,16 @@ router.get("/sales/csv", async (req, res) => {
 
 router.get("/inventory/pdf", async (req, res) => {
   try {
-    const items = await Item.find({ userId: req.user._id }).sort({ name: 1 }).lean();
+    const items = await Item.find({ userId: req.user._id })
+      .collation({ locale: "en", numericOrdering: true })
+      .sort({ name: 1 })
+      .lean();
+    items.sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+    );
     const pdfBuffer = await generateInventoryReportPdf(items, req.user);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
@@ -162,7 +171,16 @@ router.get("/inventory/pdf", async (req, res) => {
 
 router.get("/inventory/csv", async (req, res) => {
   try {
-    const items = await Item.find({ userId: req.user._id }).sort({ name: 1 }).lean();
+    const items = await Item.find({ userId: req.user._id })
+      .collation({ locale: "en", numericOrdering: true })
+      .sort({ name: 1 })
+      .lean();
+    items.sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+    );
     let csv = "Item Name,Category,Barcode,Selling Price,Purchase Price,Stock,Unit,Low Stock Threshold,Status,Valuation\n";
 
     for (const it of items) {

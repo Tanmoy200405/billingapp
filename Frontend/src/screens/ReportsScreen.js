@@ -42,8 +42,14 @@ export default function ReportsScreen({ onOpenDrawer, onBack }) {
         }
       } else if (reportType === "inventory") {
         const res = await api.items.getAll();
-        if (res.success && res.items) {
-          setInventoryItems(res.items);
+        if (res.success && Array.isArray(res.items)) {
+          const sorted = [...res.items].sort((a, b) =>
+            String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
+              numeric: true,
+              sensitivity: "base",
+            })
+          );
+          setInventoryItems(sorted);
         }
       } else if (reportType === "parties") {
         const res = await api.parties.getAll();
