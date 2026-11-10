@@ -207,6 +207,12 @@ export const api = {
   },
   items: {
     getAll: (params = "") => request(`/items${params ? `?${params}` : ""}`),
+    getCategories: () => request("/items/categories"),
+    addCategory: (name) =>
+      request("/items/categories", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
     getByBarcode: (barcode) => request(`/items/barcode/${barcode}`),
     create: (payload) =>
       request("/items", {

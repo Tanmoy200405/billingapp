@@ -49,9 +49,14 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
   const [search, setSearch] = useState("");
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
+  const [categories, setCategories] = useState(["General"]);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
 
   const [formName, setFormName] = useState("");
   const [formCategory, setFormCategory] = useState("General");
@@ -74,13 +79,25 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
     );
   };
 
+  const loadCategories = useCallback(async () => {
+    try {
+      const res = await api.items.getCategories();
+      if (res && res.success && Array.isArray(res.categories) && res.categories.length > 0) {
+        setCategories(res.categories);
+      }
+    } catch {}
+  }, []);
+
   const loadItems = useCallback(async () => {
     try {
       setLoading(true);
-      let query = search ? `search=${encodeURIComponent(search)}` : "";
-      if (filterLowStock) {
-        query += `${query ? "&" : ""}lowStock=true`;
+      let queryParts = [];
+      if (search) queryParts.push(`search=${encodeURIComponent(search)}`);
+      if (filterLowStock) queryParts.push("lowStock=true");
+      if (selectedCategory && selectedCategory !== "All") {
+        queryParts.push(`category=${encodeURIComponent(selectedCategory)}`);
       }
+      const query = queryParts.join("&");
       const res = await api.items.getAll(query);
       if (res && res.success && Array.isArray(res.items)) {
         setItems(sortItemsNaturally(res.items));
@@ -92,11 +109,15 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
     } finally {
       setLoading(false);
     }
-  }, [search, filterLowStock]);
+  }, [search, filterLowStock, selectedCategory]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   useEffect(() => {
     loadItems();
-  }, [filterLowStock]);
+  }, [filterLowStock, selectedCategory]);
 
   const handleDownloadInventoryPdf = async () => {
     setDownloadingReport(true);
@@ -216,9 +237,49 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
     }
   };
 
+  const handleOpenCategoryModal = () => {
+    setNewCategoryName("");
+    setCategoryModalVisible(true);
+  };
+
+  const handleSaveCategory = async () => {
+    Keyboard.dismiss();
+    const cat = newCategoryName.trim();
+    if (!cat) {
+      Alert.alert("Required", "Please enter a category name");
+      return;
+    }
+    setSavingCategory(true);
+    try {
+      const res = await api.items.addCategory(cat);
+      if (res && res.success) {
+        setNewCategoryName("");
+        setCategoryModalVisible(false);
+        await loadCategories();
+        setSelectedCategory(cat);
+        setFormCategory(cat);
+        Alert.alert(
+          "Category Ready!",
+          `Category "${cat}" has been added. You can now add food to "${cat}".`
+        );
+      } else {
+        Alert.alert("Notice", res?.message || "Failed to add category");
+      }
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to add category");
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
   const handleOpenAdd = () => {
     setEditingItem(null);
     resetForm();
+    if (selectedCategory && selectedCategory !== "All") {
+      setFormCategory(selectedCategory);
+    } else if (categories.length > 0) {
+      setFormCategory(categories[0]);
+    }
     setModalVisible(true);
   };
 
@@ -344,45 +405,56 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
           </View>
         </View>
 
+        {/* ── 2 Primary Actions: 1. Add Category  2. Add Food / Item ── */}
         <View className="flex-row gap-2 mb-2">
+          <TouchableOpacity
+            onPress={handleOpenCategoryModal}
+            className="flex-1 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
+          >
+            <Ionicons name="folder-outline" size={17} color="#FFFFFF" />
+            <Text className="text-white font-extrabold text-xs ml-1.5">+ Add Category</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={handleOpenAdd}
             className="flex-1 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
           >
-            <Ionicons name="add-circle" size={17} color="#FFFFFF" />
-            <Text className="text-white font-extrabold text-xs ml-1.5">+ Add Item</Text>
+            <Ionicons name="fast-food-outline" size={17} color="#FFFFFF" />
+            <Text className="text-white font-extrabold text-xs ml-1.5">+ Add Food / Item</Text>
           </TouchableOpacity>
+        </View>
 
+        <View className="flex-row gap-2 mb-2.5">
           <TouchableOpacity
             onPress={handleImportPdf}
             disabled={importingPdf}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
+            className="flex-1 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 py-2 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
           >
             {importingPdf ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <>
-                <Ionicons name="document-attach" size={16} color="#FFFFFF" />
-                <Text className="text-white font-extrabold text-xs ml-1.5">Add by PDF</Text>
+                <Ionicons name="document-attach" size={15} color="#FFFFFF" />
+                <Text className="text-white font-bold text-xs ml-1.5">Add by PDF</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleDownloadInventoryPdf}
+            disabled={downloadingReport}
+            className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-3 rounded-xl flex-row items-center justify-center"
+          >
+            {downloadingReport ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="document-text-outline" size={14} color="#FFFFFF" />
+                <Text className="text-white font-bold text-xs ml-1.5">PDF Report</Text>
               </>
             )}
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          onPress={handleDownloadInventoryPdf}
-          disabled={downloadingReport}
-          className="w-full bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-3 rounded-xl flex-row items-center justify-center mb-2.5"
-        >
-          {downloadingReport ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="document-text-outline" size={15} color="#FFFFFF" />
-              <Text className="text-white font-bold text-xs ml-1.5">Download Inventory PDF Report</Text>
-            </>
-          )}
-        </TouchableOpacity>
 
         <View className="flex-row bg-white rounded-xl px-3 py-2 items-center shadow-xs">
           <Ionicons name="search" size={18} color="#9CA3AF" />
@@ -405,6 +477,56 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
             </TouchableOpacity>
           ) : null}
         </View>
+      </View>
+
+      {/* Category Filter Chips Bar */}
+      <View className="bg-white border-b border-gray-100 px-3 py-2">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+          <TouchableOpacity
+            onPress={() => setSelectedCategory("All")}
+            className={`px-3 py-1.5 rounded-full mr-2 border ${
+              selectedCategory === "All"
+                ? "bg-blue-600 border-blue-600 shadow-xs"
+                : "bg-gray-100 border-gray-200"
+            }`}
+          >
+            <Text
+              className={`text-xs font-bold ${
+                selectedCategory === "All" ? "text-white" : "text-gray-700"
+              }`}
+            >
+              All Categories
+            </Text>
+          </TouchableOpacity>
+
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              onPress={() => setSelectedCategory(cat)}
+              className={`px-3 py-1.5 rounded-full mr-2 border ${
+                selectedCategory === cat
+                  ? "bg-blue-600 border-blue-600 shadow-xs"
+                  : "bg-gray-100 border-gray-200"
+              }`}
+            >
+              <Text
+                className={`text-xs font-bold ${
+                  selectedCategory === cat ? "text-white" : "text-gray-700"
+                }`}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity
+            onPress={handleOpenCategoryModal}
+            className="px-3 py-1.5 rounded-full border border-dashed border-blue-400 bg-blue-50 flex-row items-center"
+          >
+            <Ionicons name="add" size={14} color="#2563EB" />
+            <Text className="text-xs font-bold text-blue-700 ml-1">+ Category</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       <View className="flex-row bg-white border-b border-gray-200 px-3 py-2">
@@ -615,8 +737,54 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
                   )}
                 </View>
 
+                {/* 1. Food Category Selection */}
+                <View className="mb-3.5 bg-blue-50/70 p-3 rounded-2xl border border-blue-100">
+                  <View className="flex-row items-center justify-between mb-1.5">
+                    <Text className="text-xs font-bold text-gray-800">
+                      Food Category: <Text className="text-blue-600">{formCategory || "General"}</Text>
+                    </Text>
+                    <TouchableOpacity onPress={handleOpenCategoryModal}>
+                      <Text className="text-[11px] font-bold text-blue-600">+ Add Category</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    className="flex-row py-0.5"
+                  >
+                    {categories.map((cat) => {
+                      const isSelected = formCategory === cat;
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          onPress={() => setFormCategory(cat)}
+                          className={`px-3 py-1.5 rounded-xl mr-2 border flex-row items-center ${
+                            isSelected
+                              ? "bg-blue-600 border-blue-600 shadow-xs"
+                              : "bg-white border-gray-200"
+                          }`}
+                        >
+                          <Ionicons
+                            name={isSelected ? "checkmark-circle" : "folder-outline"}
+                            size={13}
+                            color={isSelected ? "#FFFFFF" : "#6B7280"}
+                          />
+                          <Text
+                            className={`text-xs font-bold ml-1.5 ${
+                              isSelected ? "text-white" : "text-gray-700"
+                            }`}
+                          >
+                            {cat}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
                 <View className="mb-3">
-                  <Text className="text-xs font-bold text-gray-700 mb-1">Product / Item Name</Text>
+                  <Text className="text-xs font-bold text-gray-700 mb-1">Food / Item Name</Text>
                   <TextInput
                     className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
                     placeholder="Enter item name"

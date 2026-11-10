@@ -12,6 +12,10 @@ import {
   Switch,
   RefreshControl,
   ScrollView,
+  Platform,
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { api } from "../config/api";
@@ -64,6 +68,7 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
     }
   };
   const handleSavePerks = async () => {
+    Keyboard.dismiss();
     if (!selectedParty) return;
     const res = await api.parties.updateRegularPerks(selectedParty._id, {
       isRegular: formIsRegular,

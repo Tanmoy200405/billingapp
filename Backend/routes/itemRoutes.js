@@ -1,6 +1,7 @@
 import express from "express";
 import { createRequire } from "module";
 import Item from "../models/Item.js";
+import Category from "../models/Category.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const require = createRequire(import.meta.url);
@@ -53,6 +54,78 @@ router.get("/", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch items",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/categories", async (req, res) => {
+  try {
+    const itemCategories = await Item.distinct("category", { userId: req.user._id });
+    let savedCategories = [];
+    try {
+      savedCategories = (await Category.find({ userId: req.user._id }).lean()).map((c) => c.name);
+    } catch {}
+
+    const combined = Array.from(new Set([...savedCategories, ...itemCategories].filter(Boolean)));
+    if (!combined.length) {
+      combined.push("General");
+    }
+
+    combined.sort((a, b) =>
+      String(a).localeCompare(String(b), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      categories: combined,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch categories",
+      error: error.message,
+    });
+  }
+});
+
+router.post("/categories", async (req, res) => {
+  try {
+    const name = (req.body.name || "").toString().trim();
+    if (!name) {
+      return res.status(400).json({ success: false, message: "Category name is required" });
+    }
+
+    const existing = await Category.findOne({
+      userId: req.user._id,
+      name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+    });
+
+    if (existing) {
+      return res.status(200).json({
+        success: true,
+        message: "Category already exists",
+        category: existing.name,
+      });
+    }
+
+    const cat = await Category.create({
+      userId: req.user._id,
+      name,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Category created successfully",
+      category: cat.name,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create category",
       error: error.message,
     });
   }
