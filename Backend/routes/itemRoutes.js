@@ -158,6 +158,103 @@ router.get("/barcode/:barcode", async (req, res) => {
   }
 });
 
+async function upsertItemsBulk(userId, rawEntries) {
+  const existingItems = await Item.find({ userId })
+    .select("_id name barcode hsnCode category costPrice sellingPrice taxRate stock unit lowStockThreshold")
+    .lean();
+
+  const byBarcode = new Map();
+  const byName = new Map();
+  for (const it of existingItems) {
+    if (it.barcode) byBarcode.set(String(it.barcode).trim(), it);
+    const nm = (it.name || "").trim().toLowerCase();
+    if (nm && !byName.has(nm)) byName.set(nm, it);
+  }
+
+  let addedCount = 0;
+  let updatedCount = 0;
+  let skippedCount = 0;
+  const bulkOps = [];
+
+  for (const entry of rawEntries) {
+    const name = (entry.name || entry["Item Name"] || entry.itemName || "").toString().trim();
+    const sellingPrice = Number(
+      entry.sellingPrice ??
+      entry["Selling Price"] ??
+      entry.price ??
+      entry.rate ??
+      0
+    );
+
+    if (!name || isNaN(sellingPrice) || sellingPrice <= 0) {
+      continue;
+    }
+
+    const category = (entry.category || entry["Category"] || "General").toString().trim();
+    const barcode = (entry.barcode || entry["Barcode"] || "").toString().trim();
+    const hsnCode = (entry.hsnCode || entry["HSN"] || entry["Hsn Code"] || "").toString().trim();
+    const costPrice = Number(entry.costPrice ?? entry["Purchase Price"] ?? entry["Cost Price"] ?? 0) || 0;
+    const taxRate = Number(entry.taxRate ?? entry["Tax"] ?? entry["Tax Rate"] ?? 0) || 0;
+    const stock = Number(entry.stock ?? entry["Stock"] ?? entry.quantity ?? 10) || 0;
+    const unit = (entry.unit || entry["Unit"] || "PCS").toString().trim().toUpperCase();
+    const lowStockThreshold = Number(entry.lowStockThreshold ?? entry["Low Stock Threshold"] ?? 5) || 5;
+
+    let existing = barcode ? byBarcode.get(barcode) : null;
+    if (!existing) {
+      existing = byName.get(name.toLowerCase()) || null;
+    }
+
+    if (existing) {
+      const updates = {};
+      if (existing.sellingPrice !== sellingPrice) updates.sellingPrice = sellingPrice;
+      if (category && category !== "General" && existing.category !== category) updates.category = category;
+      if (barcode && existing.barcode !== barcode) updates.barcode = barcode;
+      if (hsnCode && existing.hsnCode !== hsnCode) updates.hsnCode = hsnCode;
+      if (costPrice && existing.costPrice !== costPrice) updates.costPrice = costPrice;
+      if (taxRate !== undefined && existing.taxRate !== taxRate && taxRate > 0) updates.taxRate = taxRate;
+      if (unit && existing.unit !== unit) updates.unit = unit;
+
+      if (Object.keys(updates).length > 0 && existing._id) {
+        Object.assign(existing, updates);
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: existing._id },
+            update: { $set: updates },
+          },
+        });
+        updatedCount++;
+      } else {
+        skippedCount++;
+      }
+    } else {
+      const doc = {
+        userId,
+        name,
+        ...(barcode ? { barcode } : {}),
+        ...(hsnCode ? { hsnCode } : {}),
+        category,
+        costPrice,
+        sellingPrice,
+        taxRate,
+        stock,
+        unit,
+        lowStockThreshold,
+      };
+      bulkOps.push({ insertOne: { document: doc } });
+      if (barcode) byBarcode.set(barcode, doc);
+      byName.set(name.toLowerCase(), doc);
+      addedCount++;
+    }
+  }
+
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < bulkOps.length; i += CHUNK_SIZE) {
+    await Item.bulkWrite(bulkOps.slice(i, i + CHUNK_SIZE), { ordered: false });
+  }
+
+  return { addedCount, updatedCount, skippedCount };
+}
+
 router.post("/bulk-import", async (req, res) => {
   try {
     const rawItems = Array.isArray(req.body.items)
@@ -170,80 +267,15 @@ router.post("/bulk-import", async (req, res) => {
       return res.status(400).json({ success: false, message: "No items provided for import" });
     }
 
-    let addedCount = 0;
-    let updatedCount = 0;
-
-    for (const entry of rawItems) {
-      const name = (entry.name || entry["Item Name"] || entry.itemName || "").toString().trim();
-      const sellingPrice = Number(
-        entry.sellingPrice ??
-        entry["Selling Price"] ??
-        entry.price ??
-        entry.rate ??
-        0
-      );
-
-      if (!name || isNaN(sellingPrice) || sellingPrice <= 0) {
-        continue;
-      }
-
-      const category = (entry.category || entry["Category"] || "General").toString().trim();
-      const barcode = (entry.barcode || entry["Barcode"] || "").toString().trim();
-      const hsnCode = (entry.hsnCode || entry["HSN"] || entry["Hsn Code"] || "").toString().trim();
-      const costPrice = Number(entry.costPrice ?? entry["Purchase Price"] ?? entry["Cost Price"] ?? 0) || 0;
-      const taxRate = Number(entry.taxRate ?? entry["Tax"] ?? entry["Tax Rate"] ?? 0) || 0;
-      const stock = Number(entry.stock ?? entry["Stock"] ?? entry.quantity ?? 0) || 0;
-      const unit = (entry.unit || entry["Unit"] || "PCS").toString().trim().toUpperCase();
-      const lowStockThreshold = Number(entry.lowStockThreshold ?? entry["Low Stock Threshold"] ?? 5) || 5;
-
-      let existing = null;
-      if (barcode) {
-        existing = await Item.findOne({ userId: req.user._id, barcode });
-      }
-      if (!existing) {
-        existing = await Item.findOne({
-          userId: req.user._id,
-          name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i") },
-        });
-      }
-
-      if (existing) {
-        existing.name = name;
-        if (barcode) existing.barcode = barcode;
-        if (hsnCode) existing.hsnCode = hsnCode;
-        if (category) existing.category = category;
-        existing.sellingPrice = sellingPrice;
-        if (costPrice) existing.costPrice = costPrice;
-        existing.taxRate = taxRate;
-        existing.stock = stock;
-        existing.unit = unit;
-        existing.lowStockThreshold = lowStockThreshold;
-        await existing.save();
-        updatedCount++;
-      } else {
-        await Item.create({
-          userId: req.user._id,
-          name,
-          barcode: barcode || undefined,
-          hsnCode: hsnCode || undefined,
-          category,
-          costPrice,
-          sellingPrice,
-          taxRate,
-          stock,
-          unit,
-          lowStockThreshold,
-        });
-        addedCount++;
-      }
-    }
+    const { addedCount, updatedCount, skippedCount } = await upsertItemsBulk(req.user._id, rawItems);
 
     return res.status(200).json({
       success: true,
-      message: `Menu imported successfully (${addedCount} added, ${updatedCount} updated)`,
+      message: `Menu imported successfully (${addedCount} added, ${updatedCount} updated, ${skippedCount} unchanged)`,
       addedCount,
       updatedCount,
-      totalProcessed: addedCount + updatedCount,
+      skippedCount,
+      totalProcessed: addedCount + updatedCount + skippedCount,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -360,51 +392,15 @@ router.post("/import-pdf", async (req, res) => {
       });
     }
 
-    let addedCount = 0;
-    let updatedCount = 0;
-
-    for (const entry of items) {
-      const name = entry.name.trim();
-      const sellingPrice = Number(entry.sellingPrice);
-      const category = entry.category || "General";
-      const stock = Number(entry.stock) || 10;
-      const unit = (entry.unit || "PCS").toUpperCase();
-
-      let existing = await Item.findOne({
-        userId: req.user._id,
-        name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i") },
-      });
-
-      if (existing) {
-        existing.sellingPrice = sellingPrice;
-        if (category && category !== "General") existing.category = category;
-        existing.stock = stock;
-        existing.unit = unit;
-        await existing.save();
-        updatedCount++;
-      } else {
-        await Item.create({
-          userId: req.user._id,
-          name,
-          category,
-          costPrice: 0,
-          sellingPrice,
-          taxRate: 0,
-          stock,
-          unit,
-          lowStockThreshold: 5,
-        });
-        addedCount++;
-      }
-    }
+    const { addedCount, updatedCount, skippedCount } = await upsertItemsBulk(req.user._id, items);
 
     return res.status(200).json({
       success: true,
-      message: `PDF menu imported successfully (${addedCount} added, ${updatedCount} updated)`,
+      message: `PDF menu imported (${addedCount} added, ${updatedCount} updated, ${skippedCount} unchanged)`,
       addedCount,
       updatedCount,
-      totalProcessed: addedCount + updatedCount,
-      items,
+      skippedCount,
+      totalProcessed: addedCount + updatedCount + skippedCount,
     });
   } catch (error) {
     return res.status(500).json({

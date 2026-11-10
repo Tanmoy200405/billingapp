@@ -124,7 +124,7 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
             if (res && res.success) {
               Alert.alert(
                 "PDF Party List Imported!",
-                `Successfully parsed and saved customers from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
+                `Added: ${res.addedCount || 0}\nUpdated: ${res.updatedCount || 0}\nAlready Existed (Skipped): ${res.skippedCount || 0}`
               );
               loadParties();
             } else {
@@ -166,7 +166,7 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
         if (res && res.success) {
           Alert.alert(
             "PDF Party List Imported!",
-            `Successfully parsed and saved customers from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
+            `Added: ${res.addedCount || 0}\nUpdated: ${res.updatedCount || 0}\nAlready Existed (Skipped): ${res.skippedCount || 0}`
           );
           loadParties();
         } else {

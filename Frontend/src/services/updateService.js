@@ -3,7 +3,7 @@ import * as Updates from "expo-updates";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiBaseUrl } from "../config/api";
 
-export const CURRENT_APP_VERSION = "1.0.5";
+export const CURRENT_APP_VERSION = "1.0.6";
 export const GITHUB_RELEASES_URL = "https://billingapp-backend-hcan.onrender.com/api/download-apk";
 
 /**

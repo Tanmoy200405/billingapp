@@ -257,6 +257,137 @@ router.post("/send-bulk-vip-offer", async (req, res) => {
   }
 });
 
+async function upsertPartiesBulk(userId, rawEntries) {
+  const existingParties = await Party.find({ userId })
+    .select("_id name phone whatsappNumber type isRegular balance visitCount totalSpent")
+    .lean();
+
+  const byPhone = new Map();
+  const byName = new Map();
+
+  const normalizePhone = (val) => {
+    const digits = (val || "").toString().replace(/[^0-9]/g, "").slice(-10);
+    return digits && digits !== "0000000000" ? digits : "";
+  };
+
+  for (const p of existingParties) {
+    const ph = normalizePhone(p.phone);
+    const wa = normalizePhone(p.whatsappNumber);
+    if (ph && !byPhone.has(ph)) byPhone.set(ph, p);
+    if (wa && !byPhone.has(wa)) byPhone.set(wa, p);
+    const nm = (p.name || "").trim().toLowerCase();
+    if (nm && !byName.has(nm)) byName.set(nm, p);
+  }
+
+  let addedCount = 0;
+  let updatedCount = 0;
+  let skippedCount = 0;
+  const bulkOps = [];
+
+  for (const entry of rawEntries) {
+    const rawPhone = (entry.phone || entry.whatsappNumber || entry["Phone"] || entry["Mobile"] || "").toString();
+    const cleanPhone = normalizePhone(rawPhone);
+    const name = (entry.name || entry["Customer Name"] || entry["Party Name"] || entry["Name"] || "").toString().trim();
+
+    if (!cleanPhone && !name) {
+      continue;
+    }
+
+    const partyName = name || `Customer ${cleanPhone ? cleanPhone.slice(-4) : "Imported"}`;
+    const type = (entry.type || entry["Type"] || "customer").toString().toLowerCase().includes("supp")
+      ? "supplier"
+      : "customer";
+    const isRegular = Boolean(
+      entry.isRegular === true ||
+      entry.isRegular === "true" ||
+      entry["Is Regular"] === "YES" ||
+      entry["Is Regular"] === "true" ||
+      entry["VIP"] === "YES"
+    );
+    const balance = Number(entry.balance ?? entry["Udhar Balance"] ?? entry["Balance"] ?? 0) || 0;
+    const visitCount = Number(entry.visitCount ?? entry["Visits"] ?? entry["Visit Count"] ?? 1) || 1;
+    const totalSpent = Number(entry.totalSpent ?? entry["Total Spent"] ?? 0) || 0;
+
+    let existing = cleanPhone ? byPhone.get(cleanPhone) : null;
+    if (!existing && partyName && !partyName.startsWith("Customer ")) {
+      existing = byName.get(partyName.toLowerCase()) || null;
+    }
+
+    if (existing) {
+      const updates = {};
+      if (partyName && !partyName.startsWith("Customer ") && existing.name !== partyName) {
+        updates.name = partyName;
+        existing.name = partyName;
+      }
+      if (cleanPhone && (!existing.phone || existing.phone === "0000000000")) {
+        updates.phone = cleanPhone;
+        existing.phone = cleanPhone;
+        if (!existing.whatsappNumber || existing.whatsappNumber === "0000000000") {
+          updates.whatsappNumber = cleanPhone;
+          existing.whatsappNumber = cleanPhone;
+        }
+      }
+      if (type && existing.type !== type && type === "supplier") {
+        updates.type = type;
+        existing.type = type;
+      }
+      if (isRegular && !existing.isRegular) {
+        updates.isRegular = true;
+        existing.isRegular = true;
+      }
+      if (balance !== 0 && existing.balance !== balance) {
+        updates.balance = balance;
+        existing.balance = balance;
+      }
+      if (visitCount > (existing.visitCount || 0)) {
+        updates.visitCount = visitCount;
+        existing.visitCount = visitCount;
+      }
+      if (totalSpent > (existing.totalSpent || 0)) {
+        updates.totalSpent = totalSpent;
+        existing.totalSpent = totalSpent;
+      }
+
+      if (Object.keys(updates).length > 0 && existing._id) {
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: existing._id },
+            update: { $set: updates },
+          },
+        });
+        updatedCount++;
+      } else {
+        skippedCount++;
+      }
+    } else {
+      const doc = {
+        userId,
+        name: partyName,
+        phone: cleanPhone || "0000000000",
+        whatsappNumber: cleanPhone || "0000000000",
+        type,
+        isRegular,
+        balance,
+        visitCount,
+        totalSpent,
+      };
+      bulkOps.push({ insertOne: { document: doc } });
+      if (cleanPhone) byPhone.set(cleanPhone, doc);
+      if (partyName && !partyName.startsWith("Customer ")) {
+        byName.set(partyName.toLowerCase(), doc);
+      }
+      addedCount++;
+    }
+  }
+
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < bulkOps.length; i += CHUNK_SIZE) {
+    await Party.bulkWrite(bulkOps.slice(i, i + CHUNK_SIZE), { ordered: false });
+  }
+
+  return { addedCount, updatedCount, skippedCount };
+}
+
 router.post("/bulk-import", async (req, res) => {
   try {
     const rawParties = Array.isArray(req.body.parties)
@@ -269,82 +400,15 @@ router.post("/bulk-import", async (req, res) => {
       return res.status(400).json({ success: false, message: "No parties provided for import" });
     }
 
-    let addedCount = 0;
-    let updatedCount = 0;
-
-    for (const entry of rawParties) {
-      const rawPhone = (entry.phone || entry.whatsappNumber || entry["Phone"] || entry["Mobile"] || "").toString();
-      const cleanPhone = rawPhone.replace(/[^0-9]/g, "").slice(-10);
-      const name = (entry.name || entry["Customer Name"] || entry["Party Name"] || entry["Name"] || "").toString().trim();
-
-      if (!cleanPhone && !name) {
-        continue;
-      }
-
-      const partyName = name || `Customer ${cleanPhone ? cleanPhone.slice(-4) : "Imported"}`;
-      const type = (entry.type || entry["Type"] || "customer").toString().toLowerCase().includes("supp") ? "supplier" : "customer";
-      const isRegular = Boolean(
-        entry.isRegular === true ||
-        entry.isRegular === "true" ||
-        entry["Is Regular"] === "YES" ||
-        entry["Is Regular"] === "true" ||
-        entry["VIP"] === "YES"
-      );
-      const balance = Number(entry.balance ?? entry["Udhar Balance"] ?? entry["Balance"] ?? 0) || 0;
-      const visitCount = Number(entry.visitCount ?? entry["Visits"] ?? entry["Visit Count"] ?? 1) || 1;
-      const totalSpent = Number(entry.totalSpent ?? entry["Total Spent"] ?? 0) || 0;
-
-      let existing = null;
-      if (cleanPhone) {
-        existing = await Party.findOne({
-          userId: req.user._id,
-          $or: [{ phone: cleanPhone }, { whatsappNumber: cleanPhone }],
-        });
-      }
-      if (!existing && name) {
-        existing = await Party.findOne({
-          userId: req.user._id,
-          name: { $regex: new RegExp(`^${partyName.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i") },
-        });
-      }
-
-      if (existing) {
-        if (partyName && !partyName.startsWith("Customer ")) {
-          existing.name = partyName;
-        }
-        if (cleanPhone) {
-          existing.phone = cleanPhone;
-          if (!existing.whatsappNumber) existing.whatsappNumber = cleanPhone;
-        }
-        existing.type = type;
-        if (isRegular) existing.isRegular = true;
-        if (balance !== 0) existing.balance = balance;
-        if (visitCount > (existing.visitCount || 0)) existing.visitCount = visitCount;
-        if (totalSpent > (existing.totalSpent || 0)) existing.totalSpent = totalSpent;
-        await existing.save();
-        updatedCount++;
-      } else {
-        await Party.create({
-          userId: req.user._id,
-          name: partyName,
-          phone: cleanPhone || "0000000000",
-          whatsappNumber: cleanPhone || "0000000000",
-          type,
-          isRegular,
-          balance,
-          visitCount,
-          totalSpent,
-        });
-        addedCount++;
-      }
-    }
+    const { addedCount, updatedCount, skippedCount } = await upsertPartiesBulk(req.user._id, rawParties);
 
     return res.status(200).json({
       success: true,
-      message: `Parties imported successfully (${addedCount} added, ${updatedCount} updated)`,
+      message: `Parties imported successfully (${addedCount} added, ${updatedCount} updated, ${skippedCount} already existed)`,
       addedCount,
       updatedCount,
-      totalProcessed: addedCount + updatedCount,
+      skippedCount,
+      totalProcessed: addedCount + updatedCount + skippedCount,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -559,62 +623,19 @@ router.post("/import-pdf", async (req, res) => {
       });
     }
 
-    let addedCount = 0;
-    let updatedCount = 0;
-
-    for (const entry of parsedParties) {
-      const cleanPhone = (entry.phone || "").replace(/[^0-9]/g, "").slice(-10);
-      const partyName = entry.name.trim();
-
-      let existing = null;
-      if (cleanPhone) {
-        existing = await Party.findOne({
-          userId: req.user._id,
-          $or: [{ phone: cleanPhone }, { whatsappNumber: cleanPhone }],
-        });
-      }
-      if (!existing && partyName && !partyName.startsWith("Customer ")) {
-        existing = await Party.findOne({
-          userId: req.user._id,
-          name: { $regex: new RegExp(`^${partyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-        });
-      }
-
-      if (existing) {
-        if (partyName && !partyName.startsWith("Customer ")) {
-          existing.name = partyName;
-        }
-        if (cleanPhone) {
-          existing.phone = cleanPhone;
-          if (!existing.whatsappNumber) existing.whatsappNumber = cleanPhone;
-        }
-        if (entry.isRegular) existing.isRegular = true;
-        if (entry.type) existing.type = entry.type;
-        await existing.save();
-        updatedCount++;
-      } else {
-        await Party.create({
-          userId: req.user._id,
-          name: partyName,
-          phone: cleanPhone || "0000000000",
-          whatsappNumber: cleanPhone || "0000000000",
-          type: entry.type || "customer",
-          isRegular: Boolean(entry.isRegular),
-          balance: Number(entry.balance) || 0,
-          visitCount: Number(entry.visitCount) || 1,
-          totalSpent: Number(entry.totalSpent) || 0,
-        });
-        addedCount++;
-      }
-    }
+    const { addedCount, updatedCount, skippedCount } = await upsertPartiesBulk(
+      req.user._id,
+      parsedParties
+    );
 
     return res.status(200).json({
       success: true,
-      message: `PDF party list imported successfully (${addedCount} added, ${updatedCount} updated)`,
+      message: `PDF party list imported (${addedCount} added, ${updatedCount} updated, ${skippedCount} already existed)`,
       addedCount,
       updatedCount,
-      totalProcessed: addedCount + updatedCount,
-      parties: parsedParties,
+      skippedCount,
+      totalParsed: parsedParties.length,
+      totalProcessed: addedCount + updatedCount + skippedCount,
     });
   } catch (error) {
     return res.status(500).json({

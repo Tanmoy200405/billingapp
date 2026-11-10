@@ -89,12 +89,12 @@ app.get("/api/app-version", (req, res) => {
   const fallbackApkUrl = `${protocol}://${host}/api/download-apk`;
   res.status(200).json({
     success: true,
-    latestVersion: process.env.APP_LATEST_VERSION || "1.0.5",
+    latestVersion: process.env.APP_LATEST_VERSION || "1.0.6",
     minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
     apkUrl: process.env.APP_APK_URL || defaultApkUrl || fallbackApkUrl,
     releaseNotes:
       process.env.APP_RELEASE_NOTES ||
-      "Version 1.0.5: Add, edit, and delete parties, manual VIP visit threshold setting, 100MB PDF import limit, and keyboard fixes.",
+      "Version 1.0.6: Ultra-fast bulkWrite PDF import (no timeouts on 1000+ rows, deduplicates existing phones), party edit/delete, and manual VIP criteria.",
     forceUpdate: false,
     timestamp: new Date().toISOString(),
   });
