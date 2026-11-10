@@ -80,8 +80,8 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
         input.onchange = async (e) => {
           const file = e.target.files?.[0];
           if (!file) return;
-          if (file.size && file.size > 45 * 1024 * 1024) {
-            Alert.alert("File Too Large", "Please choose a PDF smaller than 45 MB.");
+          if (file.size && file.size > 100 * 1024 * 1024) {
+            Alert.alert("File Too Large", "Please choose a PDF smaller than 100 MB.");
             return;
           }
           setImportingPdf(true);
@@ -121,9 +121,9 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
       }
 
       const asset = resDoc.assets[0];
-      if (asset.size && asset.size > 45 * 1024 * 1024) {
+      if (asset.size && asset.size > 100 * 1024 * 1024) {
         setImportingPdf(false);
-        Alert.alert("File Too Large", "Please choose a PDF smaller than 45 MB.");
+        Alert.alert("File Too Large", "Please choose a PDF smaller than 100 MB.");
         return;
       }
 
