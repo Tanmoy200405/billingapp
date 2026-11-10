@@ -80,30 +80,29 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
         input.onchange = async (e) => {
           const file = e.target.files?.[0];
           if (!file) return;
+          if (file.size && file.size > 45 * 1024 * 1024) {
+            Alert.alert("File Too Large", "Please choose a PDF smaller than 45 MB.");
+            return;
+          }
           setImportingPdf(true);
           try {
-            const reader = new FileReader();
-            reader.onload = async () => {
-              const base64Data = reader.result;
-              const res = await api.parties.importPdf({ pdfBase64: base64Data });
-              setImportingPdf(false);
-              if (res && res.success) {
-                Alert.alert(
-                  "PDF Party List Imported!",
-                  `Successfully parsed and saved customers from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
-                );
-                loadParties();
-              } else {
-                Alert.alert(
-                  "Import Notice",
-                  res?.message || "Could not extract customer list from this PDF."
-                );
-              }
-            };
-            reader.readAsDataURL(file);
+            const res = await api.parties.importPdfFile(file);
+            if (res && res.success) {
+              Alert.alert(
+                "PDF Party List Imported!",
+                `Successfully parsed and saved customers from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
+              );
+              loadParties();
+            } else {
+              Alert.alert(
+                "Import Notice",
+                res?.message || "Could not extract customer list from this PDF."
+              );
+            }
           } catch (err) {
+            Alert.alert("Error", err.message || "Failed to upload PDF file.");
+          } finally {
             setImportingPdf(false);
-            Alert.alert("Error", err.message || "Failed to read PDF file.");
           }
         };
         input.click();
@@ -122,27 +121,33 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
       }
 
       const asset = resDoc.assets[0];
-      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: "base64",
-      });
+      if (asset.size && asset.size > 45 * 1024 * 1024) {
+        setImportingPdf(false);
+        Alert.alert("File Too Large", "Please choose a PDF smaller than 45 MB.");
+        return;
+      }
 
-      const res = await api.parties.importPdf({ pdfBase64: base64 });
-      setImportingPdf(false);
-      if (res && res.success) {
-        Alert.alert(
-          "PDF Party List Imported!",
-          `Successfully parsed and saved customers from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
-        );
-        loadParties();
-      } else {
-        Alert.alert(
-          "Import Notice",
-          res?.message || "Could not extract customer list from this PDF."
-        );
+      try {
+        const res = await api.parties.importPdfFile(asset.uri);
+        if (res && res.success) {
+          Alert.alert(
+            "PDF Party List Imported!",
+            `Successfully parsed and saved customers from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
+          );
+          loadParties();
+        } else {
+          Alert.alert(
+            "Import Notice",
+            res?.message || "Could not extract customer list from this PDF."
+          );
+        }
+      } finally {
+        FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(() => {});
       }
     } catch (err) {
-      setImportingPdf(false);
       Alert.alert("Import Error", err.message || "Failed to import party list from PDF.");
+    } finally {
+      setImportingPdf(false);
     }
   };
   const handleSavePerks = async () => {

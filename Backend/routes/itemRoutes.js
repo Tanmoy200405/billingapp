@@ -316,10 +316,18 @@ function parseItemsFromPdfText(text) {
 
 router.post("/import-pdf", async (req, res) => {
   try {
-    const { pdfBase64, pdfText, previewOnly } = req.body;
+    const isRawBuffer = Buffer.isBuffer(req.body);
+    const { pdfBase64, pdfText, previewOnly: bodyPreview } = isRawBuffer ? {} : (req.body || {});
+    const previewOnly = bodyPreview || req.query.previewOnly === "true";
     let extractedText = pdfText || "";
 
-    if (pdfBase64) {
+    if (isRawBuffer && req.body.length > 0) {
+      const parser = new PDFParse({ data: req.body });
+      await parser.load();
+      const result = await parser.getText();
+      await parser.destroy();
+      extractedText = result.text || "";
+    } else if (pdfBase64) {
       const cleanBase64 = pdfBase64.replace(/^data:[^;]+;base64,/, "");
       const buffer = Buffer.from(cleanBase64, "base64");
       const parser = new PDFParse({ data: buffer });

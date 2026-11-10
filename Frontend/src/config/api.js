@@ -149,6 +149,73 @@ const request = async (endpoint, options = {}) => {
   }
 };
 
+const uploadPdfFile = async (endpoint, fileOrUri) => {
+  const url = `${currentBaseUrl}${endpoint}`;
+  let token = authToken;
+  if (!token) {
+    try {
+      token = await loadStoredToken();
+    } catch {}
+  }
+
+  try {
+    if (Platform.OS === "web") {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/pdf",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: fileOrUri,
+      });
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        data = {
+          success: false,
+          message: `Server returned HTTP ${response.status}`,
+        };
+      }
+      if (!response.ok && data && !data.message) {
+        data.message = `Request failed with status ${response.status}`;
+      }
+      return data;
+    }
+
+    const FileSystem = await import("expo-file-system/legacy");
+    const uploadResult = await FileSystem.uploadAsync(url, fileOrUri, {
+      httpMethod: "POST",
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: {
+        "Content-Type": "application/pdf",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    let data;
+    try {
+      data = JSON.parse(uploadResult.body || "{}");
+    } catch {
+      data = {
+        success: false,
+        message: `Server returned HTTP ${uploadResult.status}`,
+      };
+    }
+
+    if (uploadResult.status >= 400 && data && !data.message) {
+      data.message = `Upload failed with status ${uploadResult.status}`;
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      message: error?.message || "Failed to upload PDF file",
+    };
+  }
+};
+
 export const api = {
   auth: {
     sendOtp: (phone, channel = "whatsapp") =>
@@ -209,6 +276,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    importPdfFile: (fileOrUri) => uploadPdfFile("/parties/import-pdf", fileOrUri),
   },
   items: {
     getAll: (params = "") => request(`/items${params ? `?${params}` : ""}`),
@@ -240,6 +308,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    importPdfFile: (fileOrUri) => uploadPdfFile("/items/import-pdf", fileOrUri),
   },
   invoices: {
     getAll: (params = "") => request(`/invoices${params ? `?${params}` : ""}`),

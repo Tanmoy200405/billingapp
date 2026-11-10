@@ -137,6 +137,7 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
   };
 
   const handleImportPdf = async () => {
+    Keyboard.dismiss();
     try {
       if (Platform.OS === "web" && typeof document !== "undefined") {
         const input = document.createElement("input");
@@ -145,27 +146,26 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
         input.onchange = async (e) => {
           const file = e.target.files && e.target.files[0];
           if (!file) return;
+          if (file.size && file.size > 45 * 1024 * 1024) {
+            Alert.alert("File Too Large", "Please choose a PDF smaller than 45 MB.");
+            return;
+          }
           setImportingPdf(true);
           try {
-            const reader = new FileReader();
-            reader.onload = async () => {
-              const base64Data = reader.result;
-              const res = await api.items.importPdf({ pdfBase64: base64Data });
-              setImportingPdf(false);
-              if (res && res.success) {
-                Alert.alert(
-                  "PDF Menu Imported!",
-                  `Successfully parsed and added items from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
-                );
-                loadItems();
-              } else {
-                Alert.alert("Import Notice", res?.message || "Could not extract menu items from this PDF.");
-              }
-            };
-            reader.readAsDataURL(file);
+            const res = await api.items.importPdfFile(file);
+            if (res && res.success) {
+              Alert.alert(
+                "PDF Menu Imported!",
+                `Successfully parsed and added items from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
+              );
+              loadItems();
+            } else {
+              Alert.alert("Import Notice", res?.message || "Could not extract menu items from this PDF.");
+            }
           } catch (err) {
+            Alert.alert("Error", err.message || "Failed to upload PDF file.");
+          } finally {
             setImportingPdf(false);
-            Alert.alert("Error", err.message || "Failed to read PDF file.");
           }
         };
         input.click();
@@ -184,34 +184,32 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
       }
 
       const asset = resDoc.assets[0];
-      let base64 = "";
-      if (Platform.OS === "web" && asset.file) {
-        base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(asset.file);
-        });
-      } else {
-        base64 = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: "base64",
-        });
+      if (asset.size && asset.size > 45 * 1024 * 1024) {
+        setImportingPdf(false);
+        Alert.alert("File Too Large", "Please choose a PDF smaller than 45 MB.");
+        return;
       }
 
-      const res = await api.items.importPdf({ pdfBase64: base64 });
-      setImportingPdf(false);
-      if (res && res.success) {
-        Alert.alert(
-          "PDF Menu Imported!",
-          `Successfully parsed and added items from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
-        );
-        loadItems();
-      } else {
-        Alert.alert("Import Notice", res?.message || "Could not extract menu items from this PDF.");
+      try {
+        const res = await api.items.importPdfFile(Platform.OS === "web" && asset.file ? asset.file : asset.uri);
+        if (res && res.success) {
+          Alert.alert(
+            "PDF Menu Imported!",
+            `Successfully parsed and added items from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
+          );
+          loadItems();
+        } else {
+          Alert.alert("Import Notice", res?.message || "Could not extract menu items from this PDF.");
+        }
+      } finally {
+        if (Platform.OS !== "web" && asset.uri) {
+          FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(() => {});
+        }
       }
     } catch (err) {
-      setImportingPdf(false);
       Alert.alert("Import Error", err.message || "Failed to import items from PDF.");
+    } finally {
+      setImportingPdf(false);
     }
   };
 

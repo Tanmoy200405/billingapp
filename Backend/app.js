@@ -40,6 +40,7 @@ app.use(
 );
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.raw({ type: "application/pdf", limit: "50mb" }));
 app.use(cookieParser());
 
 app.get("/", (req, res) => {
@@ -88,12 +89,12 @@ app.get("/api/app-version", (req, res) => {
   const fallbackApkUrl = `${protocol}://${host}/api/download-apk`;
   res.status(200).json({
     success: true,
-    latestVersion: process.env.APP_LATEST_VERSION || "1.0.2",
+    latestVersion: process.env.APP_LATEST_VERSION || "1.0.3",
     minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
     apkUrl: process.env.APP_APK_URL || defaultApkUrl || fallbackApkUrl,
     releaseNotes:
       process.env.APP_RELEASE_NOTES ||
-      "Version 1.0.2: Party list PDF import, food category filters & management, full keyboard fixes across modals/forms, and PDF share/download fixes.",
+      "Version 1.0.3: Streaming binary PDF import (fixes Android growth-limit OOM crash), party list PDF import, food categories, and keyboard fixes.",
     forceUpdate: false,
     timestamp: new Date().toISOString(),
   });
