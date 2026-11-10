@@ -895,6 +895,90 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ── Modal 2: Add Category Modal ── */}
+      <Modal
+        visible={categoryModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setCategoryModalVisible(false);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center p-4">
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+            </TouchableWithoutFeedback>
+
+            <View className="bg-white w-full sm:max-w-md rounded-3xl p-6 shadow-2xl">
+              <View className="flex-row justify-between items-center mb-3">
+                <View>
+                  <Text className="text-lg font-bold text-gray-900">Add New Category</Text>
+                  <Text className="text-xs text-gray-500">Create a category to organize your food items</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setCategoryModalVisible(false);
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick suggestions */}
+              <Text className="text-[11px] font-bold text-gray-500 mb-1.5 uppercase">Quick Suggestions</Text>
+              <View className="flex-row flex-wrap gap-1.5 mb-3.5">
+                {["Beverages", "Fast Food", "Starters", "Main Course", "Pizza", "Desserts", "Chinese", "Biryani"].map(
+                  (sug) => (
+                    <TouchableOpacity
+                      key={sug}
+                      onPress={() => setNewCategoryName(sug)}
+                      className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg"
+                    >
+                      <Text className="text-xs font-semibold text-blue-700">{sug}</Text>
+                    </TouchableOpacity>
+                  )
+                )}
+              </View>
+
+              <View className="mb-4">
+                <Text className="text-xs font-bold text-gray-700 mb-1">Category Name *</Text>
+                <TextInput
+                  className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+                  placeholder="e.g. Fast Food, Beverages"
+                  value={newCategoryName}
+                  onChangeText={setNewCategoryName}
+                  autoFocus={true}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSaveCategory}
+                />
+              </View>
+
+              <TouchableOpacity
+                onPress={handleSaveCategory}
+                disabled={savingCategory}
+                className="w-full bg-blue-600 py-3.5 rounded-xl items-center shadow flex-row justify-center"
+              >
+                {savingCategory ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+                    <Text className="text-white font-bold text-sm ml-1.5">Save Category</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
