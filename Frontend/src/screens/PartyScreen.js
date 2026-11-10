@@ -18,6 +18,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../config/api";
@@ -28,6 +29,7 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [vipVisitThreshold, setVipVisitThreshold] = useState(3);
+  const [vipInputText, setVipInputText] = useState("3");
   const [bulkSending, setBulkSending] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
@@ -36,12 +38,44 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
   const [formIsRegular, setFormIsRegular] = useState(false);
   const [formDiscount, setFormDiscount] = useState("0");
   const [formFreebie, setFormFreebie] = useState("");
+
+  // Edit / Add Party Modal state
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingParty, setEditingParty] = useState(null);
+  const [partyFormName, setPartyFormName] = useState("");
+  const [partyFormPhone, setPartyFormPhone] = useState("");
+  const [partyFormType, setPartyFormType] = useState("customer");
+  const [partyFormAddress, setPartyFormAddress] = useState("");
+  const [partyFormGstin, setPartyFormGstin] = useState("");
+  const [partyFormBalance, setPartyFormBalance] = useState("0");
+  const [partyFormVisits, setPartyFormVisits] = useState("1");
+  const [savingParty, setSavingParty] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("party_vip_threshold").then((val) => {
+      if (val) {
+        const parsed = parseInt(val, 10);
+        if (!isNaN(parsed) && parsed >= 1) {
+          setVipVisitThreshold(parsed);
+          setVipInputText(String(parsed));
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
+  const updateVipThreshold = (newVal) => {
+    const num = parseInt(String(newVal).replace(/[^0-9]/g, ""), 10);
+    if (!isNaN(num) && num >= 1) {
+      setVipVisitThreshold(num);
+      setVipInputText(String(num));
+      AsyncStorage.setItem("party_vip_threshold", String(num)).catch(() => {});
+    }
+  };
+
   const loadParties = useCallback(async () => {
     setLoading(true);
     let query = search ? `search=${encodeURIComponent(search)}` : "";
-    if (filterType === "vip") {
-      query += `${query ? "&" : ""}isRegular=true`;
-    } else if (filterType === "customer" || filterType === "supplier") {
+    if (filterType === "customer" || filterType === "supplier") {
       query += `${query ? "&" : ""}type=${filterType}`;
     }
     const res = await api.parties.getAll(query);
@@ -213,6 +247,109 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
     setFormFreebie(party.assignedFreebie || "");
     setPerksModalVisible(true);
   };
+
+  const openAddPartyModal = () => {
+    setEditingParty(null);
+    setPartyFormName("");
+    setPartyFormPhone("");
+    setPartyFormType("customer");
+    setPartyFormAddress("");
+    setPartyFormGstin("");
+    setPartyFormBalance("0");
+    setPartyFormVisits("1");
+    setEditModalVisible(true);
+  };
+
+  const openEditPartyModal = (party) => {
+    setEditingParty(party);
+    setPartyFormName(party.name || "");
+    setPartyFormPhone(party.phone || party.whatsappNumber || "");
+    setPartyFormType(party.type || "customer");
+    setPartyFormAddress(party.billingAddress || "");
+    setPartyFormGstin(party.gstin || "");
+    setPartyFormBalance(String(party.balance || 0));
+    setPartyFormVisits(String(party.visitCount ?? 1));
+    setEditModalVisible(true);
+  };
+
+  const handleSaveParty = async () => {
+    Keyboard.dismiss();
+    const cleanName = partyFormName.trim();
+    const cleanPhone = partyFormPhone.replace(/[^0-9]/g, "");
+    if (!cleanName || !cleanPhone) {
+      Alert.alert("Required", "Customer name and phone number are required.");
+      return;
+    }
+
+    setSavingParty(true);
+    try {
+      const payload = {
+        name: cleanName,
+        phone: cleanPhone,
+        whatsappNumber: cleanPhone,
+        type: partyFormType,
+        billingAddress: partyFormAddress.trim(),
+        gstin: partyFormGstin.trim().toUpperCase(),
+        balance: Number(partyFormBalance) || 0,
+        visitCount: Math.max(0, parseInt(partyFormVisits, 10) || 0),
+      };
+
+      const res = editingParty
+        ? await api.parties.update(editingParty._id, payload)
+        : await api.parties.create({ ...payload, openingBalance: payload.balance });
+
+      if (res && res.success) {
+        setEditModalVisible(false);
+        loadParties();
+        Alert.alert("Saved", editingParty ? "Party updated successfully." : "Party added successfully.");
+      } else {
+        Alert.alert("Error", res?.message || "Failed to save party.");
+      }
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to save party.");
+    } finally {
+      setSavingParty(false);
+    }
+  };
+
+  const executeDeleteParty = async (partyId) => {
+    try {
+      const res = await api.parties.delete(partyId);
+      if (res && res.success) {
+        loadParties();
+        if (Platform.OS === "web") {
+          window.alert("Customer deleted successfully.");
+        } else {
+          Alert.alert("Deleted", "Customer deleted successfully.");
+        }
+      } else {
+        Alert.alert("Error", res?.message || "Failed to delete customer.");
+      }
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to delete customer.");
+    }
+  };
+
+  const handleDeleteParty = (party) => {
+    if (Platform.OS === "web") {
+      if (window.confirm(`Delete "${party.name}" from your party list?`)) {
+        executeDeleteParty(party._id);
+      }
+      return;
+    }
+    Alert.alert(
+      "Delete Customer",
+      `Are you sure you want to delete "${party.name}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => executeDeleteParty(party._id),
+        },
+      ]
+    );
+  };
   const displayedParties = React.useMemo(() => {
     if (filterType === "vip") {
       return parties.filter((p) => p.isRegular || (p.visitCount || 0) >= vipVisitThreshold);
@@ -249,6 +386,13 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
               </Text>
             </View>
           </View>
+          <TouchableOpacity
+            onPress={openAddPartyModal}
+            className="bg-white px-3 py-1.5 rounded-xl flex-row items-center shadow-xs"
+          >
+            <Ionicons name="person-add-outline" size={14} color="#2563EB" />
+            <Text className="text-blue-600 font-bold text-xs ml-1">+ Add</Text>
+          </TouchableOpacity>
         </View>
         <View className="flex-row gap-2 mb-2.5">
           <TouchableOpacity
@@ -337,13 +481,13 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
               </TouchableOpacity>
             ))}
           </View>
-          <View className="flex-row items-center flex-wrap">
-            <Text className="text-[11px] font-bold text-gray-500 mr-1.5">VIP Criteria:</Text>
+          <View className="flex-row items-center flex-wrap gap-1">
+            <Text className="text-[11px] font-bold text-gray-500 mr-1">VIP Criteria (visits ≥):</Text>
             {[2, 3, 5].map((threshold) => (
               <TouchableOpacity
                 key={threshold}
-                onPress={() => setVipVisitThreshold(threshold)}
-                className={`px-2.5 py-1 rounded-md border mr-1 ${
+                onPress={() => updateVipThreshold(threshold)}
+                className={`px-2 py-1 rounded-md border ${
                   vipVisitThreshold === threshold
                     ? "bg-amber-100 border-amber-400"
                     : "bg-gray-50 border-gray-200"
@@ -354,10 +498,44 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
                     vipVisitThreshold === threshold ? "text-amber-800" : "text-gray-600"
                   }`}
                 >
-                  {threshold} visits
+                  {threshold}
                 </Text>
               </TouchableOpacity>
             ))}
+            <View className="flex-row items-center bg-gray-100 border border-gray-300 rounded-md px-1.5 py-0.5 ml-1">
+              <TextInput
+                className="w-9 text-center text-[11px] font-bold text-gray-800 py-0"
+                keyboardType="numeric"
+                value={vipInputText}
+                onChangeText={(txt) => {
+                  const clean = txt.replace(/[^0-9]/g, "");
+                  setVipInputText(clean);
+                  const n = parseInt(clean, 10);
+                  if (!isNaN(n) && n >= 1) {
+                    setVipVisitThreshold(n);
+                    AsyncStorage.setItem("party_vip_threshold", String(n)).catch(() => {});
+                  }
+                }}
+                onSubmitEditing={() => {
+                  Keyboard.dismiss();
+                  if (!vipInputText || parseInt(vipInputText, 10) < 1) {
+                    updateVipThreshold(vipVisitThreshold || 3);
+                  }
+                }}
+                maxLength={3}
+                placeholder="3"
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  updateVipThreshold(vipInputText || 3);
+                }}
+                className="bg-amber-500 px-1.5 py-0.5 rounded ml-1"
+              >
+                <Text className="text-[10px] font-extrabold text-white">Set</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -449,18 +627,30 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
                     ) : null}
                   </View>
                 </View>
-                <View className="flex-row items-center gap-2">
+                <View className="flex-row items-center gap-1.5">
                   <TouchableOpacity
                     onPress={() => openWhatsAppOffer(item)}
-                    className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-200 items-center justify-center"
+                    className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 items-center justify-center"
                   >
-                    <FontAwesome name="whatsapp" size={18} color="#059669" />
+                    <FontAwesome name="whatsapp" size={16} color="#059669" />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => openPerksDialog(item)}
-                    className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-200 items-center justify-center"
+                    className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 items-center justify-center"
                   >
-                    <Ionicons name="gift-outline" size={18} color="#2563EB" />
+                    <Ionicons name="gift-outline" size={16} color="#D97706" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => openEditPartyModal(item)}
+                    className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 items-center justify-center"
+                  >
+                    <Ionicons name="create-outline" size={16} color="#2563EB" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteParty(item)}
+                    className="w-8 h-8 rounded-lg bg-red-50 border border-red-200 items-center justify-center"
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -552,6 +742,160 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
                   className="w-full bg-blue-600 py-3.5 rounded-xl items-center shadow"
                 >
                   <Text className="text-white font-bold text-sm">Save Customer Perks</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Edit / Add Party Modal ── */}
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setEditModalVisible(false);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+        >
+          <View className="flex-1 bg-black/50 justify-end sm:justify-center items-center p-0 sm:p-4">
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+            </TouchableWithoutFeedback>
+
+            <View className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[85%] shadow-2xl">
+              <View className="flex-row justify-between items-center pb-3 border-b border-gray-100">
+                <Text className="text-base font-extrabold text-gray-900">
+                  {editingParty ? "Edit Customer / Party" : "Add New Customer / Party"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setEditModalVisible(false);
+                  }}
+                  className="p-1"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={22} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                className="py-3"
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                contentContainerStyle={{ paddingBottom: 32 }}
+              >
+                <View className="mb-3">
+                  <Text className="text-xs font-bold text-gray-700 mb-1">Party Name *</Text>
+                  <TextInput
+                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900"
+                    placeholder="Customer or supplier name"
+                    value={partyFormName}
+                    onChangeText={setPartyFormName}
+                  />
+                </View>
+
+                <View className="mb-3">
+                  <Text className="text-xs font-bold text-gray-700 mb-1">Phone / WhatsApp Number *</Text>
+                  <TextInput
+                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900"
+                    placeholder="10-digit mobile number"
+                    keyboardType="phone-pad"
+                    value={partyFormPhone}
+                    onChangeText={setPartyFormPhone}
+                    maxLength={15}
+                  />
+                </View>
+
+                <View className="mb-3">
+                  <Text className="text-xs font-bold text-gray-700 mb-1">Party Type</Text>
+                  <View className="flex-row gap-2">
+                    {["customer", "supplier"].map((t) => (
+                      <TouchableOpacity
+                        key={t}
+                        onPress={() => setPartyFormType(t)}
+                        className={`flex-1 py-2 rounded-xl border items-center ${
+                          partyFormType === t
+                            ? "bg-blue-600 border-blue-600"
+                            : "bg-gray-100 border-gray-300"
+                        }`}
+                      >
+                        <Text
+                          className={`text-xs font-bold capitalize ${
+                            partyFormType === t ? "text-white" : "text-gray-700"
+                          }`}
+                        >
+                          {t}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View className="flex-row gap-3 mb-3">
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">Udhar Balance (Rs)</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900"
+                      placeholder="0"
+                      keyboardType="numeric"
+                      value={partyFormBalance}
+                      onChangeText={setPartyFormBalance}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">Visit Count</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900"
+                      placeholder="1"
+                      keyboardType="numeric"
+                      value={partyFormVisits}
+                      onChangeText={setPartyFormVisits}
+                    />
+                  </View>
+                </View>
+
+                <View className="mb-3">
+                  <Text className="text-xs font-bold text-gray-700 mb-1">Billing Address (Optional)</Text>
+                  <TextInput
+                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900"
+                    placeholder="Street, city, pincode"
+                    value={partyFormAddress}
+                    onChangeText={setPartyFormAddress}
+                  />
+                </View>
+
+                <View className="mb-5">
+                  <Text className="text-xs font-bold text-gray-700 mb-1">GSTIN (Optional)</Text>
+                  <TextInput
+                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900"
+                    placeholder="e.g. 19AAACB1234F1Z5"
+                    autoCapitalize="characters"
+                    value={partyFormGstin}
+                    onChangeText={setPartyFormGstin}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleSaveParty}
+                  disabled={savingParty}
+                  className="w-full bg-blue-600 py-3.5 rounded-xl items-center shadow flex-row justify-center"
+                >
+                  {savingParty ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-white font-bold text-sm">
+                      {editingParty ? "Update Customer" : "Save Customer"}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </ScrollView>
             </View>

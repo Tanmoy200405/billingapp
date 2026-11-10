@@ -776,6 +776,8 @@ router.put("/:id", async (req, res) => {
       type,
       billingAddress,
       gstin,
+      balance,
+      visitCount,
       isRegular,
       customDiscountPercent,
       assignedFreebie,
@@ -793,6 +795,8 @@ router.put("/:id", async (req, res) => {
         ...(type && { type }),
         ...(billingAddress !== undefined && { billingAddress }),
         ...(gstin !== undefined && { gstin }),
+        ...(balance !== undefined && { balance: Number(balance) || 0 }),
+        ...(visitCount !== undefined && { visitCount: Math.max(0, Number(visitCount) || 0) }),
         ...(isRegular !== undefined && { isRegular: Boolean(isRegular) }),
         ...(customDiscountPercent !== undefined && {
           customDiscountPercent: Number(customDiscountPercent),

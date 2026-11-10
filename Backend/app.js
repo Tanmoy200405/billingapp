@@ -89,12 +89,12 @@ app.get("/api/app-version", (req, res) => {
   const fallbackApkUrl = `${protocol}://${host}/api/download-apk`;
   res.status(200).json({
     success: true,
-    latestVersion: process.env.APP_LATEST_VERSION || "1.0.4",
+    latestVersion: process.env.APP_LATEST_VERSION || "1.0.5",
     minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
     apkUrl: process.env.APP_APK_URL || defaultApkUrl || fallbackApkUrl,
     releaseNotes:
       process.env.APP_RELEASE_NOTES ||
-      "Version 1.0.4: Increased PDF import & upload limit up to 100 MB, streaming binary PDF import, party list PDF import, food categories, and keyboard fixes.",
+      "Version 1.0.5: Add, edit, and delete parties, manual VIP visit threshold setting, 100MB PDF import limit, and keyboard fixes.",
     forceUpdate: false,
     timestamp: new Date().toISOString(),
   });

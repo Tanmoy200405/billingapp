@@ -251,6 +251,16 @@ export const api = {
   parties: {
     getAll: (params = "") => request(`/parties${params ? `?${params}` : ""}`),
     getOne: (id) => request(`/parties/${id}`),
+    create: (payload) =>
+      request("/parties", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    update: (id, payload) =>
+      request(`/parties/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
     getVipCount: () => request("/parties/vip-count"),
     sendBulkVipOffer: () =>
       request("/parties/send-bulk-vip-offer", { method: "POST" }),
