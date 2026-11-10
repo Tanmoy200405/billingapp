@@ -17,8 +17,8 @@ export function generateSalesReportPdf(reportData, storeInfo = {}) {
       doc.on("end", () => resolve(Buffer.concat(chunks)));
       doc.on("error", (err) => reject(err));
 
-      const storeName = storeInfo.businessName || "THE A POP JAKO BITES";
-      const storePhone = storeInfo.phone || storeInfo.whatsappNumber || "7003317615";
+      const storeName = storeInfo.businessName || "My Store";
+      const storePhone = storeInfo.phone || storeInfo.whatsappNumber || "";
       const { startDate, endDate, summary = {}, invoices = [] } = reportData;
 
       const pageWidth = 535;
@@ -142,7 +142,7 @@ export function generateInventoryReportPdf(items = [], storeInfo = {}) {
       doc.on("end", () => resolve(Buffer.concat(chunks)));
       doc.on("error", (err) => reject(err));
 
-      const storeName = storeInfo.businessName || "THE A POP JAKO BITES";
+      const storeName = storeInfo.businessName || "My Store";
       const pageWidth = 535;
       const leftX = 30;
 
@@ -242,7 +242,7 @@ export function generatePartyReportPdf(parties = [], storeInfo = {}) {
       doc.on("end", () => resolve(Buffer.concat(chunks)));
       doc.on("error", (err) => reject(err));
 
-      const storeName = storeInfo.businessName || "THE A POP JAKO BITES";
+      const storeName = storeInfo.businessName || "My Store";
       const pageWidth = 535;
       const leftX = 30;
 

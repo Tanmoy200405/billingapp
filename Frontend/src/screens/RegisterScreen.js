@@ -172,19 +172,10 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
         </TouchableOpacity>
       </View>
 
-      <View className="items-center mt-6">
-        <Text className="text-xs text-blue-600 font-bold mb-3">Or continue with</Text>
-        <View className="flex-row gap-4">
-          <View className="w-11 h-11 rounded-xl bg-gray-100 items-center justify-center border border-gray-200">
-            <FontAwesome name="google" size={18} color="#EA4335" />
-          </View>
-          <View className="w-11 h-11 rounded-xl bg-gray-100 items-center justify-center border border-gray-200">
-            <FontAwesome name="apple" size={20} color="#111827" />
-          </View>
-          <View className="w-11 h-11 rounded-xl bg-gray-100 items-center justify-center border border-gray-200">
-            <MaterialIcons name="whatsapp" size={22} color="#16A34A" />
-          </View>
-        </View>
+      <View className="items-center mt-4 pb-4">
+        <Text className="text-[11px] text-gray-400 text-center">
+          Your store profile, GST details, and receipts are securely synced to the cloud.
+        </Text>
       </View>
       </ScrollView>
     </KeyboardAvoidingView>

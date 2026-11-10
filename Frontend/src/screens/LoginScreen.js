@@ -220,30 +220,16 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
       </View>
 
       <View className="items-center mt-8">
-        <Text className="text-xs text-blue-600 font-bold mb-4">Or continue with</Text>
-        <View className="flex-row gap-4">
-          <TouchableOpacity
-            onPress={() => Alert.alert("Coming Soon", "Google login will be supported in an upcoming update")}
-            activeOpacity={0.7}
-            className="w-11 h-11 rounded-xl bg-gray-100 items-center justify-center border border-gray-200"
-          >
-            <FontAwesome name="google" size={18} color="#EA4335" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => Alert.alert("Coming Soon", "Apple login will be supported in an upcoming update")}
-            activeOpacity={0.7}
-            className="w-11 h-11 rounded-xl bg-gray-100 items-center justify-center border border-gray-200"
-          >
-            <FontAwesome name="apple" size={20} color="#111827" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleWhatsAppShortcut}
-            activeOpacity={0.7}
-            className="w-11 h-11 rounded-xl bg-green-50 items-center justify-center border border-green-300 shadow-sm"
-          >
-            <MaterialIcons name="whatsapp" size={24} color="#16A34A" />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={handleWhatsAppShortcut}
+          activeOpacity={0.8}
+          className="flex-row items-center bg-green-50 border border-green-300 px-5 py-3 rounded-xl shadow-xs"
+        >
+          <MaterialIcons name="whatsapp" size={20} color="#16A34A" />
+          <Text className="text-green-800 font-bold text-xs ml-2">
+            Quick Login with WhatsApp OTP
+          </Text>
+        </TouchableOpacity>
       </View>
       </ScrollView>
     </KeyboardAvoidingView>

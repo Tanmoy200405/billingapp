@@ -185,7 +185,15 @@ export default function App() {
               }}
             />
           ) : activeTab === "party" ? (
-            <PartyScreen onOpenDrawer={() => setDrawerVisible(true)} onBack={() => setActiveTab("dashboard")} />
+            <PartyScreen
+              user={user}
+              onProfileUpdated={(updated) => {
+                setUser(updated);
+                setAuthToken(getAuthToken(), updated);
+              }}
+              onOpenDrawer={() => setDrawerVisible(true)}
+              onBack={() => setActiveTab("dashboard")}
+            />
           ) : activeTab === "inventory" ? (
             <InventoryScreen onOpenDrawer={() => setDrawerVisible(true)} onBack={() => setActiveTab("dashboard")} />
           ) : activeTab === "reports" ? (

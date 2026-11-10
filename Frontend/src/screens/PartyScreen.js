@@ -23,13 +23,14 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../config/api";
 import { downloadReportFile } from "../utils/reportDownloader";
-export default function PartyScreen({ onOpenDrawer, onBack }) {
+export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBack }) {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [vipVisitThreshold, setVipVisitThreshold] = useState(3);
-  const [vipInputText, setVipInputText] = useState("3");
+  const [vipVisitThreshold, setVipVisitThreshold] = useState(user?.vipVisitThreshold || 3);
+  const [vipInputText, setVipInputText] = useState(String(user?.vipVisitThreshold || 3));
+  const [savingVipThreshold, setSavingVipThreshold] = useState(false);
   const [bulkSending, setBulkSending] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
@@ -38,6 +39,7 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
   const [formIsRegular, setFormIsRegular] = useState(false);
   const [formDiscount, setFormDiscount] = useState("0");
   const [formFreebie, setFormFreebie] = useState("");
+  const [savingPerks, setSavingPerks] = useState(false);
 
   // Edit / Add Party Modal state
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -49,9 +51,18 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
   const [partyFormGstin, setPartyFormGstin] = useState("");
   const [partyFormBalance, setPartyFormBalance] = useState("0");
   const [partyFormVisits, setPartyFormVisits] = useState("1");
+  const [partyFormIsRegular, setPartyFormIsRegular] = useState(false);
+  const [partyFormDiscount, setPartyFormDiscount] = useState("0");
+  const [partyFormFreebie, setPartyFormFreebie] = useState("");
   const [savingParty, setSavingParty] = useState(false);
 
   useEffect(() => {
+    if (user?.vipVisitThreshold && user.vipVisitThreshold >= 1) {
+      setVipVisitThreshold(user.vipVisitThreshold);
+      setVipInputText(String(user.vipVisitThreshold));
+      AsyncStorage.setItem("party_vip_threshold", String(user.vipVisitThreshold)).catch(() => {});
+      return;
+    }
     AsyncStorage.getItem("party_vip_threshold").then((val) => {
       if (val) {
         const parsed = parseInt(val, 10);
@@ -61,14 +72,32 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
         }
       }
     }).catch(() => {});
-  }, []);
+  }, [user?.vipVisitThreshold]);
 
-  const updateVipThreshold = (newVal) => {
+  const updateVipThreshold = async (newVal, showConfirm = true) => {
     const num = parseInt(String(newVal).replace(/[^0-9]/g, ""), 10);
-    if (!isNaN(num) && num >= 1) {
-      setVipVisitThreshold(num);
-      setVipInputText(String(num));
-      AsyncStorage.setItem("party_vip_threshold", String(num)).catch(() => {});
+    if (isNaN(num) || num < 1) {
+      Alert.alert("Invalid Number", "Please enter 1 or more visits for VIP criteria.");
+      return;
+    }
+    setVipVisitThreshold(num);
+    setVipInputText(String(num));
+    AsyncStorage.setItem("party_vip_threshold", String(num)).catch(() => {});
+    setSavingVipThreshold(true);
+    try {
+      const res = await api.auth.updateProfile({ vipVisitThreshold: num });
+      if (res && res.success && res.user) {
+        if (onProfileUpdated) onProfileUpdated(res.user);
+      }
+      if (showConfirm) {
+        Alert.alert("VIP Criteria Saved", `Customers with ${num}+ visits are now marked as VIP.`);
+      }
+    } catch {
+      if (showConfirm) {
+        Alert.alert("VIP Criteria Updated", `VIP threshold set to ${num}+ visits.`);
+      }
+    } finally {
+      setSavingVipThreshold(false);
     }
   };
 
@@ -187,17 +216,28 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
   const handleSavePerks = async () => {
     Keyboard.dismiss();
     if (!selectedParty) return;
-    const res = await api.parties.updateRegularPerks(selectedParty._id, {
-      isRegular: formIsRegular,
-      customDiscountPercent: Number(formDiscount) || 0,
-      assignedFreebie: formFreebie.trim(),
-    });
-    if (res && res.success) {
-      setPerksModalVisible(false);
-      loadParties();
-      Alert.alert("Saved", "Customer perks updated");
-    } else {
-      Alert.alert("Error", res?.message || "Failed to update perks");
+    setSavingPerks(true);
+    try {
+      const payload = {
+        isRegular: Boolean(formIsRegular),
+        customDiscountPercent: Math.max(0, Math.min(100, Number(formDiscount) || 0)),
+        assignedFreebie: formFreebie.trim(),
+      };
+      const res = await api.parties.updateRegularPerks(selectedParty._id, payload);
+      if (res && res.success) {
+        setParties((prev) =>
+          prev.map((p) => (p._id === selectedParty._id ? { ...p, ...payload, ...(res.party || {}) } : p))
+        );
+        setPerksModalVisible(false);
+        loadParties();
+        Alert.alert("Saved", `VIP & perks updated for ${selectedParty.name}`);
+      } else {
+        Alert.alert("Error", res?.message || "Failed to update perks");
+      }
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to update perks");
+    } finally {
+      setSavingPerks(false);
     }
   };
   const openWhatsAppOffer = async (party) => {
@@ -257,6 +297,9 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
     setPartyFormGstin("");
     setPartyFormBalance("0");
     setPartyFormVisits("1");
+    setPartyFormIsRegular(false);
+    setPartyFormDiscount("0");
+    setPartyFormFreebie("");
     setEditModalVisible(true);
   };
 
@@ -269,6 +312,9 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
     setPartyFormGstin(party.gstin || "");
     setPartyFormBalance(String(party.balance || 0));
     setPartyFormVisits(String(party.visitCount ?? 1));
+    setPartyFormIsRegular(Boolean(party.isRegular || (party.visitCount || 0) >= vipVisitThreshold));
+    setPartyFormDiscount(String(party.customDiscountPercent || 0));
+    setPartyFormFreebie(party.assignedFreebie || "");
     setEditModalVisible(true);
   };
 
@@ -292,6 +338,9 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
         gstin: partyFormGstin.trim().toUpperCase(),
         balance: Number(partyFormBalance) || 0,
         visitCount: Math.max(0, parseInt(partyFormVisits, 10) || 0),
+        isRegular: Boolean(partyFormIsRegular),
+        customDiscountPercent: Math.max(0, Math.min(100, Number(partyFormDiscount) || 0)),
+        assignedFreebie: partyFormFreebie.trim(),
       };
 
       const res = editingParty
@@ -502,38 +551,35 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
                 </Text>
               </TouchableOpacity>
             ))}
-            <View className="flex-row items-center bg-gray-100 border border-gray-300 rounded-md px-1.5 py-0.5 ml-1">
+            <View className="flex-row items-center bg-gray-100 border border-gray-300 rounded-lg px-1.5 py-0.5 ml-1">
               <TextInput
-                className="w-9 text-center text-[11px] font-bold text-gray-800 py-0"
+                style={{ width: 42, height: 26, paddingVertical: 0, textAlign: "center", fontSize: 12, fontWeight: "700", color: "#1F2937" }}
                 keyboardType="numeric"
                 value={vipInputText}
                 onChangeText={(txt) => {
                   const clean = txt.replace(/[^0-9]/g, "");
                   setVipInputText(clean);
-                  const n = parseInt(clean, 10);
-                  if (!isNaN(n) && n >= 1) {
-                    setVipVisitThreshold(n);
-                    AsyncStorage.setItem("party_vip_threshold", String(n)).catch(() => {});
-                  }
                 }}
                 onSubmitEditing={() => {
                   Keyboard.dismiss();
-                  if (!vipInputText || parseInt(vipInputText, 10) < 1) {
-                    updateVipThreshold(vipVisitThreshold || 3);
-                  }
+                  updateVipThreshold(vipInputText || 3, true);
                 }}
                 maxLength={3}
                 placeholder="3"
+                placeholderTextColor="#9CA3AF"
                 returnKeyType="done"
               />
               <TouchableOpacity
                 onPress={() => {
                   Keyboard.dismiss();
-                  updateVipThreshold(vipInputText || 3);
+                  updateVipThreshold(vipInputText || 3, true);
                 }}
-                className="bg-amber-500 px-1.5 py-0.5 rounded ml-1"
+                disabled={savingVipThreshold}
+                className="bg-amber-500 px-2 py-1 rounded ml-1"
               >
-                <Text className="text-[10px] font-extrabold text-white">Set</Text>
+                <Text className="text-[10px] font-extrabold text-white">
+                  {savingVipThreshold ? "..." : "Set"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -739,9 +785,14 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
                 </View>
                 <TouchableOpacity
                   onPress={handleSavePerks}
-                  className="w-full bg-blue-600 py-3.5 rounded-xl items-center shadow"
+                  disabled={savingPerks}
+                  className="w-full bg-blue-600 py-3.5 rounded-xl items-center shadow flex-row justify-center"
                 >
-                  <Text className="text-white font-bold text-sm">Save Customer Perks</Text>
+                  {savingPerks ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-white font-bold text-sm">Save Customer Perks</Text>
+                  )}
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -859,6 +910,41 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
                       keyboardType="numeric"
                       value={partyFormVisits}
                       onChangeText={setPartyFormVisits}
+                    />
+                  </View>
+                </View>
+
+                <View className="flex-row items-center justify-between bg-amber-50 p-3 rounded-xl border border-amber-200 mb-3">
+                  <View>
+                    <Text className="text-xs font-bold text-gray-800">VIP / Regular Member</Text>
+                    <Text className="text-[10px] text-gray-500">Always treat this customer as VIP</Text>
+                  </View>
+                  <Switch
+                    value={partyFormIsRegular}
+                    onValueChange={setPartyFormIsRegular}
+                    trackColor={{ false: "#D1D5DB", true: "#FBBF24" }}
+                    thumbColor={partyFormIsRegular ? "#D97706" : "#9CA3AF"}
+                  />
+                </View>
+
+                <View className="flex-row gap-3 mb-3">
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">VIP Discount (%)</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900"
+                      placeholder="0"
+                      keyboardType="numeric"
+                      value={partyFormDiscount}
+                      onChangeText={setPartyFormDiscount}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-gray-700 mb-1">Freebie Gift</Text>
+                    <TextInput
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900"
+                      placeholder="e.g. Cold Drink"
+                      value={partyFormFreebie}
+                      onChangeText={setPartyFormFreebie}
                     />
                   </View>
                 </View>

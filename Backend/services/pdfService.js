@@ -1,15 +1,13 @@
 import PDFDocument from "pdfkit";
 
 /**
- * Generate a mesmerizing, ultra-premium restaurant & retail bill PDF.
- * Inspired by Petpooja / Zudio enterprise billing format:
- * - Crisp branding with dual accent gradient bar and optional store logo
- * - Modern typography hierarchy & dual pill badges (ORDER TOKEN + STATUS)
- * - Clean alternating item table with right-aligned numbers
- * - Comprehensive summary breakdown (Subtotal, Discounts, Perks, Taxes, Split modes)
- * - Grand Total highlight card with subtle border glow
- * - Embedded high-density Barcode representation + Verification QR-ready footer
- * - Dynamic height auto-calculation to prevent any clipping or awkward page breaks
+ * Generate a clean, authentic, commercial-grade POS & Restaurant receipt PDF.
+ * Layout modeled after crisp thermal POS receipts (no barcode):
+ * - Centered Store Logo (if configured)
+ * - Centered Bold Store Name, Address, Phone, Email (@), GSTIN
+ * - Clean Left-Aligned Bill Metadata (Bill No, Created On, Bill To / Payment, Customer)
+ * - Crisp 4-column Item Table (Item Name, Qty, Rate, Total) with clean wrapping
+ * - Clean Subtotal, Discount, Freebie, Tax, Bold Grand Total, Savings & Footer
  *
  * @param {Object} invoice
  * @param {Object} storeInfo
@@ -19,65 +17,20 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
   return new Promise(async (resolve, reject) => {
     try {
       const items = invoice.items || [];
-      const itemCount = items.length;
 
-      // Dynamic height calculation so the page is small, compact, and fully covered (no bottom blank space)
-      const hasLogo = Boolean(storeInfo.logo);
-      const hasAddress = Boolean(storeInfo.address);
-      const hasEmail = Boolean(storeInfo.email);
-      const hasGstin = Boolean(storeInfo.gstin);
+      const storeName = (storeInfo.businessName || invoice.businessName || "My Store").trim();
+      const storePhone = (storeInfo.phone || storeInfo.whatsappNumber || "").toString().trim();
+      const storeAddress = (storeInfo.address || "").toString().trim();
+      const storeEmail = (storeInfo.email || "").toString().trim();
+      const storeGstin = (storeInfo.gstin || "").toString().trim();
+      const storeLogo = (storeInfo.logo || "").toString().trim();
 
-      let estimatedHeight = 270;
-      if (hasLogo) estimatedHeight += 58;
-      if (hasAddress) estimatedHeight += 12;
-      if (hasEmail) estimatedHeight += 11;
-      if (hasGstin) estimatedHeight += 12;
-
-      const itemRowHeight = 17;
-      estimatedHeight += itemCount * itemRowHeight;
-
-      if (invoice.discountTotal > 0) estimatedHeight += 14;
-      if (invoice.regularDiscountAmount > 0) estimatedHeight += 14;
-      if (invoice.freebieItemGiven) estimatedHeight += 14;
-      if (invoice.taxTotal > 0) estimatedHeight += 14;
-      if (invoice.paymentMode === "UPI/CASH") estimatedHeight += 16;
-      if (invoice.notes) estimatedHeight += 16;
-      const savingsEstimate = (invoice.discountTotal || 0) + (invoice.regularDiscountAmount || 0);
-      if (savingsEstimate > 0) estimatedHeight += 22;
-
-      // Clean tight finish with zero trailing white void
-      const calculatedHeight = Math.ceil(estimatedHeight + 14);
-
-      const doc = new PDFDocument({
-        size: [288, calculatedHeight], // Compact 76mm / 3-inch roll width
-        autoFirstPage: true,
-        bufferPages: true,
-        margins: { top: 0, bottom: 6, left: 14, right: 14 },
-      });
-
-      const chunks = [];
-      doc.on("data", (chunk) => chunks.push(chunk));
-      doc.on("end", () => resolve(Buffer.concat(chunks)));
-      doc.on("error", (err) => reject(err));
-
-      const storeName = storeInfo.businessName || invoice.businessName || "BAOMIAN CAFE & RESTAURANT";
-      const storePhone = storeInfo.phone || storeInfo.whatsappNumber || "7003317615";
-      const storeAddress = storeInfo.address || "";
-      const storeEmail = storeInfo.email || "";
-      const storeGstin = storeInfo.gstin || "";
-      const storeLogo = storeInfo.logo || "";
-
-      const pageWidth = 288;
-      const contentWidth = 260;
+      const pageWidth = 240; // ~80mm crisp POS receipt width
       const leftX = 14;
+      const contentWidth = pageWidth - leftX * 2; // 212pt
       const rightX = leftX + contentWidth;
 
-      // ─── 1. TOP PREMIUM ACCENT BARS (Double hairline gradient aesthetic) ───
-      doc.rect(0, 0, pageWidth, 5).fill("#0F172A");
-      doc.rect(0, 5, pageWidth, 2.5).fill("#059669");
-      doc.y = 16;
-
-      // ─── 2. STORE LOGO EMBEDDING ──────────────────────────────────────────
+      // Load logo buffer if available
       let logoBuf = null;
       try {
         if (storeLogo) {
@@ -87,8 +40,7 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
           } else if (storeLogo.startsWith("http://") || storeLogo.startsWith("https://")) {
             const logoRes = await fetch(storeLogo);
             if (logoRes.ok) {
-              const arrBuf = await logoRes.arrayBuffer();
-              logoBuf = Buffer.from(arrBuf);
+              logoBuf = Buffer.from(await logoRes.arrayBuffer());
             }
           } else {
             const fs = await import("fs");
@@ -97,266 +49,318 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
             }
           }
         }
-        if (!logoBuf) {
-          const fs = await import("fs");
-          const path = await import("path");
-          const defaultAsset = path.resolve("./Frontend/assets/icon.png");
-          if (fs.existsSync(defaultAsset)) {
-            logoBuf = fs.readFileSync(defaultAsset);
-          }
-        }
-        if (logoBuf) {
-          const logoSize = 52;
-          const logoX = leftX + (contentWidth - logoSize) / 2;
-          doc.image(logoBuf, logoX, doc.y, { width: logoSize, height: logoSize, align: "center" });
-          doc.y += logoSize + 4;
-        }
       } catch (logoErr) {
         console.warn("Logo embed notice:", logoErr.message);
       }
 
-      // ─── 3. STORE BRAND HEADER ────────────────────────────────────────────
-      doc
-        .fontSize(14)
-        .font("Helvetica-Bold")
-        .fillColor("#0F172A")
-        .text(storeName.toUpperCase(), leftX, doc.y, { width: contentWidth, align: "center", characterSpacing: 0.5 });
+      // Estimate dynamic page height cleanly so there is never clipping or excessive white space
+      let estimatedHeight = 225;
+      if (logoBuf) estimatedHeight += 64;
+      if (storeAddress) estimatedHeight += Math.ceil(storeAddress.length / 30) * 11 + 4;
+      if (storePhone) estimatedHeight += 12;
+      if (storeEmail) estimatedHeight += 12;
+      if (storeGstin) estimatedHeight += 12;
 
-      // Dual Badges: TAX INVOICE & PAID STATUS
-      const badgeY = doc.y + 3;
-      const badgeW = 76;
-      const badgeH = 13;
-      const badge1X = leftX + (contentWidth - (badgeW * 2 + 8)) / 2;
-      const badge2X = badge1X + badgeW + 8;
-
-      doc.roundedRect(badge1X, badgeY, badgeW, badgeH, 6).fillAndStroke("#F1F5F9", "#CBD5E1");
-      doc.fontSize(7).font("Helvetica-Bold").fillColor("#334155")
-        .text("TAX INVOICE", badge1X, badgeY + 3, { width: badgeW, align: "center" });
-
-      const isPaid = (invoice.paymentStatus || "PAID").toUpperCase() === "PAID";
-      doc.roundedRect(badge2X, badgeY, badgeW, badgeH, 6).fillAndStroke(isPaid ? "#DCFCE7" : "#FEE2E2", isPaid ? "#86EFAC" : "#FCA5A5");
-      doc.fontSize(7).font("Helvetica-Bold").fillColor(isPaid ? "#15803D" : "#B91C1C")
-        .text(isPaid ? "PAID" : "DUE", badge2X, badgeY + 3, { width: badgeW, align: "center" });
-
-      doc.y = badgeY + 18;
-
-      if (storeAddress) {
-        doc.fontSize(7.5).font("Helvetica").fillColor("#475569")
-          .text(storeAddress, leftX, doc.y, { width: contentWidth, align: "center" });
-        doc.moveDown(0.15);
-      }
-
-      doc.fontSize(7.5).font("Helvetica").fillColor("#475569")
-        .text(`Helpline: +${storePhone}`, leftX, doc.y, { width: contentWidth, align: "center" });
-
-      if (storeEmail) {
-        doc.fontSize(7).font("Helvetica").fillColor("#64748B")
-          .text(`Email: ${storeEmail}`, leftX, doc.y + 1, { width: contentWidth, align: "center" });
-      }
-
-      if (storeGstin) {
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor("#1E293B")
-          .text(`GSTIN: ${storeGstin}`, leftX, doc.y + 1, { width: contentWidth, align: "center" });
-      }
-
-      doc.moveDown(0.35);
-
-      // ─── 4. ORDER / TOKEN NUMBER BADGE ────────────────────────────────────
-      const rawToken = invoice.invoiceNumber || "1";
-      const tokenDisplay = rawToken.toString().replace(/[^0-9]/g, "") || rawToken;
-      const tokenBoxY = doc.y;
-      
-      doc.roundedRect(leftX, tokenBoxY, contentWidth, 34, 6).fillAndStroke("#F8FAFC", "#E2E8F0");
-      doc.fontSize(7).font("Helvetica-Bold").fillColor("#64748B")
-        .text("ORDER / TOKEN NUMBER", leftX, tokenBoxY + 4, { width: contentWidth, align: "center", characterSpacing: 1 });
-      doc.fontSize(16).font("Helvetica-Bold").fillColor("#0F172A")
-        .text(`#${tokenDisplay}`, leftX, tokenBoxY + 14, { width: contentWidth, align: "center" });
-
-      doc.y = tokenBoxY + 38;
-
-      // ─── 5. BILL METADATA CARD (Petpooja Date & Customer Info) ────────────
-      const rawDate = invoice.invoiceDate || invoice.createdAt || new Date();
-      const petpoojaDateStr = new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Asia/Kolkata",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(new Date(rawDate)).replace(",", "");
-
-      const paymentMode = invoice.paymentMode || "CASH";
-      const custName = invoice.partyName || "Walk-in Customer";
-      const custPhone = invoice.partyPhone ? invoice.partyPhone : "";
-
-      const metaY = doc.y;
-      doc.roundedRect(leftX, metaY, contentWidth, 32, 4).fillAndStroke("#F8FAFC", "#E2E8F0");
-      doc.fontSize(7.5).font("Helvetica").fillColor("#334155");
-
-      // Left Column
-      doc.font("Helvetica-Bold").fillColor("#64748B").text("Bill No:", leftX + 8, metaY + 5);
-      doc.font("Helvetica-Bold").fillColor("#0F172A").text(`#${invoice.invoiceNumber || "1"}`, leftX + 44, metaY + 5);
-
-      doc.font("Helvetica-Bold").fillColor("#64748B").text("Date:", leftX + 8, metaY + 18);
-      doc.font("Helvetica").fillColor("#0F172A").text(petpoojaDateStr, leftX + 44, metaY + 18);
-
-      // Right Column
-      doc.font("Helvetica-Bold").fillColor("#64748B").text("Customer:", leftX + 134, metaY + 5);
-      doc.font("Helvetica").fillColor("#0F172A").text(custName.slice(0, 16), leftX + 180, metaY + 5, { width: 75, ellipsis: true });
-
-      doc.font("Helvetica-Bold").fillColor("#64748B").text("Pay Mode:", leftX + 134, metaY + 18);
-      doc.font("Helvetica-Bold").fillColor(paymentMode === "CREDIT" ? "#DC2626" : "#059669")
-        .text(paymentMode, leftX + 180, metaY + 18);
-
-      doc.y = metaY + 36;
-
-      // ─── 6. ITEMS TABLE ───────────────────────────────────────────────────
-      const colItem = leftX + 6;
-      const colQty = leftX + 130;
-      const colRate = leftX + 168;
-      const colTotal = leftX + 214;
-
-      const tableHeadY = doc.y;
-      doc.roundedRect(leftX, tableHeadY, contentWidth, 16, 4).fill("#0F172A");
-
-      doc.fontSize(7.5).font("Helvetica-Bold").fillColor("#FFFFFF");
-      doc.text("ITEM", colItem, tableHeadY + 4, { width: 120 });
-      doc.text("QTY", colQty, tableHeadY + 4, { width: 34, align: "center" });
-      doc.text("RATE", colRate, tableHeadY + 4, { width: 42, align: "right" });
-      doc.text("TOTAL", colTotal, tableHeadY + 4, { width: 42, align: "right" });
-
-      doc.y = tableHeadY + 18;
-
-      // Render Item Rows with subtle alternating zebra banding
-      let rowIndex = 0;
       for (const it of items) {
-        const itemY = doc.y;
-        const name = it.name || "Item";
-        const qty = it.quantity || 1;
-        const rateVal = Number(it.sellingPrice ?? it.price ?? it.rate ?? 0);
-        const totalVal = Number(it.total ?? rateVal * qty);
-
-        if (rowIndex % 2 === 1) {
-          doc.rect(leftX, itemY - 1, contentWidth, 16).fill("#F8FAFC");
-        }
-
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor("#1E293B");
-        doc.text(name, colItem, itemY + 2, { width: 122, height: 14, ellipsis: true });
-
-        doc.font("Helvetica").fillColor("#475569");
-        doc.text(`${qty}`, colQty, itemY + 2, { width: 34, align: "center" });
-        doc.text(rateVal.toFixed(0), colRate, itemY + 2, { width: 42, align: "right" });
-
-        doc.font("Helvetica-Bold").fillColor("#0F172A");
-        doc.text(`Rs.${totalVal.toFixed(0)}`, colTotal, itemY + 2, { width: 42, align: "right" });
-
-        doc.y = itemY + 16;
-        rowIndex++;
+        const nm = (it.name || "Item").toString();
+        const lines = Math.max(1, Math.ceil(nm.length / 18));
+        estimatedHeight += lines * 11 + 6;
       }
 
-      doc.moveDown(0.2);
-      doc.moveTo(leftX, doc.y).lineTo(rightX, doc.y).dash(3, { space: 2 }).strokeColor("#CBD5E1").lineWidth(0.5).stroke();
-      doc.undash();
-      doc.moveDown(0.3);
+      if (invoice.discountTotal > 0) estimatedHeight += 13;
+      if (invoice.regularDiscountAmount > 0) estimatedHeight += 13;
+      if (invoice.freebieItemGiven) estimatedHeight += 13;
+      if (invoice.taxTotal > 0) estimatedHeight += 13;
+      if (invoice.paymentMode === "UPI/CASH") estimatedHeight += 14;
+      const totalSaved = (invoice.discountTotal || 0) + (invoice.regularDiscountAmount || 0);
+      if (totalSaved > 0) estimatedHeight += 18;
+      if (invoice.notes) estimatedHeight += 16;
 
-      // ─── 7. TOTALS BREAKDOWN ─────────────────────────────────────────────
-      const printSummaryLine = (label, val, isBold = false, color = "#334155") => {
-        const currY = doc.y;
-        doc.fontSize(7.5).font(isBold ? "Helvetica-Bold" : "Helvetica").fillColor(color);
-        doc.text(label, leftX + 70, currY, { width: 110, align: "right" });
-        doc.text(val, colTotal - 10, currY, { width: 52, align: "right" });
-        doc.moveDown(0.2);
-      };
-
-      printSummaryLine("Subtotal:", `Rs. ${Number(invoice.subtotal || invoice.grandTotal || 0).toFixed(2)}`);
-
-      if (invoice.discountTotal > 0) {
-        printSummaryLine("Discount:", `-Rs. ${Number(invoice.discountTotal).toFixed(2)}`, false, "#059669");
-      }
-
-      if (invoice.regularDiscountAmount > 0) {
-        printSummaryLine("Regular Perk:", `-Rs. ${Number(invoice.regularDiscountAmount).toFixed(2)}`, true, "#059669");
-      }
-
-      if (invoice.freebieItemGiven) {
-        printSummaryLine("Free Gift:", `${invoice.freebieItemGiven}`, true, "#2563EB");
-      }
-
-      if (invoice.taxTotal > 0) {
-        printSummaryLine("Taxes (GST):", `Rs. ${Number(invoice.taxTotal).toFixed(2)}`);
-      }
-
-      doc.moveDown(0.2);
-
-      // ─── 8. GRAND TOTAL HERO CARD ─────────────────────────────────────────
-      const grandY = doc.y;
-      doc.roundedRect(leftX, grandY, contentWidth, 24, 6).fill("#0F172A");
-      doc.fontSize(10).font("Helvetica-Bold").fillColor("#FFFFFF");
-      doc.text("GRAND TOTAL", leftX + 12, grandY + 6.5);
-      doc.text(`Rs. ${Number(invoice.grandTotal || 0).toFixed(2)}`, colTotal - 25, grandY + 6.5, {
-        width: 67,
-        align: "right",
+      const doc = new PDFDocument({
+        size: [pageWidth, Math.max(300, Math.ceil(estimatedHeight + 30))],
+        autoFirstPage: true,
+        bufferPages: true,
+        margins: { top: 14, bottom: 12, left: leftX, right: leftX },
       });
 
-      doc.y = grandY + 30;
+      const chunks = [];
+      doc.on("data", (chunk) => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", (err) => reject(err));
 
-      // Split Payment Details (if UPI/CASH)
-      if (invoice.paymentMode === "UPI/CASH") {
-        doc.fontSize(7).font("Helvetica-Bold").fillColor("#059669");
-        doc.text(
-          `Paid: Cash Rs.${invoice.cashAmount || 0}  +  UPI Rs.${invoice.upiAmount || 0}`,
-          leftX,
-          doc.y,
-          { width: contentWidth, align: "center" }
-        );
-        doc.moveDown(0.3);
+      const drawDashedLine = (yPos) => {
+        doc
+          .moveTo(leftX, yPos)
+          .lineTo(rightX, yPos)
+          .dash(2.5, { space: 2 })
+          .strokeColor("#94A3B8")
+          .lineWidth(0.6)
+          .stroke();
+        doc.undash();
+      };
+
+      const drawSolidLine = (yPos, color = "#0F172A", width = 0.8) => {
+        doc
+          .moveTo(leftX, yPos)
+          .lineTo(rightX, yPos)
+          .strokeColor(color)
+          .lineWidth(width)
+          .stroke();
+      };
+
+      doc.y = 14;
+
+      // ─── 1. CENTERED STORE LOGO ─────────────────────────────────────────────
+      if (logoBuf) {
+        try {
+          const logoSize = 54;
+          const logoX = leftX + (contentWidth - logoSize) / 2;
+          doc.image(logoBuf, logoX, doc.y, {
+            fit: [logoSize, logoSize],
+            align: "center",
+            valign: "center",
+          });
+          doc.y += logoSize + 6;
+        } catch (imgErr) {
+          console.warn("Logo render notice:", imgErr.message);
+        }
       }
 
-      // Savings Callout Banner
-      const totalSaved = (invoice.discountTotal || 0) + (invoice.regularDiscountAmount || 0);
-      if (totalSaved > 0) {
-        const saveY = doc.y;
-        doc.roundedRect(leftX, saveY, contentWidth, 18, 5).fillAndStroke("#DCFCE7", "#86EFAC");
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor("#15803D")
-          .text(`TOTAL SAVINGS: Rs. ${totalSaved.toFixed(0)} ON THIS BILL`, leftX, saveY + 5, {
+      // ─── 2. CLEAN STORE HEADER ──────────────────────────────────────────────
+      doc
+        .fontSize(12.5)
+        .font("Helvetica-Bold")
+        .fillColor("#0F172A")
+        .text(storeName.toUpperCase(), leftX, doc.y, {
+          width: contentWidth,
+          align: "center",
+        });
+
+      doc.moveDown(0.15);
+
+      if (storeAddress) {
+        doc
+          .fontSize(8.2)
+          .font("Helvetica")
+          .fillColor("#1E293B")
+          .text(storeAddress, leftX, doc.y, {
+            width: contentWidth,
+            align: "center",
+            lineGap: 1.5,
+          });
+      }
+
+      if (storePhone) {
+        doc
+          .fontSize(8.2)
+          .font("Helvetica")
+          .fillColor("#1E293B")
+          .text(`Phone: ${storePhone}`, leftX, doc.y + 1, {
             width: contentWidth,
             align: "center",
           });
-        doc.y = saveY + 22;
       }
 
-      // ─── 9. VISUAL BARCODE REPRESENTATION (Petpooja / Zudio Style) ────────
-      doc.moveDown(0.2);
-      const barcodeY = doc.y;
-      const barcodeW = 180;
-      const barcodeH = 16;
-      const barcodeX = leftX + (contentWidth - barcodeW) / 2;
-
-      // Generate a sleek rhythmic barcode simulation
-      const barPattern = [2, 1, 3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 4, 1, 2, 3, 1, 2, 1, 4, 2, 1, 3, 1, 2, 4, 1, 3, 2, 1, 2, 3, 1, 4, 1, 2];
-      let currBarX = barcodeX;
-      doc.fillColor("#0F172A");
-      for (let i = 0; i < barPattern.length && currBarX < barcodeX + barcodeW; i++) {
-        const barWidth = barPattern[i] * 1.1;
-        if (i % 2 === 0) {
-          doc.rect(currBarX, barcodeY, barWidth, barcodeH).fill();
-        }
-        currBarX += barWidth + 1.2;
+      if (storeEmail) {
+        doc
+          .fontSize(8)
+          .font("Helvetica")
+          .fillColor("#334155")
+          .text(`@: ${storeEmail}`, leftX, doc.y + 1, {
+            width: contentWidth,
+            align: "center",
+          });
       }
 
-      doc.y = barcodeY + barcodeH + 3;
-      doc.fontSize(6.5).font("Helvetica").fillColor("#64748B")
-        .text(`*${invoice.invoiceNumber || "000000"}*`, leftX, doc.y, { width: contentWidth, align: "center", characterSpacing: 2 });
+      if (storeGstin) {
+        doc
+          .fontSize(8)
+          .font("Helvetica-Bold")
+          .fillColor("#0F172A")
+          .text(`GSTIN: ${storeGstin}`, leftX, doc.y + 1, {
+            width: contentWidth,
+            align: "center",
+          });
+      }
 
-      // ─── 10. CLEAN FOOTER ─────────────────────────────────────────────────
-      doc.moveDown(0.3);
-      doc.moveTo(leftX, doc.y).lineTo(rightX, doc.y).dash(3, { space: 2 }).strokeColor("#CBD5E1").lineWidth(0.5).stroke();
-      doc.undash();
-      doc.moveDown(0.35);
+      doc.y += 7;
+      drawDashedLine(doc.y);
+      doc.y += 7;
 
-      doc.fontSize(8).font("Helvetica-Bold").fillColor("#0F172A")
-        .text("Thank you for your visit! Have a wonderful day.", leftX, doc.y, { width: contentWidth, align: "center" });
+      // ─── 3. BILL METADATA BLOCK (Clean Left-Aligned Receipt Style) ──────────
+      const rawDate = invoice.invoiceDate || invoice.createdAt || new Date();
+      const formattedDate = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+        .format(new Date(rawDate))
+        .replace(",", "")
+        .toUpperCase();
+
+      const billNo = (invoice.invoiceNumber || "1").toString();
+      const paymentMode = (invoice.paymentMode || "CASH").toUpperCase();
+      const saleLabel =
+        paymentMode === "CREDIT"
+          ? "Credit Sale (Due)"
+          : paymentMode === "UPI"
+          ? "UPI Sale"
+          : paymentMode === "UPI/CASH"
+          ? "Split Sale (Cash + UPI)"
+          : `${paymentMode === "CASH" ? "Cash" : paymentMode} Sale`;
+
+      const custName = (invoice.partyName || "").trim();
+      const custPhone = (invoice.partyPhone || "").trim();
+
+      doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#0F172A");
+      doc.text(`Bill No: ${billNo}`, leftX, doc.y, { width: contentWidth });
+      doc.font("Helvetica").fillColor("#1E293B");
+      doc.text(`Created On: ${formattedDate}`, leftX, doc.y + 1.5, { width: contentWidth });
+      doc.text(`Bill To: ${saleLabel}`, leftX, doc.y + 1.5, { width: contentWidth });
+
+      if (custName && custName !== "Walk-in Customer") {
+        const custLine = custPhone ? `${custName} | ${custPhone}` : custName;
+        doc.text(`Customer: ${custLine}`, leftX, doc.y + 1.5, { width: contentWidth });
+      } else if (custPhone) {
+        doc.text(`Phone: ${custPhone}`, leftX, doc.y + 1.5, { width: contentWidth });
+      }
+
+      doc.y += 6;
+      drawDashedLine(doc.y);
+      doc.y += 6;
+
+      // ─── 4. ITEMS TABLE ─────────────────────────────────────────────────────
+      const colItemX = leftX;
+      const colItemW = 104;
+      const colQtyX = leftX + 106;
+      const colQtyW = 26;
+      const colRateX = leftX + 134;
+      const colRateW = 36;
+      const colTotalX = leftX + 172;
+      const colTotalW = 40;
+
+      const headerY = doc.y;
+      doc.fontSize(8.2).font("Helvetica-Bold").fillColor("#0F172A");
+      doc.text("Item Name", colItemX, headerY, { width: colItemW });
+      doc.text("Qty", colQtyX, headerY, { width: colQtyW, align: "center" });
+      doc.text("Rate", colRateX, headerY, { width: colRateW, align: "right" });
+      doc.text("Total", colTotalX, headerY, { width: colTotalW, align: "right" });
+
+      doc.y = headerY + 13;
+      drawSolidLine(doc.y, "#334155", 0.7);
+      doc.y += 5;
+
+      for (const it of items) {
+        const rowY = doc.y;
+        const name = (it.name || "Item").toString();
+        const qty = Number(it.quantity || 1);
+        const rateVal = Number(it.sellingPrice ?? it.price ?? it.rate ?? 0);
+        const totalVal = Number(it.total ?? rateVal * qty);
+
+        doc.fontSize(8.2).font("Helvetica").fillColor("#0F172A");
+        const nameHeight = doc.heightOfString(name, { width: colItemW });
+
+        doc.text(name, colItemX, rowY, { width: colItemW });
+        doc.text(`${qty}`, colQtyX, rowY, { width: colQtyW, align: "center" });
+        doc.text(Number.isInteger(rateVal) ? `${rateVal}` : rateVal.toFixed(2), colRateX, rowY, {
+          width: colRateW,
+          align: "right",
+        });
+        doc.font("Helvetica-Bold");
+        doc.text(Number.isInteger(totalVal) ? `${totalVal}` : totalVal.toFixed(2), colTotalX, rowY, {
+          width: colTotalW,
+          align: "right",
+        });
+
+        doc.y = rowY + Math.max(13, nameHeight + 4);
+      }
+
+      doc.y += 2;
+      drawDashedLine(doc.y);
+      doc.y += 6;
+
+      // ─── 5. TOTALS SECTION ──────────────────────────────────────────────────
+      const printRow = (label, value, isBold = false, color = "#1E293B", fontSize = 8.4) => {
+        const y = doc.y;
+        doc.fontSize(fontSize).font(isBold ? "Helvetica-Bold" : "Helvetica").fillColor(color);
+        doc.text(label, leftX, y, { width: 125 });
+        doc.text(value, leftX + 125, y, { width: contentWidth - 125, align: "right" });
+        doc.y = y + (fontSize >= 10 ? 15 : 12.5);
+      };
+
+      const subtotalVal = Number(invoice.subtotal || invoice.grandTotal || 0);
+      printRow("Subtotal", `Rs. ${subtotalVal.toFixed(2)}`);
+
+      if (invoice.discountTotal > 0) {
+        printRow("Discount", `-Rs. ${Number(invoice.discountTotal).toFixed(2)}`, false, "#059669");
+      }
+
+      if (invoice.regularDiscountAmount > 0) {
+        const discRate = invoice.regularDiscountAppliedPercent || invoice.regularDiscountRate;
+        const discLabel = discRate ? `Discount (${discRate}%)` : "VIP Discount";
+        printRow(discLabel, `-Rs. ${Number(invoice.regularDiscountAmount).toFixed(2)}`, true, "#059669");
+      }
+
+      if (invoice.freebieItemGiven) {
+        printRow("Complimentary", `${invoice.freebieItemGiven}`, true, "#2563EB");
+      }
+
+      if (invoice.taxTotal > 0) {
+        printRow("GST / Tax", `Rs. ${Number(invoice.taxTotal).toFixed(2)}`);
+      }
+
+      doc.y += 2;
+      drawSolidLine(doc.y, "#0F172A", 0.9);
+      doc.y += 5;
+
+      const grandVal = Number(invoice.grandTotal || 0);
+      printRow("GRAND TOTAL", `Rs. ${grandVal.toFixed(2)}`, true, "#0F172A", 10.5);
+
+      drawSolidLine(doc.y - 1, "#0F172A", 0.9);
+      doc.y += 5;
+
+      const payStatus = (invoice.paymentStatus || "PAID").toUpperCase();
+      printRow("Payment", `${paymentMode} (${payStatus})`, true, paymentMode === "CREDIT" ? "#DC2626" : "#0F172A", 8);
+
+      if (paymentMode === "UPI/CASH") {
+        printRow(
+          "Split Paid",
+          `Cash Rs.${invoice.cashAmount || 0} + UPI Rs.${invoice.upiAmount || 0}`,
+          false,
+          "#334155",
+          7.8
+        );
+      }
+
+      if (totalSaved > 0) {
+        doc.y += 2;
+        doc
+          .fontSize(8)
+          .font("Helvetica-Bold")
+          .fillColor("#059669")
+          .text(`You Saved Rs. ${totalSaved.toFixed(0)} on this bill!`, leftX, doc.y, {
+            width: contentWidth,
+            align: "center",
+          });
+      }
+
+      // ─── 6. CLEAN FOOTER (NO BARCODE) ───────────────────────────────────────
+      doc.y += 6;
+      drawDashedLine(doc.y);
+      doc.y += 7;
+
+      doc
+        .fontSize(8.5)
+        .font("Helvetica-Bold")
+        .fillColor("#0F172A")
+        .text("Thank you! Visit again.", leftX, doc.y, {
+          width: contentWidth,
+          align: "center",
+        });
 
       doc.end();
     } catch (err) {

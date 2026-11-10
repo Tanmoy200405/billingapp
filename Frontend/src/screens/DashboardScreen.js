@@ -141,7 +141,7 @@ export default function DashboardScreen({
     try {
       const storeData = {
         businessName: user?.businessName || "My Store",
-        phone: user?.phone || "7003317615",
+        phone: user?.phone || "",
         address: user?.address || "",
         email: user?.email || "",
         gstin: user?.gstin || "",

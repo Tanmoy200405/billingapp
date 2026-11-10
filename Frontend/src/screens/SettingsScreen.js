@@ -29,7 +29,14 @@ import { printTestSlip, INVOICE_STYLES } from "../utils/receiptPdfGenerator";
 export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, onProfileUpdated, initialTab = "profile" }) {
   const [activeTab, setActiveTab] = useState(initialTab || "profile");
   const [vipVisitThreshold, setVipVisitThreshold] = useState(user?.vipVisitThreshold || 3);
+  const [vipInputText, setVipInputText] = useState(String(user?.vipVisitThreshold || 3));
   const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => {
+    if (user?.vipVisitThreshold) {
+      setVipVisitThreshold(user.vipVisitThreshold);
+      setVipInputText(String(user.vipVisitThreshold));
+    }
+  }, [user?.vipVisitThreshold]);
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab);
@@ -61,7 +68,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [waPhone, setWaPhone] = useState(null);
   const [waLoading, setWaLoading] = useState(false);
   const [showPairingInput, setShowPairingInput] = useState(false);
-  const [pairingPhone, setPairingPhone] = useState(user?.whatsappNumber || user?.phone || "7003317615");
+  const [pairingPhone, setPairingPhone] = useState(user?.whatsappNumber || user?.phone || "");
   const [pairingCode, setPairingCode] = useState(null);
   const [pairingLoading, setPairingLoading] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -127,7 +134,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
     try {
       const storeData = {
         businessName: businessName || user?.businessName || "My Store",
-        phone: user?.phone || "7003317615",
+        phone: user?.phone || "",
         address: address || user?.address || "",
         email: email || user?.email || "",
         gstin: gstin || user?.gstin || "",
@@ -246,7 +253,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       raw = raw.slice(2);
     }
     if (raw.length !== 10) {
-      Alert.alert("Invalid Phone", "Please enter a valid 10-digit mobile number (e.g. 7003317615)");
+      Alert.alert("Invalid Phone", "Please enter a valid 10-digit mobile number (e.g. 9876543210)");
       return;
     }
     const fullNumber = `91${raw}`;
@@ -312,6 +319,10 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   };
     const handleSaveProfile = async () => {
     setSaving(true);
+    const thresholdVal = Math.max(1, parseInt(vipInputText || vipVisitThreshold, 10) || 3);
+    setVipVisitThreshold(thresholdVal);
+    setVipInputText(String(thresholdVal));
+    AsyncStorage.setItem("party_vip_threshold", String(thresholdVal)).catch(() => {});
     const res = await api.auth.updateProfile({
       businessName: businessName.trim(),
       email: email.trim() || undefined,
@@ -321,7 +332,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       logo: logo || "",
       invoiceStyle,
       thermalPrinterSize: printerSize,
-      vipVisitThreshold: Number(vipVisitThreshold) || 3,
+      vipVisitThreshold: thresholdVal,
     });
     setSaving(false);
     if (res.success && res.user) {
@@ -555,11 +566,14 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 <Text className="text-[11px] text-gray-500 mb-2">
                   Customers reaching this number of visits are dynamically awarded VIP privileges.
                 </Text>
-                <View className="flex-row gap-2">
+                <View className="flex-row items-center gap-2">
                   {[2, 3, 4, 5].map((threshold) => (
                     <TouchableOpacity
                       key={threshold}
-                      onPress={() => setVipVisitThreshold(threshold)}
+                      onPress={() => {
+                        setVipVisitThreshold(threshold);
+                        setVipInputText(String(threshold));
+                      }}
                       className={`flex-1 py-2 rounded-xl border items-center ${
                         vipVisitThreshold === threshold
                           ? "bg-blue-600 border-blue-600"
@@ -571,10 +585,23 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                           vipVisitThreshold === threshold ? "text-white" : "text-gray-700"
                         }`}
                       >
-                        {threshold} Visits
+                        {threshold}
                       </Text>
                     </TouchableOpacity>
                   ))}
+                  <TextInput
+                    className="w-14 bg-gray-100 border border-gray-300 rounded-xl py-2 text-center text-xs font-bold text-gray-900"
+                    keyboardType="numeric"
+                    placeholder="Custom"
+                    value={vipInputText}
+                    onChangeText={(txt) => {
+                      const clean = txt.replace(/[^0-9]/g, "");
+                      setVipInputText(clean);
+                      const n = parseInt(clean, 10);
+                      if (!isNaN(n) && n >= 1) setVipVisitThreshold(n);
+                    }}
+                    maxLength={3}
+                  />
                 </View>
               </View>
             </View>
@@ -973,7 +1000,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                       <View className="flex-row items-center">
                         <TextInput
                           className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-900"
-                          placeholder="e.g. 7003317615"
+                          placeholder="e.g. 9876543210"
                           placeholderTextColor="#9CA3AF"
                           value={pairingPhone}
                           onChangeText={setPairingPhone}
@@ -1104,59 +1131,53 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {(previewTab === "both" || previewTab === "customer") && (
-                <View style={{ backgroundColor: "#f9fafb", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "dashed", marginBottom: previewTab === "both" ? 12 : 0 }}>
+                <View style={{ backgroundColor: "#ffffff", borderRadius: 10, padding: 14, borderWidth: 1, borderColor: "#e5e7eb", marginBottom: previewTab === "both" ? 12 : 0 }}>
                   <View style={{ alignItems: "center", marginBottom: 6 }}>
-                    <Text style={{ fontSize: 9, fontWeight: "800", color: "#666", textTransform: "uppercase", letterSpacing: 1, borderWidth: 1, borderColor: "#ccc", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 3 }}>
-                      CUSTOMER COPY ({invoiceStyle.toUpperCase()})
+                    <Text style={{ fontSize: 9, fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: 1, borderWidth: 1, borderColor: "#CBD5E1", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                      CUSTOMER COPY
                     </Text>
                   </View>
                   <View style={{ alignItems: "center", marginBottom: 8 }}>
                     {billShowLogo && (logo || user?.logo) ? (
-                      <Image source={{ uri: logo || user.logo }} style={{ width: 50, height: 50, borderRadius: 8, marginBottom: 4 }} />
+                      <Image source={{ uri: logo || user.logo }} style={{ width: 52, height: 52, borderRadius: 8, marginBottom: 4 }} />
                     ) : null}
-                    <Text style={{ fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 1, textTransform: "uppercase" }}>
+                    <Text style={{ fontSize: 14, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase", color: "#0F172A", textAlign: "center" }}>
                       {businessName || user?.businessName || "MY STORE"}
                     </Text>
-                    {address || user?.address ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555", marginTop: 2 }}>{address || user.address}</Text> : null}
-                    {user?.phone ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>Phone: {user.phone}</Text> : null}
-                    {billShowEmail && (email || user?.email) ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>@: {email || user.email}</Text> : null}
-                    {billShowGstin && (gstin || user?.gstin) ? <Text style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>GSTIN: {gstin || user.gstin}</Text> : null}
+                    {address || user?.address ? <Text style={{ fontSize: 10.5, color: "#334155", marginTop: 2, textAlign: "center" }}>{address || user.address}</Text> : null}
+                    {user?.phone ? <Text style={{ fontSize: 10.5, color: "#334155", textAlign: "center" }}>Phone: {user.phone}</Text> : null}
+                    {billShowEmail && (email || user?.email) ? <Text style={{ fontSize: 10, color: "#475569", textAlign: "center" }}>@: {email || user.email}</Text> : null}
+                    {billShowGstin && (gstin || user?.gstin) ? <Text style={{ fontSize: 10, fontWeight: "700", color: "#0F172A", textAlign: "center" }}>GSTIN: {gstin || user.gstin}</Text> : null}
                   </View>
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-                  {billShowToken ? (
-                    <Text style={{ fontFamily: "monospace", fontSize: 24, fontWeight: "900", textAlign: "center", letterSpacing: 2 }}>
-                      TOKEN #1
-                    </Text>
-                  ) : null}
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-                  <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill No: INV-1001</Text>
-                  <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Date: 28/10/26 08:30 PM</Text>
-                  {billShowType ? <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Bill Type: Cash Sale</Text> : null}
-                  {billShowPhone ? <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Customer: 9876543210</Text> : null}
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-                  <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#333", paddingBottom: 3, marginBottom: 4 }}>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", flex: 3 }}>Item Name</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 28, textAlign: "center" }}>Qty</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 36, textAlign: "right" }}>Rate</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700", width: 36, textAlign: "right" }}>Total</Text>
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#94A3B8", marginVertical: 6 }} />
+                  {billShowToken ? <Text style={{ fontSize: 11, fontWeight: "800", color: "#0F172A" }}>Bill No: 21</Text> : null}
+                  <Text style={{ fontSize: 10.5, color: "#1E293B", marginTop: 1 }}>Created On: 25/07/25 12:03 AM</Text>
+                  {billShowType ? <Text style={{ fontSize: 10.5, color: "#1E293B", marginTop: 1 }}>Bill To: Cash Sale</Text> : null}
+                  {billShowPhone ? <Text style={{ fontSize: 10.5, color: "#1E293B", marginTop: 1 }}>Customer: Dipak | 9876543210</Text> : null}
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#94A3B8", marginVertical: 6 }} />
+                  <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#0F172A", paddingBottom: 3, marginBottom: 4 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: "800", flex: 3, color: "#0F172A" }}>Item Name</Text>
+                    <Text style={{ fontSize: 10.5, fontWeight: "800", width: 28, textAlign: "center", color: "#0F172A" }}>Qty</Text>
+                    <Text style={{ fontSize: 10.5, fontWeight: "800", width: 38, textAlign: "right", color: "#0F172A" }}>Rate</Text>
+                    <Text style={{ fontSize: 10.5, fontWeight: "800", width: 38, textAlign: "right", color: "#0F172A" }}>Total</Text>
                   </View>
                   <View style={{ flexDirection: "row", paddingVertical: 2 }}>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, flex: 3 }}>Coffee Cappuccino</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, width: 28, textAlign: "center" }}>1</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, width: 36, textAlign: "right" }}>159</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, width: 36, textAlign: "right", fontWeight: "700" }}>159</Text>
+                    <Text style={{ fontSize: 10.5, flex: 3, color: "#0F172A" }}>Coffee Cappuccino (Hot)</Text>
+                    <Text style={{ fontSize: 10.5, width: 28, textAlign: "center", color: "#0F172A" }}>1</Text>
+                    <Text style={{ fontSize: 10.5, width: 38, textAlign: "right", color: "#0F172A" }}>159</Text>
+                    <Text style={{ fontSize: 10.5, width: 38, textAlign: "right", fontWeight: "700", color: "#0F172A" }}>159</Text>
                   </View>
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Grand Total</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "900" }}>Rs. 159</Text>
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#94A3B8", marginVertical: 6 }} />
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 3, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#0F172A" }}>
+                    <Text style={{ fontSize: 11.5, fontWeight: "900", color: "#0F172A" }}>GRAND TOTAL</Text>
+                    <Text style={{ fontSize: 11.5, fontWeight: "900", color: "#0F172A" }}>Rs. 159.00</Text>
                   </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10 }}>Payment Mode</Text>
-                    <Text style={{ fontFamily: "monospace", fontSize: 10, fontWeight: "700" }}>CASH</Text>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+                    <Text style={{ fontSize: 10, color: "#334155" }}>Payment</Text>
+                    <Text style={{ fontSize: 10, fontWeight: "700", color: "#0F172A" }}>CASH (PAID)</Text>
                   </View>
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#999", marginVertical: 6 }} />
-                  <Text style={{ fontFamily: "monospace", fontSize: 10, textAlign: "center", color: "#555" }}>
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#94A3B8", marginVertical: 6 }} />
+                  <Text style={{ fontSize: 10.5, fontWeight: "700", textAlign: "center", color: "#0F172A" }}>
                     {billFooter}
                   </Text>
                 </View>

@@ -11,13 +11,13 @@ export default function WelcomeScreen({ onNavigate }) {
         </View>
 
         <Text className="text-3xl font-extrabold text-blue-900 text-center">
-          Discover Your
+          Smart POS &
         </Text>
         <Text className="text-3xl font-extrabold text-blue-600 text-center mb-4">
-          Stats here
+          Billing Suite
         </Text>
         <Text className="text-sm text-gray-500 text-center max-w-xs leading-5">
-          Explore all the existing tools and calculate your bills, stock, and regular customer discounts seamlessly.
+          Fast thermal billing, inventory control, WhatsApp PDF receipts, and VIP customer loyalty built for your store.
         </Text>
       </View>
 

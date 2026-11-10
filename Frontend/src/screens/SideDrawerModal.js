@@ -9,13 +9,13 @@ export default function SideDrawerModal({
   onLogout,
 }) {
   const menuItems = [
-    { id: "dashboard", label: "1. Dashboard", icon: "home" },
-    { id: "reports", label: "2. Reports", icon: "assessment" },
-    { id: "sales", label: "3. Sale List", icon: "receipt" },
-    { id: "party", label: "4. Party", icon: "people" },
-    { id: "inventory", label: "5. Inventory", icon: "inventory" },
-    { id: "marketing", label: "6. Marketing", icon: "campaign" },
-    { id: "setting", label: "7. Settings", icon: "settings" },
+    { id: "dashboard", label: "Dashboard", icon: "home" },
+    { id: "reports", label: "Reports & Analytics", icon: "assessment" },
+    { id: "sales", label: "Sale List", icon: "receipt" },
+    { id: "party", label: "Customers & Parties", icon: "people" },
+    { id: "inventory", label: "Menu & Inventory", icon: "inventory" },
+    { id: "marketing", label: "WhatsApp Marketing", icon: "campaign" },
+    { id: "setting", label: "Settings", icon: "settings" },
   ];
   return (
     <Modal
@@ -38,10 +38,10 @@ export default function SideDrawerModal({
               )}
             </View>
             <Text className="text-white text-lg font-extrabold text-center uppercase tracking-wider">
-              {user?.businessName || "COMPANY NAME"}
+              {user?.businessName || "My Store"}
             </Text>
             <Text className="text-blue-100 text-xs font-semibold mt-1">
-              {user?.phone || "Phone Number"}
+              {user?.phone || ""}
             </Text>
             {user?.gstin ? (
               <Text className="text-blue-200 text-xs mt-0.5">

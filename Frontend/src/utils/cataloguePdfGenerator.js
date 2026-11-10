@@ -211,7 +211,7 @@ export function getStyleThemeCss(styleId) {
 export function generateCatalogueHtml(items = [], storeInfo = {}, styleId = "modern_minimal") {
   const {
     businessName = "Our Store",
-    phone = "7003317615",
+    phone = "",
     address = "",
     email = "",
     gstin = "",

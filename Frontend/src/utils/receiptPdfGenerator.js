@@ -4,14 +4,14 @@ import { getApiBaseUrl, getAuthToken, loadStoredToken } from "../config/api";
 export const INVOICE_STYLES = [
   {
     id: "modern_zudio",
-    name: "Modern Sleek (Zudio Style)",
-    description: "Rounded summary badges, bold order token & savings card",
+    name: "Clean Thermal POS",
+    description: "Crisp centered logo, clean metadata & high-contrast thermal layout",
     badge: "Recommended",
   },
   {
     id: "classic_thermal",
-    name: "Classic Thermal POS",
-    description: "Standard monospace font, dashed dividers & kitchen KOT",
+    name: "Classic Monospace POS",
+    description: "Traditional monospace font, dashed dividers & kitchen KOT",
     badge: "High Speed",
   },
   {
@@ -130,19 +130,24 @@ function formatReceiptDate(dateStr) {
       timeZone: "Asia/Kolkata",
       day: "2-digit",
       month: "2-digit",
-      year: "numeric",
+      year: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
-      hour12: false,
-    }).format(d).replace(",", "");
+      hour12: true,
+    })
+      .format(d)
+      .replace(",", "")
+      .toUpperCase();
   } catch {
     const d = dateStr ? new Date(dateStr) : new Date();
     const day = String(d.getDate()).padStart(2, "0");
     const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = String(d.getFullYear());
-    const hours = String(d.getHours()).padStart(2, "0");
+    const year = String(d.getFullYear()).slice(-2);
+    let hours = d.getHours();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
     const minutes = String(d.getMinutes()).padStart(2, "0");
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
+    return `${day}/${month}/${year} ${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
   }
 }
 
@@ -160,13 +165,13 @@ function getReceiptStyles(receiptWidth, fontBase, isNarrow, invoiceStyle = "mode
     `;
   } else if (invoiceStyle === "modern_zudio") {
     styleSpecificCss = `
-      .receipt { border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
-      .copy-badge { background: #0F172A; color: #FFFFFF; border: none; border-radius: 12px; padding: 2px 8px; }
-      .store-name { letter-spacing: 0.5px; color: #0F172A; }
-      .divider { border-top: 1px dashed #CBD5E1; }
-      .token-box { background: #F8FAFC; border: 1.5px dashed #94A3B8; border-radius: 8px; padding: 6px; text-align: center; margin: 6px 0; }
-      .grand-total td { background: #0F172A; color: #FFFFFF; padding: 6px 8px !important; border-radius: 6px; }
-      .savings-pill { background: #DCFCE7; color: #15803D; padding: 4px; border-radius: 6px; text-align: center; font-weight: 700; margin: 6px 0; font-size: 11px; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
+      .receipt { border: 1px solid #E2E8F0; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+      .copy-badge { background: transparent; color: #475569; border: 1px solid #CBD5E1; border-radius: 4px; padding: 1px 6px; font-size: 9px; }
+      .store-name { letter-spacing: 0.4px; color: #0F172A; }
+      .divider { border-top: 1px dashed #94A3B8; }
+      .grand-total td { border-top: 1.5px solid #0F172A; border-bottom: 1.5px solid #0F172A; color: #0F172A; padding: 5px 0 !important; }
+      .savings-pill { color: #059669; padding: 4px 0; text-align: center; font-weight: 700; margin: 4px 0; font-size: 10.5px; }
     `;
   } else if (invoiceStyle === "gst_detailed") {
     styleSpecificCss = `
@@ -323,7 +328,7 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
   const {
     businessName = "My Store",
     address = "",
-    phone = "7003317615",
+    phone = "",
     email = "",
     logo = "",
     gstin = "",
@@ -352,51 +357,52 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
     const total = it.total || qty * rate;
     const hsnText = invoiceStyle === "gst_detailed" && it.hsnCode ? `<div style="font-size:9px;color:#64748B;">HSN: ${it.hsnCode}</div>` : "";
     return `<tr>
-      <td style="padding:2px 0;word-break:break-word;max-width:${isNarrow ? "100px" : "200px"}">${name}${hsnText}</td>
-      <td style="padding:2px 4px;text-align:center">${qty}</td>
-      <td style="padding:2px 4px;text-align:right">${rate}</td>
-      <td style="padding:2px 0;text-align:right;font-weight:700">${total}</td>
+      <td style="padding:3px 0;word-break:break-word;max-width:${isNarrow ? "110px" : "220px"}">${name}${hsnText}</td>
+      <td style="padding:3px 4px;text-align:center">${qty}</td>
+      <td style="padding:3px 4px;text-align:right">${rate}</td>
+      <td style="padding:3px 0;text-align:right;font-weight:700">${total}</td>
     </tr>`;
   }).join("");
 
-  const paymentMode = invoice?.paymentMode || "CASH";
+  const paymentMode = (invoice?.paymentMode || "CASH").toUpperCase();
+  const saleLabel =
+    paymentMode === "CREDIT"
+      ? "Credit Sale (Due)"
+      : paymentMode === "UPI"
+      ? "UPI Sale"
+      : paymentMode === "UPI/CASH"
+      ? "Split Sale (Cash + UPI)"
+      : `${paymentMode === "CASH" ? "Cash" : paymentMode} Sale`;
+
   let paymentBreakdown = "";
   if (paymentMode === "UPI/CASH") {
     paymentBreakdown = `<tr><td colspan="3" style="padding:1px 0">Cash</td><td style="text-align:right">Rs. ${invoice?.cashAmount || 0}</td></tr><tr><td colspan="3" style="padding:1px 0">UPI</td><td style="text-align:right">Rs. ${invoice?.upiAmount || 0}</td></tr>`;
   }
 
-  const logoHtml = showLogo && logo ? `<div style="text-align:center;margin-bottom:6px"><img src="${logo}" style="width:${isNarrow ? "60px" : "80px"};height:${isNarrow ? "60px" : "80px"};object-fit:contain;border-radius:6px" /></div>` : "";
+  const logoHtml = showLogo && logo ? `<div style="text-align:center;margin-bottom:6px"><img src="${logo}" style="width:${isNarrow ? "56px" : "76px"};height:${isNarrow ? "56px" : "76px"};object-fit:contain;border-radius:6px" /></div>` : "";
   const gstinHtml = showGstin && gstin ? `<div>GSTIN: ${gstin}</div>` : "";
   const emailHtml = showEmail && email ? `<div>@: ${email}</div>` : "";
-  
-  let tokenHtml = "";
-  if (showTokenNumber) {
-    if (invoiceStyle === "modern_zudio") {
-      tokenHtml = `
-        <div class="token-box">
-          <div style="font-size:10px;font-weight:700;color:#64748B;letter-spacing:1px;text-transform:uppercase;">Order Token</div>
-          <div style="font-size:${isNarrow ? "24px" : "30px"};font-weight:900;color:#0F172A;">#${tokenDisplay}</div>
-        </div>
-      `;
-    } else {
-      tokenHtml = `<div style="font-size:${isNarrow ? "28px" : "36px"};font-weight:900;letter-spacing:2px;margin:4px 0">${tokenDisplay}</div>`;
-    }
-  }
 
   const createdOn = formatReceiptDate(invoice?.createdAt || invoice?.invoiceDate);
-  const billToCustomer = (invoice?.partyName && invoice.partyName !== "Walk-in Customer")
-    ? `<div>Bill To: ${invoice.partyName}${showCustomerPhone && invoice?.partyPhone ? " | " + invoice.partyPhone : ""}</div>`
-    : "";
+  const custName = (invoice?.partyName || "").trim();
+  const custPhone = showCustomerPhone && invoice?.partyPhone ? invoice.partyPhone : "";
+  const billToCustomer =
+    custName && custName !== "Walk-in Customer"
+      ? `<div class="meta">Bill To: ${custName}${custPhone ? " | " + custPhone : ""}</div>`
+      : custPhone
+      ? `<div class="meta">Phone: ${custPhone}</div>`
+      : "";
+
   const discountRow = invoice?.regularDiscountAmount > 0
-    ? `<tr><td colspan="3">Discount (${invoice?.regularDiscountRate || ""}%)</td><td style="text-align:right;color:#059669;font-weight:700">-${invoice.regularDiscountAmount}</td></tr>`
+    ? `<tr><td colspan="3">Discount (${invoice?.regularDiscountRate || invoice?.regularDiscountAppliedPercent || ""}%)</td><td style="text-align:right;color:#059669;font-weight:700">-${invoice.regularDiscountAmount}</td></tr>`
     : "";
   const freebieRow = invoice?.freebieItemGiven
     ? `<tr><td colspan="3">Freebie</td><td style="text-align:right;color:#2563eb;font-weight:700">${invoice.freebieItemGiven}</td></tr>`
     : "";
 
   const totalSavings = (invoice?.discountTotal || 0) + (invoice?.regularDiscountAmount || 0);
-  const savingsHtml = invoiceStyle === "modern_zudio" && totalSavings > 0
-    ? `<div class="savings-pill">🎉 TOTAL SAVINGS: Rs. ${totalSavings.toFixed(0)}</div>`
+  const savingsHtml = totalSavings > 0
+    ? `<div class="savings-pill">You Saved Rs. ${totalSavings.toFixed(0)} on this bill!</div>`
     : "";
 
   const signHtml = invoiceStyle === "gst_detailed"
@@ -409,16 +415,15 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
       <div class="header">
         ${logoHtml}
         <div class="store-name">${businessName}</div>
-        ${tokenHtml}
-        ${address ? `<div>${address}</div>` : ""}
+        ${address ? `<div style="margin-top:2px;line-height:1.35">${address}</div>` : ""}
         ${phone ? `<div>Phone: ${phone}</div>` : ""}
         ${emailHtml}
         ${gstinHtml}
       </div>
       <hr class="divider"/>
-      <div class="meta">Bill No: #${tokenDisplay}</div>
+      ${showTokenNumber ? `<div class="meta"><b>Bill No: ${tokenDisplay}</b></div>` : ""}
       <div class="meta">Created On: ${createdOn}</div>
-      ${showBillType ? `<div class="meta">Payment Mode: ${paymentMode === "CREDIT" ? "Credit" : "Cash / Instant"}</div>` : ""}
+      ${showBillType ? `<div class="meta">Bill To: ${saleLabel}</div>` : ""}
       ${billToCustomer}
       <hr class="divider"/>
       <table class="items-table">
@@ -429,11 +434,11 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
       </table>
       <hr class="divider"/>
       <table class="totals-table">
-        <tr><td colspan="3">Subtotal</td><td style="text-align:right">Rs. ${invoice?.subtotal || 0}</td></tr>
+        <tr><td colspan="3">Subtotal</td><td style="text-align:right">Rs. ${invoice?.subtotal || invoice?.grandTotal || 0}</td></tr>
         ${discountRow}
         ${freebieRow}
         <tr class="grand-total"><td colspan="3">Grand Total</td><td style="text-align:right">Rs. ${invoice?.grandTotal || 0}</td></tr>
-        <tr><td colspan="3" style="padding:4px 0 1px">Payment Status</td><td style="text-align:right;padding:4px 0 1px;font-weight:700">${paymentMode} (${invoice?.paymentStatus || "PAID"})</td></tr>
+        <tr><td colspan="3" style="padding:4px 0 1px">Payment</td><td style="text-align:right;padding:4px 0 1px;font-weight:700">${paymentMode} (${invoice?.paymentStatus || "PAID"})</td></tr>
         ${paymentBreakdown}
       </table>
       ${savingsHtml}

@@ -354,7 +354,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
         try {
           const storeData = {
             businessName: user?.businessName || "My Store",
-            phone: user?.phone || "7003317615",
+            phone: user?.phone || "",
             address: user?.address || "",
             email: user?.email || "",
             gstin: user?.gstin || "",
@@ -408,7 +408,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     try {
       const storeData = {
         businessName: user?.businessName || "My Store",
-        phone: user?.phone || "7003317615",
+        phone: user?.phone || "",
         address: user?.address || "",
         email: user?.email || "",
         gstin: user?.gstin || "",
@@ -754,7 +754,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                       </Text>
                     </View>
                   </View>
-                  {activeCustomer.isRegular ? (
+                  {(activeCustomer.isRegular || (activeCustomer.visitCount || 0) >= (user?.vipVisitThreshold || 3)) ? (
                     <View className="bg-amber-200 px-2 py-0.5 rounded-full">
                       <Text className="text-[10px] font-extrabold text-amber-900">VIP / Regular</Text>
                     </View>

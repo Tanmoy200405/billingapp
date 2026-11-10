@@ -35,8 +35,8 @@ router.get("/public/:id", async (req, res) => {
       return res.status(404).send("Invoice not found.");
     }
     const storeUser = await User.findById(invoice.userId);
-    const storeName = storeUser?.businessName || invoice.businessName || "THE A POP JAKO BITES";
-    const phone = storeUser?.phone || storeUser?.whatsappNumber || "7003317615";
+    const storeName = storeUser?.businessName || invoice.businessName || "My Store";
+    const phone = storeUser?.phone || storeUser?.whatsappNumber || "";
     const rawDate = invoice.createdAt || invoice.invoiceDate || new Date();
     const petpoojaDate = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Asia/Kolkata",
@@ -124,7 +124,7 @@ router.get("/public/:id", async (req, res) => {
               <span class="pill pill-status">${isPaid ? 'PAID' : 'DUE'}</span>
             </div>
             ${storeUser?.address ? `<div style="font-size: 11.5px; color: #64748B; margin-top: 4px;">${storeUser.address}</div>` : ''}
-            <div style="font-size: 11.5px; color: #64748B;">Helpline: +${phone}</div>
+            ${phone ? `<div style="font-size: 11.5px; color: #64748B;">Phone: ${phone}</div>` : ''}
           </div>
           <div class="token-box">
             <div class="token-lbl">Order / Token Number</div>
@@ -487,9 +487,9 @@ router.post("/", async (req, res) => {
       minute: "2-digit",
       hour12: false,
     }).format(new Date(invoice.invoiceDate || invoice.createdAt || currentTimestamp)).replace(",", "");
-    const storeTitle = business.businessName || "THE A POP JAKO BITES";
+    const storeTitle = business.businessName || "My Store";
     const amountVal = Number(grandTotal || 0).toFixed(0);
-    const storePhoneClean = (business.phone || "7003317615").replace(/[^0-9]/g, "");
+    const storePhoneClean = (business.phone || business.whatsappNumber || "").replace(/[^0-9]/g, "");
     const feedbackStorePhone = storePhoneClean.length === 10 ? `91${storePhoneClean}` : storePhoneClean;
     const invoiceNumStr = String(invoiceNumber || invoice.invoiceNumber || "");
     const lovedUrl = `https://wa.me/${feedbackStorePhone}?text=${encodeURIComponent(`Loved it! ⭐️ Fantastic experience with Order #${invoiceNumStr}`)}`;
@@ -534,7 +534,7 @@ router.post("/", async (req, res) => {
         whatsappText,
         pdfBuffer,
         invoiceNumber,
-        business.businessName || "THE A POP JAKO BITES"
+        business.businessName || "My Store"
       );
       if (autoSent) {
         invoice.whatsappSent = true;
@@ -592,9 +592,9 @@ router.post("/:id/send-whatsapp", async (req, res) => {
       minute: "2-digit",
       hour12: false,
     }).format(new Date(invoice.createdAt || invoice.invoiceDate || new Date())).replace(",", "");
-    const storeTitle = business.businessName || "THE A POP JAKO BITES";
+    const storeTitle = business.businessName || "My Store";
     const amountVal = Number(invoice.grandTotal || 0).toFixed(0);
-    const storePhoneClean = (business.phone || "7003317615").replace(/[^0-9]/g, "");
+    const storePhoneClean = (business.phone || business.whatsappNumber || "").replace(/[^0-9]/g, "");
     const feedbackStorePhone = storePhoneClean.length === 10 ? `91${storePhoneClean}` : storePhoneClean;
     const invoiceNumStr = String(invoice.invoiceNumber || "");
     const lovedUrl = `https://wa.me/${feedbackStorePhone}?text=${encodeURIComponent(`Loved it! ⭐️ Fantastic experience with Order #${invoiceNumStr}`)}`;

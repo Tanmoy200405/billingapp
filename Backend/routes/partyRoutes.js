@@ -22,13 +22,14 @@ router.post("/broadcast-offer", async (req, res) => {
 
     const business = req.user;
     const storeName = business.businessName || "Our Store";
+    const vipThreshold = Number(business.vipVisitThreshold) || 3;
 
     let partyFilter = { userId: business._id };
     if (targetAudience === "vips") {
       partyFilter.$or = [
         { isRegular: true },
         { isRegular: "true" },
-        { visitCount: { $gte: 2 } },
+        { visitCount: { $gte: vipThreshold } },
         { customDiscountPercent: { $gt: 0 } },
       ];
     }
@@ -44,19 +45,19 @@ router.post("/broadcast-offer", async (req, res) => {
           recipientMap.set(cleanPh, {
             name: p.name || "Valued Customer",
             phone: cleanPh,
-            isVip: Boolean(p.isRegular || (p.visitCount || 0) >= 2 || p.customDiscountPercent > 0),
+            isVip: Boolean(p.isRegular || (p.visitCount || 0) >= vipThreshold || p.customDiscountPercent > 0),
           });
         }
       }
     }
 
-    // If VIPs, also discover repeat customers from Invoices (>= 2 purchases)
+    // If VIPs, also discover repeat customers from Invoices (>= vipThreshold purchases)
     if (targetAudience === "vips") {
       try {
         const repeatInvoices = await Invoice.aggregate([
           { $match: { userId: business._id, partyPhone: { $exists: true, $ne: "" } } },
           { $group: { _id: "$partyPhone", count: { $sum: 1 }, name: { $first: "$partyName" } } },
-          { $match: { count: { $gte: 2 } } },
+          { $match: { count: { $gte: vipThreshold } } },
         ]);
         for (const inv of repeatInvoices) {
           const cleanPh = (inv._id || "").toString().replace(/[^0-9]/g, "");
@@ -211,7 +212,11 @@ const buildWhatsAppMessage = (party, business) => {
 
 router.get("/vip-count", async (req, res) => {
   try {
-    const count = await Party.countDocuments({ userId: req.user._id, isRegular: true });
+    const vipThreshold = Number(req.user?.vipVisitThreshold) || 3;
+    const count = await Party.countDocuments({
+      userId: req.user._id,
+      $or: [{ isRegular: true }, { visitCount: { $gte: vipThreshold } }],
+    });
     return res.status(200).json({ success: true, count });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -220,9 +225,10 @@ router.get("/vip-count", async (req, res) => {
 
 router.post("/send-bulk-vip-offer", async (req, res) => {
   try {
+    const vipThreshold = Number(req.user?.vipVisitThreshold) || 3;
     const vips = await Party.find({
       userId: req.user._id,
-      isRegular: true,
+      $or: [{ isRegular: true }, { visitCount: { $gte: vipThreshold } }],
     }).lean();
 
     if (!vips.length) {

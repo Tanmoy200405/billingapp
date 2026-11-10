@@ -89,12 +89,12 @@ app.get("/api/app-version", (req, res) => {
   const fallbackApkUrl = `${protocol}://${host}/api/download-apk`;
   res.status(200).json({
     success: true,
-    latestVersion: process.env.APP_LATEST_VERSION || "1.0.6",
+    latestVersion: process.env.APP_LATEST_VERSION || "1.0.7",
     minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
     apkUrl: process.env.APP_APK_URL || defaultApkUrl || fallbackApkUrl,
     releaseNotes:
       process.env.APP_RELEASE_NOTES ||
-      "Version 1.0.6: Ultra-fast bulkWrite PDF import (no timeouts on 1000+ rows, deduplicates existing phones), party edit/delete, and manual VIP criteria.",
+      "Version 1.0.7: Clean commercial thermal bill format (no barcode), end-to-end VIP setup sync fix, and UI polish across screens.",
     forceUpdate: false,
     timestamp: new Date().toISOString(),
   });
