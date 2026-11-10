@@ -204,6 +204,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ parties }),
       }),
+    importPdf: (payload) =>
+      request("/parties/import-pdf", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   },
   items: {
     getAll: (params = "") => request(`/items${params ? `?${params}` : ""}`),

@@ -44,7 +44,7 @@ export async function downloadReportFile(url, fileName = "Report.pdf", mimeType 
   }
 
   try {
-    const FileSystem = await import("expo-file-system");
+    const FileSystem = await import("expo-file-system/legacy");
     const Sharing = await import("expo-sharing");
 
     const targetUri = `${FileSystem.documentDirectory}${fileName}`;

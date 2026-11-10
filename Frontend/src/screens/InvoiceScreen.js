@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Image,
   Platform,
+  KeyboardAvoidingView,
+  Keyboard,
 } from "react-native";
 import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { api } from "../config/api";
@@ -689,7 +691,17 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
 
       {/* ────────────────── STEP 2: CUSTOMER & PAYMENT DETAILS ────────────────── */}
       {currentStep === "invoice" && (
-        <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            className="flex-1 p-4"
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={{ paddingBottom: 120 }}
+          >
           {/* Customer Details Card */}
           <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
             <View className="flex-row justify-between items-center mb-3">
@@ -1019,11 +1031,20 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               </View>
             )}
           </TouchableOpacity>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       )}
 
       {/* ────────────────── SELECT CUSTOMER MODAL ────────────────── */}
-      <Modal visible={showPartyModal} animationType="slide" transparent={true}>
+      <Modal
+        visible={showPartyModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setShowPartyModal(false);
+        }}
+      >
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-3xl p-5 max-h-[80%]">
             <View className="flex-row justify-between items-center mb-3">
@@ -1043,6 +1064,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             </TouchableOpacity>
 
             <FlatList
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               data={parties.filter(
                 (p) =>
                   p.name.toLowerCase().includes(partySearch.toLowerCase()) ||

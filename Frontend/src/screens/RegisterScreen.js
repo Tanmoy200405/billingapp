@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { api, setAuthToken } from "../config/api";
@@ -51,12 +53,17 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
   };
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
-      className="flex-1 bg-white px-6 pt-12"
-      contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between", paddingBottom: 32 }}
-      keyboardShouldPersistTaps="handled"
     >
+      <ScrollView
+        style={{ flex: 1 }}
+        className="flex-1 bg-white px-6 pt-12"
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between", paddingBottom: 32 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <View>
         <TouchableOpacity
           onPress={() => onNavigate("welcome")}
@@ -179,6 +186,7 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
           </View>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

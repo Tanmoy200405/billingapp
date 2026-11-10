@@ -1,8 +1,12 @@
 import express from "express";
+import { createRequire } from "module";
 import Party from "../models/Party.js";
 import Invoice from "../models/Invoice.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { sendWhatsAppMessage, getWhatsAppStatus } from "../services/whatsappService.js";
+
+const require = createRequire(import.meta.url);
+const { PDFParse } = require("pdf-parse");
 
 const router = express.Router();
 
@@ -344,6 +348,271 @@ router.post("/bulk-import", async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+function parsePartiesFromPdfText(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const parties = [];
+  const seenKeys = new Set();
+
+  const headerPattern =
+    /^(customer\s*name|party\s*name|name|sl\.?\s*no|s\.?\s*no|phone|mobile|contact|whatsapp|type|vip|regular|visits|total\s*spent|udhar|balance|page\s+\d+|customer\s+ledger|party\s+list|customers?\s+list|generated\s+on|report)/i;
+
+  const extractPhoneFromText = (str) => {
+    if (!str) return null;
+    // Match optional +91/91/0 followed by 10 digits allowing spaces or dashes inside
+    const match = str.match(/(?:\+?91[\s\-]?)?(?:0[\s\-]?)?([6-9](?:[\s\-]?\d){9})\b/) ||
+                  str.match(/(?:\+?91[\s\-]?)?(\d{5}[\s\-]?\d{5})\b/) ||
+                  str.match(/\b(\d{10})\b/);
+    if (!match) return null;
+    const digits = match[1].replace(/[^0-9]/g, "");
+    if (digits.length === 10 && digits !== "0000000000") {
+      return {
+        digits,
+        matchedText: match[0],
+        index: match.index ?? str.indexOf(match[0]),
+      };
+    }
+    return null;
+  };
+
+  const addParty = (entry) => {
+    const cleanPhone = (entry.phone || "").replace(/[^0-9]/g, "").slice(-10);
+    const cleanName = (entry.name || "").replace(/\s+/g, " ").trim();
+    if (!cleanPhone && (!cleanName || cleanName.length < 2)) return;
+
+    const finalName = cleanName && cleanName.length >= 2
+      ? cleanName
+      : `Customer ${cleanPhone.slice(-4)}`;
+
+    const dedupeKey = cleanPhone ? `p:${cleanPhone}` : `n:${finalName.toLowerCase()}`;
+    if (seenKeys.has(dedupeKey)) return;
+    seenKeys.add(dedupeKey);
+
+    parties.push({
+      name: finalName,
+      phone: cleanPhone,
+      type: entry.type === "supplier" ? "supplier" : "customer",
+      isRegular: Boolean(entry.isRegular),
+      balance: Number(entry.balance) || 0,
+      visitCount: Number(entry.visitCount) || 1,
+      totalSpent: Number(entry.totalSpent) || 0,
+    });
+  };
+
+  let pendingName = "";
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.length < 2) continue;
+    if (/^--\s*\d+\s*of\s*\d+\s*--$/i.test(line)) continue;
+    if (/^[-_=]{3,}$/.test(line)) continue;
+
+    // Skip pure header lines if there's no phone number on them
+    const phoneInfo = extractPhoneFromText(line);
+    if (!phoneInfo && headerPattern.test(line)) {
+      pendingName = "";
+      continue;
+    }
+
+    // 1. Key-value format: "Name: Rahul Phone: 9876543210"
+    const kvMatch = line.match(/(?:name|customer|party)\s*[:\-]\s*(.+?)\s+(?:phone|mobile|mob|ph|whatsapp|contact)\s*[:\-]\s*([+\d\s\-]{10,16})/i);
+    if (kvMatch) {
+      const name = kvMatch[1].replace(/^[\d.\-*)]+\s*/, "").trim();
+      const pInfo = extractPhoneFromText(kvMatch[2]);
+      if (pInfo) {
+        addParty({
+          name,
+          phone: pInfo.digits,
+          isRegular: /\b(vip|regular|yes)\b/i.test(line),
+          type: /\bsupplier\b/i.test(line) ? "supplier" : "customer",
+        });
+        pendingName = "";
+        continue;
+      }
+    }
+
+    // 2. Delimited columns: | , \t ;
+    const parts = line.split(/[|\t,;]/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const partPhoneIdx = parts.findIndex((p) => extractPhoneFromText(p));
+      if (partPhoneIdx !== -1) {
+        const pInfo = extractPhoneFromText(parts[partPhoneIdx]);
+        // Find name column (prefer column before phone, skipping pure serial numbers)
+        let rawName = "";
+        for (let idx = 0; idx < parts.length; idx++) {
+          if (idx === partPhoneIdx) continue;
+          const candidate = parts[idx].replace(/^[\d.\-*)]+\s*/, "").trim();
+          if (candidate && !/^\d+$/.test(candidate) && !/^(customer|supplier|vip|regular|yes|no)$/i.test(candidate)) {
+            rawName = candidate;
+            break;
+          }
+        }
+        const joinedRest = parts.join(" ");
+        const isRegular = /\b(vip|regular|yes)\b/i.test(joinedRest);
+        const isSupplier = /\bsupplier\b/i.test(joinedRest);
+        addParty({
+          name: rawName,
+          phone: pInfo.digits,
+          type: isSupplier ? "supplier" : "customer",
+          isRegular,
+        });
+        pendingName = "";
+        continue;
+      }
+    }
+
+    // 3. Single line containing both name and phone number
+    if (phoneInfo) {
+      const beforePhone = line.slice(0, phoneInfo.index).replace(/^[\d.\-*)]+\s*/, "").replace(/[-–:,\|]+$/, "").trim();
+      const afterPhone = line.slice(phoneInfo.index + phoneInfo.matchedText.length).trim();
+
+      let name = beforePhone;
+      if (!name || headerPattern.test(name) || /^\d+$/.test(name)) {
+        // Fallback: maybe pendingName from previous line, or text after phone
+        if (pendingName && !headerPattern.test(pendingName)) {
+          name = pendingName;
+        } else {
+          const cleanAfter = afterPhone.replace(/^[-–:,\|]+/, "").replace(/\b(vip|regular|customer|supplier|rs\.?\s*\d+).*$/i, "").trim();
+          if (cleanAfter && cleanAfter.length >= 2 && !/^\d+$/.test(cleanAfter)) {
+            name = cleanAfter;
+          }
+        }
+      }
+
+      addParty({
+        name,
+        phone: phoneInfo.digits,
+        type: /\bsupplier\b/i.test(line) ? "supplier" : "customer",
+        isRegular: /\b(vip|regular)\b/i.test(line),
+      });
+      pendingName = "";
+      continue;
+    }
+
+    // 4. Line with no phone — remember as candidate name for next line's phone number
+    const cleanCandidate = line.replace(/^[\d.\-*)]+\s*/, "").trim();
+    if (
+      cleanCandidate.length >= 2 &&
+      cleanCandidate.length <= 60 &&
+      !/^\d+(\.\d+)?$/.test(cleanCandidate) &&
+      !headerPattern.test(cleanCandidate) &&
+      /[a-zA-Z]/.test(cleanCandidate)
+    ) {
+      pendingName = cleanCandidate;
+    } else {
+      pendingName = "";
+    }
+  }
+
+  return parties;
+}
+
+router.post("/import-pdf", async (req, res) => {
+  try {
+    const { pdfBase64, pdfText, previewOnly } = req.body;
+    let extractedText = pdfText || "";
+
+    if (pdfBase64) {
+      const cleanBase64 = pdfBase64.replace(/^data:[^;]+;base64,/, "");
+      const buffer = Buffer.from(cleanBase64, "base64");
+      const parser = new PDFParse({ data: buffer });
+      await parser.load();
+      const result = await parser.getText();
+      await parser.destroy();
+      extractedText = result.text || "";
+    }
+
+    if (!extractedText || !extractedText.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "No readable text found in the provided PDF file.",
+      });
+    }
+
+    const parsedParties = parsePartiesFromPdfText(extractedText);
+    if (!parsedParties.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Could not find valid customer names or phone numbers in this PDF file.",
+      });
+    }
+
+    if (previewOnly) {
+      return res.status(200).json({
+        success: true,
+        count: parsedParties.length,
+        parties: parsedParties,
+      });
+    }
+
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    for (const entry of parsedParties) {
+      const cleanPhone = (entry.phone || "").replace(/[^0-9]/g, "").slice(-10);
+      const partyName = entry.name.trim();
+
+      let existing = null;
+      if (cleanPhone) {
+        existing = await Party.findOne({
+          userId: req.user._id,
+          $or: [{ phone: cleanPhone }, { whatsappNumber: cleanPhone }],
+        });
+      }
+      if (!existing && partyName && !partyName.startsWith("Customer ")) {
+        existing = await Party.findOne({
+          userId: req.user._id,
+          name: { $regex: new RegExp(`^${partyName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        });
+      }
+
+      if (existing) {
+        if (partyName && !partyName.startsWith("Customer ")) {
+          existing.name = partyName;
+        }
+        if (cleanPhone) {
+          existing.phone = cleanPhone;
+          if (!existing.whatsappNumber) existing.whatsappNumber = cleanPhone;
+        }
+        if (entry.isRegular) existing.isRegular = true;
+        if (entry.type) existing.type = entry.type;
+        await existing.save();
+        updatedCount++;
+      } else {
+        await Party.create({
+          userId: req.user._id,
+          name: partyName,
+          phone: cleanPhone || "0000000000",
+          whatsappNumber: cleanPhone || "0000000000",
+          type: entry.type || "customer",
+          isRegular: Boolean(entry.isRegular),
+          balance: Number(entry.balance) || 0,
+          visitCount: Number(entry.visitCount) || 1,
+          totalSpent: Number(entry.totalSpent) || 0,
+        });
+        addedCount++;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `PDF party list imported successfully (${addedCount} added, ${updatedCount} updated)`,
+      addedCount,
+      updatedCount,
+      totalProcessed: addedCount + updatedCount,
+      parties: parsedParties,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process PDF file: " + error.message,
+    });
   }
 });
 

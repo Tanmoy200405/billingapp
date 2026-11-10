@@ -11,6 +11,9 @@ import {
   Linking,
   FlatList,
   StyleSheet,
+  Platform,
+  KeyboardAvoidingView,
+  Keyboard,
 } from "react-native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { api } from "../config/api";
@@ -249,13 +252,18 @@ export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
         </View>
       </View>
 
-      <ScrollView
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handlePullRefresh} tintColor={C.navy} colors={[C.navy]} />}
       >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handlePullRefresh} tintColor={C.navy} colors={[C.navy]} />}
+        >
         {/* ── Card 1: WhatsApp Bulk & VIP Broadcast ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -451,7 +459,8 @@ export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
             )}
           </TouchableOpacity>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* ── Fail-Safe Bulk Dispatcher Queue Modal ── */}
       <Modal

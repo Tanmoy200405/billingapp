@@ -18,6 +18,8 @@ import {
   TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../config/api";
 import { downloadReportFile } from "../utils/reportDownloader";
 export default function PartyScreen({ onOpenDrawer, onBack }) {
@@ -28,6 +30,7 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
   const [vipVisitThreshold, setVipVisitThreshold] = useState(3);
   const [bulkSending, setBulkSending] = useState(false);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [importingPdf, setImportingPdf] = useState(false);
   const [perksModalVisible, setPerksModalVisible] = useState(false);
   const [selectedParty, setSelectedParty] = useState(null);
   const [formIsRegular, setFormIsRegular] = useState(false);
@@ -65,6 +68,81 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
       Alert.alert("Download Error", e.message || "Failed to download customer ledger report");
     } finally {
       setDownloadingReport(false);
+    }
+  };
+  const handleImportPdf = async () => {
+    Keyboard.dismiss();
+    try {
+      if (Platform.OS === "web") {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/pdf,.pdf";
+        input.onchange = async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          setImportingPdf(true);
+          try {
+            const reader = new FileReader();
+            reader.onload = async () => {
+              const base64Data = reader.result;
+              const res = await api.parties.importPdf({ pdfBase64: base64Data });
+              setImportingPdf(false);
+              if (res && res.success) {
+                Alert.alert(
+                  "PDF Party List Imported!",
+                  `Successfully parsed and saved customers from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
+                );
+                loadParties();
+              } else {
+                Alert.alert(
+                  "Import Notice",
+                  res?.message || "Could not extract customer list from this PDF."
+                );
+              }
+            };
+            reader.readAsDataURL(file);
+          } catch (err) {
+            setImportingPdf(false);
+            Alert.alert("Error", err.message || "Failed to read PDF file.");
+          }
+        };
+        input.click();
+        return;
+      }
+
+      setImportingPdf(true);
+      const resDoc = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf"],
+        copyToCacheDirectory: true,
+      });
+
+      if (resDoc.canceled || !resDoc.assets || !resDoc.assets.length) {
+        setImportingPdf(false);
+        return;
+      }
+
+      const asset = resDoc.assets[0];
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: "base64",
+      });
+
+      const res = await api.parties.importPdf({ pdfBase64: base64 });
+      setImportingPdf(false);
+      if (res && res.success) {
+        Alert.alert(
+          "PDF Party List Imported!",
+          `Successfully parsed and saved customers from PDF.\nAdded: ${res.addedCount || 0}, Updated: ${res.updatedCount || 0}`
+        );
+        loadParties();
+      } else {
+        Alert.alert(
+          "Import Notice",
+          res?.message || "Could not extract customer list from this PDF."
+        );
+      }
+    } catch (err) {
+      setImportingPdf(false);
+      Alert.alert("Import Error", err.message || "Failed to import party list from PDF.");
     }
   };
   const handleSavePerks = async () => {
@@ -169,9 +247,23 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
         </View>
         <View className="flex-row gap-2 mb-2.5">
           <TouchableOpacity
+            onPress={handleImportPdf}
+            disabled={importingPdf}
+            className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-2.5 rounded-xl flex-row items-center justify-center"
+          >
+            {importingPdf ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="cloud-upload-outline" size={15} color="#FFFFFF" />
+                <Text className="text-white font-bold text-xs ml-1.5">Import PDF</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={handleDownloadPartyReport}
             disabled={downloadingReport}
-            className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-3 rounded-xl flex-row items-center justify-center"
+            className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-2.5 rounded-xl flex-row items-center justify-center"
           >
             {downloadingReport ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -186,14 +278,14 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
             <TouchableOpacity
               onPress={handleBulkVipOffer}
               disabled={bulkSending}
-              className="flex-1 bg-amber-400 active:bg-amber-500 py-2 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
+              className="flex-1 bg-amber-400 active:bg-amber-500 py-2 px-2.5 rounded-xl flex-row items-center justify-center shadow-xs"
             >
               {bulkSending ? (
                 <ActivityIndicator size="small" color="#78350f" />
               ) : (
                 <>
                   <FontAwesome name="whatsapp" size={15} color="#78350f" />
-                  <Text className="text-amber-900 font-extrabold text-xs ml-1.5">WhatsApp VIPs</Text>
+                  <Text className="text-amber-900 font-extrabold text-xs ml-1">VIP Offer</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -280,6 +372,7 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
           keyExtractor={(item, index) => item?._id || `party-${index}`}
           contentContainerStyle={{ padding: 12, paddingBottom: 120, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           nestedScrollEnabled={true}
           scrollEnabled={true}
           showsVerticalScrollIndicator={true}
@@ -370,61 +463,95 @@ export default function PartyScreen({ onOpenDrawer, onBack }) {
           }}
         />
       )}
-      <Modal visible={perksModalVisible} animationType="slide" transparent={true}>
-        <View className="flex-1 bg-black/50 justify-end sm:justify-center items-center p-0 sm:p-4">
-          <View className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl">
-            <View className="flex-row justify-between items-center pb-3 border-b border-gray-100">
-              <View>
-                <Text className="text-base font-extrabold text-gray-900">
-                  {selectedParty?.name || "Customer Perks"}
-                </Text>
-                <Text className="text-[11px] text-gray-500">Configure VIP status and billing benefits</Text>
-              </View>
-              <TouchableOpacity onPress={() => setPerksModalVisible(false)} className="p-1">
-                <Ionicons name="close" size={22} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView className="py-3" showsVerticalScrollIndicator={false}>
-              <View className="flex-row items-center justify-between bg-gray-50 p-3 rounded-xl border border-gray-200 mb-3">
+      <Modal
+        visible={perksModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setPerksModalVisible(false);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+        >
+          <View className="flex-1 bg-black/50 justify-end sm:justify-center items-center p-0 sm:p-4">
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+            </TouchableWithoutFeedback>
+
+            <View className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[85%] shadow-2xl">
+              <View className="flex-row justify-between items-center pb-3 border-b border-gray-100">
                 <View>
-                  <Text className="text-xs font-bold text-gray-800">VIP / Regular Member</Text>
-                  <Text className="text-[10px] text-gray-500">Unlock special discounts during billing</Text>
+                  <Text className="text-base font-extrabold text-gray-900">
+                    {selectedParty?.name || "Customer Perks"}
+                  </Text>
+                  <Text className="text-[11px] text-gray-500">Configure VIP status and billing benefits</Text>
                 </View>
-                <Switch
-                  value={formIsRegular}
-                  onValueChange={setFormIsRegular}
-                  trackColor={{ false: "#D1D5DB", true: "#93C5FD" }}
-                  thumbColor={formIsRegular ? "#2563EB" : "#9CA3AF"}
-                />
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setPerksModalVisible(false);
+                  }}
+                  className="p-1"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={22} color="#6B7280" />
+                </TouchableOpacity>
               </View>
-              <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-700 mb-1">Custom Discount (%)</Text>
-                <TextInput
-                  className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
-                  placeholder="0"
-                  keyboardType="numeric"
-                  value={formDiscount}
-                  onChangeText={setFormDiscount}
-                />
-              </View>
-              <View className="mb-5">
-                <Text className="text-xs font-bold text-gray-700 mb-1">Complimentary Freebie Gift</Text>
-                <TextInput
-                  className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
-                  placeholder="e.g. Complimentary Beverage, Free Dessert"
-                  value={formFreebie}
-                  onChangeText={setFormFreebie}
-                />
-              </View>
-              <TouchableOpacity
-                onPress={handleSavePerks}
-                className="w-full bg-blue-600 py-3.5 rounded-xl items-center shadow"
+              <ScrollView
+                className="py-3"
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                contentContainerStyle={{ paddingBottom: 24 }}
               >
-                <Text className="text-white font-bold text-sm">Save Customer Perks</Text>
-              </TouchableOpacity>
-            </ScrollView>
+                <View className="flex-row items-center justify-between bg-gray-50 p-3 rounded-xl border border-gray-200 mb-3">
+                  <View>
+                    <Text className="text-xs font-bold text-gray-800">VIP / Regular Member</Text>
+                    <Text className="text-[10px] text-gray-500">Unlock special discounts during billing</Text>
+                  </View>
+                  <Switch
+                    value={formIsRegular}
+                    onValueChange={setFormIsRegular}
+                    trackColor={{ false: "#D1D5DB", true: "#93C5FD" }}
+                    thumbColor={formIsRegular ? "#2563EB" : "#9CA3AF"}
+                  />
+                </View>
+                <View className="mb-3">
+                  <Text className="text-xs font-bold text-gray-700 mb-1">Custom Discount (%)</Text>
+                  <TextInput
+                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
+                    placeholder="0"
+                    keyboardType="numeric"
+                    value={formDiscount}
+                    onChangeText={setFormDiscount}
+                    returnKeyType="done"
+                  />
+                </View>
+                <View className="mb-5">
+                  <Text className="text-xs font-bold text-gray-700 mb-1">Complimentary Freebie Gift</Text>
+                  <TextInput
+                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
+                    placeholder="e.g. Complimentary Beverage, Free Dessert"
+                    value={formFreebie}
+                    onChangeText={setFormFreebie}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSavePerks}
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={handleSavePerks}
+                  className="w-full bg-blue-600 py-3.5 rounded-xl items-center shadow"
+                >
+                  <Text className="text-white font-bold text-sm">Save Customer Perks</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

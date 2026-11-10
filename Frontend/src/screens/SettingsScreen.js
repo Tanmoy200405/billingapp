@@ -13,6 +13,7 @@ import {
   Modal,
   Linking,
   RefreshControl,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons, FontAwesome, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -430,21 +431,26 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
           </TouchableOpacity>
         ))}
       </View>
-      <ScrollView
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 14, paddingBottom: 120, flexGrow: 1 }}
-        showsVerticalScrollIndicator={true}
-        keyboardShouldPersistTaps="handled"
-        nestedScrollEnabled={true}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handlePullRefresh}
-            tintColor="#2563EB"
-            colors={["#2563EB"]}
-          />
-        }
       >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 14, paddingBottom: 120, flexGrow: 1 }}
+          showsVerticalScrollIndicator={true}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          nestedScrollEnabled={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handlePullRefresh}
+              tintColor="#2563EB"
+              colors={["#2563EB"]}
+            />
+          }
+        >
         {activeTab === "profile" && (
           <View>
             <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
@@ -1039,7 +1045,8 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
             </View>
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
       <Modal visible={showPreview} animationType="slide" transparent={true}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}>
           <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: "90%" }}>

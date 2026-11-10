@@ -86,7 +86,7 @@ export async function shareBackendPdf(invoice, fileName = null) {
   }
 
   try {
-    const FileSystem = await import("expo-file-system");
+    const FileSystem = await import("expo-file-system/legacy");
     const Sharing = await import("expo-sharing");
 
     const destUri = `${FileSystem.documentDirectory}${safeFileName}`;
