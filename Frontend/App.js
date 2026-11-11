@@ -7,6 +7,7 @@ import "./global.css";
 import { api, setAuthToken, getStoredSession, getAuthToken, clearAuthToken, prefetchCoreData } from "./src/config/api";
 import { THEME } from "./src/config/theme";
 import { useResponsive } from "./src/utils/responsive";
+import { syncOfflineInvoices, getPendingOfflineInvoices } from "./src/utils/offlineQueue";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
@@ -80,6 +81,27 @@ export default function App() {
       setCurrentScreen("welcome");
     };
     initAuth();
+
+    const trySyncOfflineQueue = async () => {
+      try {
+        const pending = await getPendingOfflineInvoices();
+        if (pending.length > 0 && getAuthToken()) {
+          await syncOfflineInvoices(
+            (payload) => api.invoices.create(payload),
+            () => {
+              prefetchCoreData().catch(() => {});
+            }
+          );
+        }
+      } catch {}
+    };
+
+    trySyncOfflineQueue();
+    const syncTimer = setInterval(trySyncOfflineQueue, 20000);
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      window.addEventListener("online", trySyncOfflineQueue);
+    }
+
     const checkUpdates = async () => {
       try {
         const update = await checkForAppUpdates(false);
@@ -93,6 +115,13 @@ export default function App() {
       } catch {}
     };
     checkUpdates();
+
+    return () => {
+      clearInterval(syncTimer);
+      if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+        window.removeEventListener("online", trySyncOfflineQueue);
+      }
+    };
   }, []);
 
   useEffect(() => {

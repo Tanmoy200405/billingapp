@@ -22,6 +22,7 @@ import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shareBackendPdf, printTestSlip } from "../utils/receiptPdfGenerator";
 import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
+import { subscribeOfflineQueue, syncOfflineInvoices } from "../utils/offlineQueue";
 import { useResponsive, ResponsiveContainer } from "../utils/responsive";
 
 export default function DashboardScreen({
@@ -43,6 +44,28 @@ export default function DashboardScreen({
   const [selectedBill, setSelectedBill] = useState(null);
   const [billLoading, setBillLoading] = useState(false);
   const [printerPaperSize, setPrinterPaperSize] = useState("2inch");
+  const [pendingOffline, setPendingOffline] = useState([]);
+  const [syncingOffline, setSyncingOffline] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeOfflineQueue((queue) => {
+      setPendingOffline(Array.isArray(queue) ? queue : []);
+    });
+    return unsub;
+  }, []);
+
+  const handleSyncOfflineNow = async () => {
+    if (syncingOffline) return;
+    setSyncingOffline(true);
+    try {
+      const result = await syncOfflineInvoices((payload) => api.invoices.create(payload));
+      if (result.synced > 0) {
+        await fetchDashboardData();
+      }
+    } finally {
+      setSyncingOffline(false);
+    }
+  };
 
   const executeDeleteInvoice = async (invoiceId) => {
     try {
@@ -223,6 +246,37 @@ export default function DashboardScreen({
         }
       >
         <ResponsiveContainer maxWidth={1200}>
+          {pendingOffline.length > 0 ? (
+            <View className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 mb-3.5 flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1 pr-2">
+                <View className="w-8 h-8 rounded-xl bg-amber-100 items-center justify-center mr-2.5">
+                  <Ionicons name="cloud-offline-outline" size={18} color="#B45309" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs font-extrabold text-amber-900">
+                    {pendingOffline.length} Offline Bill{pendingOffline.length > 1 ? "s" : ""} Pending Sync
+                  </Text>
+                  <Text className="text-[10px] text-amber-700 font-medium">
+                    Will auto-upload & send WhatsApp PDFs as soon as internet connects
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={handleSyncOfflineNow}
+                disabled={syncingOffline}
+                className="bg-amber-600 px-3 py-1.5 rounded-xl flex-row items-center"
+              >
+                {syncingOffline ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="cloud-upload-outline" size={14} color="#FFFFFF" />
+                    <Text className="text-white text-[11px] font-bold ml-1">Sync Now</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : null}
           <View style={isWide ? { flexDirection: "row", gap: 16, alignItems: "stretch", marginBottom: 16 } : undefined}>
             <View
               style={isWide ? { flex: 1, marginBottom: 0 } : undefined}
@@ -368,6 +422,10 @@ export default function DashboardScreen({
                 activeOpacity={0.8}
                 style={isWide ? { width: isDesktop ? "48.9%" : "48.6%", marginBottom: 0 } : undefined}
                 onPress={async () => {
+                  if (tx.isOfflinePending || String(tx._id).startsWith("offline_")) {
+                    setSelectedBill(tx);
+                    return;
+                  }
                   setBillLoading(true);
                   try {
                     const res = await api.invoices.getOne(tx._id);
@@ -389,6 +447,13 @@ export default function DashboardScreen({
                   <Text className="text-sm font-extrabold text-gray-900 mr-2">
                     {tx.partyName || "Cash Sale"}
                   </Text>
+                  {tx.isOfflinePending ? (
+                    <View className="bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded mr-1">
+                      <Text className="text-[9px] font-bold text-amber-800">
+                        Offline
+                      </Text>
+                    </View>
+                  ) : null}
                   {tx.isRegularCustomer ? (
                     <View className="bg-amber-100 px-1.5 py-0.2 rounded">
                       <Text className="text-[9px] font-bold text-amber-800">

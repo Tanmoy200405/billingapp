@@ -20,6 +20,7 @@ import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shareBillAsPdf, shareBackendPdf, printBill } from "../utils/receiptPdfGenerator";
 import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
+import { queueOfflineInvoice, isNetworkErrorMessage } from "../utils/offlineQueue";
 import { useResponsive } from "../utils/responsive";
 
 export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInvoice }) {
@@ -350,21 +351,40 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       })),
     };
 
-    const res = editingInvoice?._id
+    let finalRes = editingInvoice?._id
       ? await api.invoices.update(editingInvoice._id, payload)
       : await api.invoices.create(payload);
+
+    if (
+      !editingInvoice?._id &&
+      (!finalRes || (!finalRes.success && isNetworkErrorMessage(finalRes.message)))
+    ) {
+      finalRes = await queueOfflineInvoice(payload, {
+        subtotal,
+        discountTotal: regularDiscountAmount,
+        regularDiscountAmount,
+        grandTotal,
+      });
+    }
     setLoading(false);
 
-    if (res && res.success && res.invoice) {
-      setCreatedInvoice(res.invoice);
-      setWhatsappUrl(res.whatsappUrl || "");
-      setWhatsappSent(Boolean(res.whatsappSent || res.whatsappQueued));
+    if (finalRes && finalRes.success && finalRes.invoice) {
+      setCreatedInvoice(finalRes.invoice);
+      setWhatsappUrl(finalRes.whatsappUrl || "");
+      setWhatsappSent(Boolean(finalRes.whatsappSent || finalRes.whatsappQueued));
       setShowReceiptModal(true);
       setKotSent(false);
 
       if (editingInvoice) {
         if (Platform.OS === "web") {
-          window.alert(res.message || "Invoice updated successfully!");
+          window.alert(finalRes.message || "Invoice updated successfully!");
+        }
+      } else if (finalRes.offlineQueued) {
+        const msg = "No internet — Bill saved offline & will auto-sync when online!";
+        if (Platform.OS === "web") {
+          window.alert(msg);
+        } else {
+          Alert.alert("Saved Offline", msg);
         }
       }
 
@@ -378,14 +398,14 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             email: user?.email || "",
             gstin: user?.gstin || "",
           };
-          await printBill(res.invoice, storeData, billFormatOptions, printTarget);
+          await printBill(finalRes.invoice, storeData, billFormatOptions, printTarget);
           setKotSent(true);
         } catch (printErr) {
           console.warn("Thermal print notice (printer offline or skipped):", printErr.message);
         }
       }
     } else {
-      const errorMsg = res?.message || "Could not save invoice";
+      const errorMsg = finalRes?.message || "Could not save invoice";
       if (Platform.OS === "web") {
         window.alert(errorMsg);
       } else {
@@ -1169,6 +1189,13 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               <Text className="text-xs font-bold text-blue-600 mt-1">
                 #{createdInvoice?.invoiceNumber}
               </Text>
+              {createdInvoice?.isOfflinePending ? (
+                <View className="bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full mt-1.5">
+                  <Text className="text-[10px] font-extrabold text-amber-800">
+                    Saved Offline • Auto-syncs when online
+                  </Text>
+                </View>
+              ) : null}
               <Text className="text-[11px] text-gray-500 mt-0.5">
                 Date: {formatISTDate(createdInvoice?.invoiceDate || createdInvoice?.createdAt)}
               </Text>
