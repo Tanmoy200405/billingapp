@@ -126,9 +126,10 @@ export default function MarketingScreen({ user, isActive = true, onOpenDrawer, o
     }
     if (!hasCached) setLoadingItems(true);
     try {
-      const [itemRes, partyRes] = await Promise.all([
+      const [itemRes, partyRes, waRes] = await Promise.all([
         api.items.getAll(),
         api.parties.getAll(),
+        api.whatsapp.getStatus().catch(() => null),
       ]);
       if (itemRes?.success && Array.isArray(itemRes.items)) {
         setCatalogues(itemRes.items);
@@ -137,6 +138,9 @@ export default function MarketingScreen({ user, isActive = true, onOpenDrawer, o
       if (partyRes?.success && Array.isArray(partyRes.parties)) {
         setParties(partyRes.parties);
         setCachedData("parties_all", partyRes.parties);
+      }
+      if (waRes?.success && waRes.status === "connected") {
+        setAutoSendViaServer(true);
       }
     } catch {} finally {
       setLoadingItems(false);

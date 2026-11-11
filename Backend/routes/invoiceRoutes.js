@@ -528,7 +528,7 @@ router.post("/", async (req, res) => {
     invalidateUserCache(req.user._id);
 
     let whatsappQueued = false;
-    if (req.body.autoSendWhatsApp && destinationPhone) {
+    if (req.body.autoSendWhatsApp !== false && destinationPhone) {
       await enqueueJob("INVOICE_WHATSAPP_PDF", {
         invoiceId: invoice._id.toString(),
         userId: req.user._id.toString(),

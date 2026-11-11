@@ -56,6 +56,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 5004,
+        IS_MESSAGING_SERVICE: "true",
       },
     },
   ],

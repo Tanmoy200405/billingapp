@@ -616,9 +616,49 @@ export const disconnectWhatsApp = async (autoRestart = false, userId = null) => 
   return { success: true };
 };
 
+function shouldForwardToMessagingService() {
+  return process.env.MICROSERVICES_MODE === "true" && process.env.IS_MESSAGING_SERVICE !== "true";
+}
+
+function getMessagingServiceBaseUrl() {
+  return process.env.MESSAGING_SERVICE_URL || "http://127.0.0.1:5004";
+}
+
+async function ensureConnectedForUser(userKey) {
+  let state = userKey ? sessions.get(userKey) : null;
+  if (state?.sock && state.connectionStatus === "connected") {
+    return state;
+  }
+  const sessionDir = state?.sessionDir || (userKey ? path.join(BASE_SESSION_DIR, userKey) : null);
+  const hasCreds = sessionDir && fs.existsSync(path.join(sessionDir, "creds.json"));
+  if (userKey && (hasCreds || state?.isInitializing)) {
+    await initWhatsApp(false, userKey);
+    await waitForWhatsAppQrOrReady(5000, userKey);
+    state = sessions.get(userKey);
+  }
+  return state;
+}
+
 export const sendWhatsAppMessage = async (recipientPhone, textMessage, userId = null) => {
+  if (shouldForwardToMessagingService()) {
+    try {
+      const resp = await fetch(`${getMessagingServiceBaseUrl()}/internal/whatsapp/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: recipientPhone,
+          message: textMessage,
+          userId: userId ? userId.toString() : null,
+        }),
+      });
+      if (resp.ok) return await resp.json();
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
+
   const userKey = normalizeUserKey(userId);
-  const state = userKey ? sessions.get(userKey) : null;
+  const state = await ensureConnectedForUser(userKey);
 
   if (!state?.sock || state.connectionStatus !== "connected") {
     return { success: false, message: "WhatsApp not linked for this store account" };
@@ -652,6 +692,19 @@ export const sendWhatsAppMessage = async (recipientPhone, textMessage, userId = 
  * unless a system/default session is connected.
  */
 export const sendSystemWhatsAppMessage = async (recipientPhone, textMessage) => {
+  if (shouldForwardToMessagingService()) {
+    try {
+      const resp = await fetch(`${getMessagingServiceBaseUrl()}/internal/whatsapp/send-system`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: recipientPhone, message: textMessage }),
+      });
+      if (resp.ok) return await resp.json();
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
+
   const preferredKeys = ["system", "default"];
   for (const key of preferredKeys) {
     const state = sessions.get(key);
@@ -676,8 +729,30 @@ export const sendWhatsAppDocument = async (
   caption = "",
   userId = null
 ) => {
+  if (shouldForwardToMessagingService()) {
+    try {
+      const finalBuffer = Buffer.isBuffer(documentBuffer)
+        ? documentBuffer
+        : Buffer.from(documentBuffer);
+      const resp = await fetch(`${getMessagingServiceBaseUrl()}/internal/whatsapp/send-document`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: recipientPhone,
+          base64Buffer: finalBuffer.toString("base64"),
+          fileName,
+          caption,
+          userId: userId ? userId.toString() : null,
+        }),
+      });
+      if (resp.ok) return await resp.json();
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  }
+
   const userKey = normalizeUserKey(userId);
-  const state = userKey ? sessions.get(userKey) : null;
+  const state = await ensureConnectedForUser(userKey);
 
   if (!state?.sock || state.connectionStatus !== "connected") {
     return { success: false, message: "WhatsApp not linked for this store account" };

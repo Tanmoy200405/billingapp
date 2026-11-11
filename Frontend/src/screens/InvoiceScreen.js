@@ -333,6 +333,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       partyId: activeCustomer ? activeCustomer._id : undefined,
       partyName: customerName.trim() || "Walk-in Customer",
       partyPhone: cleanPhone || undefined,
+      autoSendWhatsApp: cleanPhone.length >= 10,
       paymentMode,
       cashAmount: paymentMode === "UPI/CASH" ? Number(cashAmount) || 0 : undefined,
       upiAmount: paymentMode === "UPI/CASH" ? Number(upiAmount) || 0 : undefined,

@@ -5,6 +5,8 @@ import {
   sendWhatsAppMessage,
   sendWhatsAppDocument,
   getWhatsAppStatus,
+  initWhatsApp,
+  waitForWhatsAppQrOrReady,
 } from "./whatsappService.js";
 import {
   isSqsConfigured,
@@ -36,7 +38,11 @@ async function handleInvoiceWhatsAppJob(payload) {
     console.warn("[Worker] PDF render warning:", err.message);
   }
 
-  const waStatus = getWhatsAppStatus(userId);
+  let waStatus = getWhatsAppStatus(userId);
+  if (waStatus.status !== "connected" && (business?.whatsappLinked || waStatus.sessionPersisted)) {
+    await initWhatsApp(false, userId).catch(() => {});
+    waStatus = await waitForWhatsAppQrOrReady(6000, userId);
+  }
   let sent = false;
 
   if (waStatus.status === "connected") {
@@ -58,11 +64,14 @@ async function handleInvoiceWhatsAppJob(payload) {
     } catch (waErr) {
       console.warn("[Worker] WhatsApp send warning:", waErr.message);
     }
+  } else {
+    console.warn(`[Worker] WhatsApp not connected for user ${userId} (status=${waStatus.status})`);
   }
 
   if (sent) {
     invoice.whatsappSent = true;
     await invoice.save().catch(() => {});
+    console.log(`[Worker] Delivered Bill #${invoice.invoiceNumber} to ${destinationPhone} (user=${userId})`);
   } else if (isSnsSmsEnabled()) {
     // Optional fallback SMS notification via AWS SNS if enabled
     const storeName = business?.businessName || "Our Store";
