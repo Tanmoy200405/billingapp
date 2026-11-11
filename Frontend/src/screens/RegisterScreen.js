@@ -12,8 +12,10 @@ import {
 } from "react-native";
 import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { api, setAuthToken } from "../config/api";
+import { useResponsive } from "../utils/responsive";
 
 export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
+  const { isWide } = useResponsive();
   const [businessName, setBusinessName] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -58,13 +60,33 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
       style={{ flex: 1 }}
     >
       <ScrollView
-        style={{ flex: 1 }}
-        className="flex-1 bg-white px-6 pt-12"
-        contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between", paddingBottom: 32 }}
+        style={{ flex: 1, backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF" }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: isWide ? "center" : "space-between",
+          alignItems: "center",
+          paddingHorizontal: 24,
+          paddingTop: isWide ? 24 : 48,
+          paddingBottom: 32,
+        }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-      <View>
+      <View
+        style={{
+          width: "100%",
+          maxWidth: 480,
+          backgroundColor: "#FFFFFF",
+          borderRadius: isWide ? 24 : 0,
+          padding: isWide ? 32 : 0,
+          borderWidth: isWide ? 1 : 0,
+          borderColor: "#E2E8F0",
+          shadowColor: isWide ? "#0F172A" : "transparent",
+          shadowOpacity: isWide ? 0.08 : 0,
+          shadowRadius: isWide ? 24 : 0,
+          elevation: isWide ? 4 : 0,
+        }}
+      >
         <TouchableOpacity
           onPress={() => onNavigate("welcome")}
           className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center mb-4"
@@ -170,12 +192,12 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
             Already have an account
           </Text>
         </TouchableOpacity>
-      </View>
 
-      <View className="items-center mt-4 pb-4">
-        <Text className="text-[11px] text-gray-400 text-center">
-          Your store profile, GST details, and receipts are securely synced to the cloud.
-        </Text>
+        <View className="items-center mt-5 pb-2">
+          <Text className="text-[11px] text-gray-400 text-center">
+            Your store profile, GST details, and receipts are securely synced to the cloud.
+          </Text>
+        </View>
       </View>
       </ScrollView>
     </KeyboardAvoidingView>

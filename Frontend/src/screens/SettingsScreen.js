@@ -27,7 +27,10 @@ import {
   GITHUB_RELEASES_URL,
 } from "../services/updateService";
 import { printTestSlip, INVOICE_STYLES } from "../utils/receiptPdfGenerator";
+import { useResponsive, ResponsiveContainer } from "../utils/responsive";
+
 export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, onProfileUpdated, initialTab = "profile" }) {
+  const { isWide, headerTopPadding } = useResponsive();
   const [activeTab, setActiveTab] = useState(initialTab || "profile");
   const [vipVisitThreshold, setVipVisitThreshold] = useState(user?.vipVisitThreshold || 3);
   const [vipInputText, setVipInputText] = useState(String(user?.vipVisitThreshold || 3));
@@ -384,12 +387,15 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   };
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
-      <View className="bg-blue-600 px-4 pt-10 pb-3 flex-row items-center justify-between">
+      <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-3">
+        <ResponsiveContainer maxWidth={920} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View className="flex-row items-center">
-          <TouchableOpacity onPress={onOpenDrawer} className="mr-2">
-            <Ionicons name="menu" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          {onBack ? (
+          {!isWide && (
+            <TouchableOpacity onPress={onOpenDrawer} className="mr-2">
+              <Ionicons name="menu" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+          {onBack && !isWide ? (
             <TouchableOpacity
               onPress={onBack}
               className="flex-row items-center bg-white/20 px-2.5 py-1 rounded-lg mr-2"
@@ -414,8 +420,10 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
             </>
           )}
         </TouchableOpacity>
+        </ResponsiveContainer>
       </View>
-      <View className="bg-blue-700 px-2 py-2 flex-row justify-around">
+      <View className="bg-blue-700 px-2 py-2">
+        <ResponsiveContainer maxWidth={920} style={{ flexDirection: "row", justifyContent: "space-around" }}>
         {[
           { key: "profile", label: "Profile", icon: "storefront-outline" },
           { key: "printer", label: "Printer & Bills", icon: "print-outline" },
@@ -442,6 +450,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
             </Text>
           </TouchableOpacity>
         ))}
+        </ResponsiveContainer>
       </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -449,7 +458,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 14, paddingBottom: 120, flexGrow: 1 }}
+          contentContainerStyle={{ padding: isWide ? 20 : 14, paddingBottom: 120, flexGrow: 1 }}
           showsVerticalScrollIndicator={true}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -463,6 +472,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
             />
           }
         >
+        <ResponsiveContainer maxWidth={920}>
         {activeTab === "profile" && (
           <View>
             <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
@@ -1073,11 +1083,12 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
             </View>
           </View>
         )}
+        </ResponsiveContainer>
         </ScrollView>
       </KeyboardAvoidingView>
       <Modal visible={showPreview} animationType="slide" transparent={true}>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}>
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: "90%" }}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: isWide ? "center" : "flex-end", alignItems: isWide ? "center" : "stretch", padding: isWide ? 24 : 0 }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: isWide ? 20 : 0, borderBottomRightRadius: isWide ? 20 : 0, padding: 16, maxHeight: "90%", width: "100%", maxWidth: isWide ? 520 : undefined }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <Text style={{ fontSize: 14, fontWeight: "800", color: "#111" }}>
                 Receipt Preview ({INVOICE_STYLES.find((s) => s.id === invoiceStyle)?.name || invoiceStyle})

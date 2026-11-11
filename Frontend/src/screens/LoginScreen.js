@@ -12,8 +12,10 @@ import {
 } from "react-native";
 import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { api, setAuthToken } from "../config/api";
+import { useResponsive } from "../utils/responsive";
 
 export default function LoginScreen({ onNavigate, onLoginSuccess }) {
+  const { isWide } = useResponsive();
   const [useOtp, setUseOtp] = useState(false);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -107,13 +109,33 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
       style={{ flex: 1 }}
     >
       <ScrollView
-        style={{ flex: 1 }}
-        className="flex-1 bg-white px-6 pt-12"
-        contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between", paddingBottom: 32 }}
+        style={{ flex: 1, backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF" }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: isWide ? "center" : "space-between",
+          alignItems: "center",
+          paddingHorizontal: 24,
+          paddingTop: isWide ? 24 : 48,
+          paddingBottom: 32,
+        }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-      <View>
+      <View
+        style={{
+          width: "100%",
+          maxWidth: 460,
+          backgroundColor: "#FFFFFF",
+          borderRadius: isWide ? 24 : 0,
+          padding: isWide ? 32 : 0,
+          borderWidth: isWide ? 1 : 0,
+          borderColor: "#E2E8F0",
+          shadowColor: isWide ? "#0F172A" : "transparent",
+          shadowOpacity: isWide ? 0.08 : 0,
+          shadowRadius: isWide ? 24 : 0,
+          elevation: isWide ? 4 : 0,
+        }}
+      >
         <TouchableOpacity
           onPress={() => onNavigate("welcome")}
           className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center mb-6"
@@ -217,19 +239,19 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
             Create new account
           </Text>
         </TouchableOpacity>
-      </View>
 
-      <View className="items-center mt-8">
-        <TouchableOpacity
-          onPress={handleWhatsAppShortcut}
-          activeOpacity={0.8}
-          className="flex-row items-center bg-green-50 border border-green-300 px-5 py-3 rounded-xl shadow-xs"
-        >
-          <MaterialIcons name="whatsapp" size={20} color="#16A34A" />
-          <Text className="text-green-800 font-bold text-xs ml-2">
-            Quick Login with WhatsApp OTP
-          </Text>
-        </TouchableOpacity>
+        <View className="items-center mt-8">
+          <TouchableOpacity
+            onPress={handleWhatsAppShortcut}
+            activeOpacity={0.8}
+            className="flex-row items-center bg-green-50 border border-green-300 px-5 py-3 rounded-xl shadow-xs"
+          >
+            <MaterialIcons name="whatsapp" size={20} color="#16A34A" />
+            <Text className="text-green-800 font-bold text-xs ml-2">
+              Quick Login with WhatsApp OTP
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
       </ScrollView>
     </KeyboardAvoidingView>

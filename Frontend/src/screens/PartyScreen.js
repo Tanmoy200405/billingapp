@@ -23,9 +23,12 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../config/api";
 import { downloadReportFile } from "../utils/reportDownloader";
-import { getCachedData, setCachedData } from "../utils/localCache";
-export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBack }) {
-  const [parties, setParties] = useState([]);
+import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
+import { useResponsive, ResponsiveContainer } from "../utils/responsive";
+
+export default function PartyScreen({ user, isActive = true, onProfileUpdated, onOpenDrawer, onBack }) {
+  const { isWide, gridColumns, headerTopPadding } = useResponsive();
+  const [parties, setParties] = useState(() => getMemoryCachedData("parties_all") || []);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -126,6 +129,12 @@ export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBa
       }
     }
   }, [search, filterType]);
+  useEffect(() => {
+    if (isActive) {
+      loadParties();
+    }
+  }, [isActive]);
+
   useEffect(() => {
     loadParties();
   }, [filterType]);
@@ -426,13 +435,16 @@ export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBa
   };
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
-      <View className="bg-blue-600 px-4 pt-10 pb-4">
+      <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-4">
+        <ResponsiveContainer maxWidth={1200}>
         <View className="flex-row items-center justify-between mb-2.5">
           <View className="flex-row items-center flex-1 mr-2">
-            <TouchableOpacity onPress={onOpenDrawer} className="mr-2 p-1">
-              <Ionicons name="menu" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            {onBack ? (
+            {!isWide && (
+              <TouchableOpacity onPress={onOpenDrawer} className="mr-2 p-1">
+                <Ionicons name="menu" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+            {onBack && !isWide ? (
               <TouchableOpacity
                 onPress={onBack}
                 className="flex-row items-center bg-white/20 px-2.5 py-1 rounded-lg mr-2"
@@ -518,8 +530,10 @@ export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBa
             </TouchableOpacity>
           ) : null}
         </View>
+        </ResponsiveContainer>
       </View>
       <View className="bg-white border-b border-gray-200 px-3 py-2">
+        <ResponsiveContainer maxWidth={1200}>
         <View className="flex-row items-center justify-between flex-wrap gap-2 mb-1">
           <View className="flex-row">
             {[
@@ -597,11 +611,14 @@ export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBa
             </View>
           </View>
         </View>
+        </ResponsiveContainer>
       </View>
       <View className="bg-blue-50 border-b border-blue-100 px-4 py-2">
-        <Text className="text-[11px] text-blue-700 font-medium">
-          Customers are saved automatically with visit history whenever you create an invoice.
-        </Text>
+        <ResponsiveContainer maxWidth={1200}>
+          <Text className="text-[11px] text-blue-700 font-medium">
+            Customers are saved automatically with visit history whenever you create an invoice.
+          </Text>
+        </ResponsiveContainer>
       </View>
       {loading && displayedParties.length === 0 ? (
         <View className="flex-1 items-center justify-center">
@@ -609,10 +626,13 @@ export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBa
         </View>
       ) : (
         <FlatList
-          style={{ flex: 1 }}
+          key={`party-cols-${gridColumns}`}
+          numColumns={gridColumns}
+          columnWrapperStyle={gridColumns > 1 ? { gap: 12 } : undefined}
+          style={{ flex: 1, width: "100%", maxWidth: 1200, alignSelf: "center" }}
           data={displayedParties}
           keyExtractor={(item, index) => item?._id || `party-${index}`}
-          contentContainerStyle={{ padding: 12, paddingBottom: 120, flexGrow: 1 }}
+          contentContainerStyle={{ padding: isWide ? 16 : 12, paddingBottom: 120, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           nestedScrollEnabled={true}
@@ -641,7 +661,10 @@ export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBa
             if (!item) return null;
             const isVip = Boolean(item.isRegular || (item.visitCount || 0) >= vipVisitThreshold);
             return (
-              <View className="bg-white rounded-xl p-4 mb-3 border border-gray-200 shadow-sm flex-row items-center justify-between">
+              <View
+                style={gridColumns > 1 ? { flex: 1, maxWidth: `${100 / gridColumns - 1}%` } : undefined}
+                className="bg-white rounded-xl p-4 mb-3 border border-gray-200 shadow-sm flex-row items-center justify-between"
+              >
                 <View className="flex-1 pr-3">
                   <View className="flex-row items-center flex-wrap gap-1.5">
                     <Text className="text-base font-extrabold text-gray-900">

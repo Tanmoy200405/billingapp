@@ -19,14 +19,16 @@ import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shareBillAsPdf, shareBackendPdf, printBill } from "../utils/receiptPdfGenerator";
-import { getCachedData, setCachedData } from "../utils/localCache";
+import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
+import { useResponsive } from "../utils/responsive";
 
 export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInvoice }) {
+  const { isWide, isDesktop, posColumns, headerTopPadding } = useResponsive();
   // Step 1: "items" (first select items) | Step 2: "invoice" (customer & payment)
   const [currentStep, setCurrentStep] = useState("items");
 
-  const [parties, setParties] = useState([]);
-  const [items, setItems] = useState([]);
+  const [parties, setParties] = useState(() => getMemoryCachedData("parties_customers") || getMemoryCachedData("parties_all") || []);
+  const [items, setItems] = useState(() => getMemoryCachedData("items_all") || []);
   const [selectedParty, setSelectedParty] = useState(null);
   const [customerName, setCustomerName] = useState("Walk-in Customer");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -484,14 +486,20 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       })
     );
 
+  const showItemsPane = isWide || currentStep === "items";
+  const showInvoicePane = isWide || currentStep === "invoice";
+
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
       {/* ────────────────── HEADER ────────────────── */}
-      <View className="bg-blue-600 px-4 pt-10 pb-4 flex-row items-center justify-between">
+      <View
+        style={{ paddingTop: headerTopPadding }}
+        className="bg-blue-600 px-4 pb-4 flex-row items-center justify-between"
+      >
         <View className="flex-row items-center">
           <TouchableOpacity
             onPress={() => {
-              if (currentStep === "invoice") {
+              if (!isWide && currentStep === "invoice") {
                 setCurrentStep("items");
               } else {
                 onBack();
@@ -505,19 +513,28 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             <Text className="text-white text-lg font-bold">
               {editingInvoice
                 ? `Edit Bill #${editingInvoice.invoiceNumber}`
-                : currentStep === "items"
-                  ? "1. Select Items"
-                  : "2. Finalize Invoice"}
+                : isWide
+                  ? "POS Billing Workspace"
+                  : currentStep === "items"
+                    ? "1. Select Items"
+                    : "2. Finalize Invoice"}
             </Text>
             <Text className="text-blue-100 text-[11px]">
-              {currentStep === "items"
-                ? `${cartTotalItems} item(s) selected · Rs. ${subtotal}`
+              {isWide || currentStep === "items"
+                ? `${cartTotalItems} item(s) in cart · Subtotal Rs. ${subtotal}`
                 : "Customer Details & Payment"}
             </Text>
           </View>
         </View>
 
-        {currentStep === "invoice" ? (
+        {isWide ? (
+          <View className="flex-row items-center bg-white/20 px-3 py-1 rounded-full">
+            <Ionicons name="desktop-outline" size={14} color="#FFFFFF" />
+            <Text className="text-white text-xs font-bold ml-1.5">
+              Grand Total: Rs. {grandTotal}
+            </Text>
+          </View>
+        ) : currentStep === "invoice" ? (
           <TouchableOpacity
             onPress={() => setCurrentStep("items")}
             className="bg-white/20 px-3 py-1.5 rounded-lg flex-row items-center"
@@ -533,9 +550,10 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
         )}
       </View>
 
-      {/* ────────────────── STEP 1: ITEM SELECTION CATALOG ────────────────── */}
-      {currentStep === "items" && (
-        <View className="flex-1">
+      <View style={{ flex: 1, flexDirection: isWide ? "row" : "column" }}>
+      {/* ────────────────── STEP 1 / LEFT PANE: ITEM SELECTION CATALOG ────────────────── */}
+      {showItemsPane && (
+        <View style={{ flex: isWide ? 1.35 : 1 }}>
           {/* Search Bar */}
           <View className="bg-white px-4 pt-3 pb-2 border-b border-gray-200">
             <View className="flex-row bg-gray-100 rounded-xl px-3 py-2 items-center">
@@ -579,11 +597,14 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
 
           {/* Items Catalog List */}
           <FlatList
+            key={`pos-cols-${posColumns}`}
+            numColumns={posColumns}
+            columnWrapperStyle={posColumns > 1 ? { gap: 10, paddingHorizontal: 4 } : undefined}
             data={filteredItems}
             keyExtractor={(i) => i._id}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
-            contentContainerStyle={{ padding: 12, paddingBottom: 110 }}
+            contentContainerStyle={{ padding: 12, paddingBottom: isWide ? 24 : 110 }}
             ListEmptyComponent={
               <View className="items-center justify-center py-16">
                 <FontAwesome5 name="box-open" size={40} color="#D1D5DB" />
@@ -599,6 +620,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               const qtyInCart = getCartItemQty(item._id);
               return (
                 <View
+                  style={posColumns > 1 ? { flex: 1, maxWidth: `${100 / posColumns - 1}%` } : undefined}
                   className={`flex-row items-center justify-between p-3.5 mb-2.5 rounded-xl border bg-white ${qtyInCart > 0
                       ? "border-blue-400 bg-blue-50/40 shadow-sm"
                       : "border-gray-200 shadow-xs"
@@ -669,7 +691,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             }}
           />
 
-          {/* Sticky Bottom Bar: Cart Summary & "Proceed to Invoice" */}
+          {/* Sticky Bottom Bar (Phone Only): Cart Summary & "Proceed to Invoice" */}
+          {!isWide && (
           <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg flex-row items-center justify-between">
             <View>
               <Text className="text-xs text-gray-500 font-medium">Selected Items</Text>
@@ -697,14 +720,24 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
+          )}
         </View>
       )}
 
-      {/* ────────────────── STEP 2: CUSTOMER & PAYMENT DETAILS ────────────────── */}
-      {currentStep === "invoice" && (
+      {/* ────────────────── STEP 2 / RIGHT PANE: CUSTOMER & PAYMENT DETAILS ────────────────── */}
+      {showInvoicePane && (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
+          style={
+            isWide
+              ? {
+                  width: isDesktop ? 420 : 350,
+                  borderLeftWidth: 1,
+                  borderLeftColor: "#E5E7EB",
+                  backgroundColor: "#F8FAFC",
+                }
+              : { flex: 1 }
+          }
         >
           <ScrollView
             className="flex-1 p-4"
@@ -1040,6 +1073,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
           </ScrollView>
         </KeyboardAvoidingView>
       )}
+      </View>
 
       {/* ────────────────── SELECT CUSTOMER MODAL ────────────────── */}
       <Modal
@@ -1051,8 +1085,28 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
           setShowPartyModal(false);
         }}
       >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 max-h-[80%]">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: isWide ? "center" : "flex-end",
+            alignItems: isWide ? "center" : "stretch",
+            padding: isWide ? 24 : 0,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              borderBottomLeftRadius: isWide ? 24 : 0,
+              borderBottomRightRadius: isWide ? 24 : 0,
+              padding: 20,
+              maxHeight: "80%",
+              width: "100%",
+              maxWidth: isWide ? 520 : undefined,
+            }}
+          >
             <View className="flex-row justify-between items-center mb-3">
               <Text className="text-base font-bold text-gray-900">Select Customer</Text>
               <TouchableOpacity onPress={() => setShowPartyModal(false)}>
@@ -1104,8 +1158,11 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
 
       {/* ────────────────── BILL & THERMAL PRINTER MODAL ────────────────── */}
       <Modal visible={showReceiptModal} animationType="fade" transparent={true}>
-        <View className="flex-1 bg-black/60 justify-center px-4">
-          <View className="bg-white rounded-2xl p-6 shadow-2xl max-h-[88%]">
+        <View className="flex-1 bg-black/60 justify-center items-center px-4">
+          <View
+            style={{ width: "100%", maxWidth: 480 }}
+            className="bg-white rounded-2xl p-6 shadow-2xl max-h-[88%]"
+          >
             <View className="items-center pb-4 border-b border-dashed border-gray-300">
               <Text className="text-lg font-black text-gray-900">BILL INVOICE</Text>
               <Text className="text-xs font-bold text-blue-600 mt-1">

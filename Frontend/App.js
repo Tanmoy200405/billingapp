@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { View, Text, TouchableOpacity, ActivityIndicator, BackHandler, Alert } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, BackHandler, Alert, Image, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import "./global.css";
-import { api, setAuthToken, getStoredSession, getAuthToken, clearAuthToken } from "./src/config/api";
+import { api, setAuthToken, getStoredSession, getAuthToken, clearAuthToken, prefetchCoreData } from "./src/config/api";
+import { useResponsive } from "./src/utils/responsive";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
@@ -24,15 +25,34 @@ import {
 } from "./src/services/updateService";
 import UpdateModal from "./src/components/UpdateModal";
 import Toast from "react-native-toast-message";
+
+const NAV_TABS = [
+  { key: "dashboard", label: "Dashboard", icon: "home", iconOutline: "home-outline" },
+  { key: "reports", label: "Reports", icon: "bar-chart", iconOutline: "bar-chart-outline" },
+  { key: "party", label: "Party", icon: "people", iconOutline: "people-outline" },
+  { key: "inventory", label: "Inventory", icon: "cube", iconOutline: "cube-outline" },
+  { key: "marketing", label: "Marketing", icon: "megaphone", iconOutline: "megaphone-outline" },
+  { key: "setting", label: "Settings", icon: "settings", iconOutline: "settings-outline" },
+];
+
 export default function App() {
+  const { isWide, isDesktop } = useResponsive();
   const [currentScreen, setCurrentScreen] = useState("loading");
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [visitedTabs, setVisitedTabs] = useState({ dashboard: true });
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [user, setUser] = useState(null);
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+  const navigateTab = (tab) => {
+    setActiveTab(tab);
+    setIsCreatingInvoice(false);
+    setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -42,6 +62,8 @@ export default function App() {
             setUser(cachedUser);
             setCurrentScreen("main");
           }
+          // Warm core endpoints in parallel right away
+          prefetchCoreData().catch(() => {});
           const res = await api.auth.getMe();
           if (res.success && res.user) {
             setUser(res.user);
@@ -71,30 +93,26 @@ export default function App() {
     };
     checkUpdates();
   }, []);
+
   useEffect(() => {
     const backAction = () => {
-      // If drawer is open, close it
       if (drawerVisible) {
         setDrawerVisible(false);
         return true;
       }
-      // If creating invoice, go back to dashboard
       if (isCreatingInvoice) {
         setIsCreatingInvoice(false);
         setActiveTab("dashboard");
         return true;
       }
-      // If on a non-dashboard tab, go back to dashboard
       if (currentScreen === "main" && activeTab !== "dashboard") {
         setActiveTab("dashboard");
         return true;
       }
-      // If on login/register screen, go to welcome
       if (currentScreen === "login" || currentScreen === "register") {
         setCurrentScreen("welcome");
         return true;
       }
-      // On dashboard (home) — ask to exit
       if (currentScreen === "main" && activeTab === "dashboard") {
         Alert.alert(
           "Exit App",
@@ -115,16 +133,30 @@ export default function App() {
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     setAuthToken(getAuthToken(), userData);
-    setCurrentScreen("main");
+    setVisitedTabs({ dashboard: true });
     setActiveTab("dashboard");
+    setCurrentScreen("main");
+    prefetchCoreData().catch(() => {});
   };
+
   const handleLogout = async () => {
     await clearAuthToken();
     setUser(null);
+    setVisitedTabs({ dashboard: true });
     setCurrentScreen("welcome");
     setIsCreatingInvoice(false);
     setDrawerVisible(false);
   };
+
+  const handleInvoiceSaved = () => {
+    setIsCreatingInvoice(false);
+    setEditingInvoice(null);
+    navigateTab("dashboard");
+    prefetchCoreData().catch(() => {});
+  };
+
+  const phoneBottomTabs = NAV_TABS.filter((t) => t.key !== "marketing");
+
   return (
     <SafeAreaProvider style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <StatusBar style={currentScreen === "main" ? "light" : "dark"} />
@@ -134,12 +166,12 @@ export default function App() {
         </View>
       )}
       {currentScreen === "welcome" && (
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF" }}>
           <WelcomeScreen onNavigate={(screen) => setCurrentScreen(screen)} />
         </SafeAreaView>
       )}
       {currentScreen === "login" && (
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF" }}>
           <LoginScreen
             onNavigate={(screen) => setCurrentScreen(screen)}
             onLoginSuccess={handleLoginSuccess}
@@ -147,7 +179,7 @@ export default function App() {
         </SafeAreaView>
       )}
       {currentScreen === "register" && (
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF" }}>
           <RegisterScreen
             onNavigate={(screen) => setCurrentScreen(screen)}
             onRegisterSuccess={handleLoginSuccess}
@@ -155,165 +187,231 @@ export default function App() {
         </SafeAreaView>
       )}
       {currentScreen === "main" && (
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#2563EB" }}>
-          {isCreatingInvoice ? (
-            <InvoiceScreen
-              user={user}
-              editingInvoice={editingInvoice}
-              onBack={() => {
-                setIsCreatingInvoice(false);
-                setEditingInvoice(null);
-              }}
-              onInvoiceSaved={() => {
-                setIsCreatingInvoice(false);
-                setEditingInvoice(null);
-                setActiveTab("dashboard");
-              }}
-            />
-          ) : activeTab === "dashboard" ? (
-            <DashboardScreen
-              user={user}
-              onOpenDrawer={() => setDrawerVisible(true)}
-              onNavigateTab={(tab) => setActiveTab(tab)}
-              onCreateInvoice={() => {
-                setEditingInvoice(null);
-                setIsCreatingInvoice(true);
-              }}
-              onEditInvoice={(inv) => {
-                setEditingInvoice(inv);
-                setIsCreatingInvoice(true);
-              }}
-            />
-          ) : activeTab === "party" ? (
-            <PartyScreen
-              user={user}
-              onProfileUpdated={(updated) => {
-                setUser(updated);
-                setAuthToken(getAuthToken(), updated);
-              }}
-              onOpenDrawer={() => setDrawerVisible(true)}
-              onBack={() => setActiveTab("dashboard")}
-            />
-          ) : activeTab === "inventory" ? (
-            <InventoryScreen onOpenDrawer={() => setDrawerVisible(true)} onBack={() => setActiveTab("dashboard")} />
-          ) : activeTab === "reports" ? (
-            <ReportsScreen onOpenDrawer={() => setDrawerVisible(true)} onBack={() => setActiveTab("dashboard")} />
-          ) : activeTab === "marketing" ? (
-            <MarketingScreen
-              user={user}
-              onOpenDrawer={() => setDrawerVisible(true)}
-              onBack={() => setActiveTab("dashboard")}
-            />
-          ) : (
-            <SettingsScreen
-              user={user}
-              initialTab="profile"
-              onOpenDrawer={() => setDrawerVisible(true)}
-              onBack={() => setActiveTab("dashboard")}
-              onLogout={handleLogout}
-              onProfileUpdated={(updated) => {
-                setUser(updated);
-                setAuthToken(getAuthToken(), updated);
-              }}
-            />
-          )}
-          {!isCreatingInvoice && (
-            <View className="bg-white border-t border-gray-200 flex-row justify-around py-2 shadow-lg">
-              <TouchableOpacity
-                onPress={() => setActiveTab("dashboard")}
-                className="items-center py-1 flex-1"
+        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? "#1E3A8A" : "#2563EB" }}>
+          <View style={{ flex: 1, flexDirection: isWide ? "row" : "column", backgroundColor: "#F3F4F6" }}>
+            {/* Persistent Sidebar for Tablet & Web */}
+            {isWide && (
+              <View
+                style={{
+                  width: isDesktop ? 244 : 206,
+                  backgroundColor: "#0F172A",
+                  borderRightWidth: 1,
+                  borderRightColor: "#1E293B",
+                  justifyContent: "space-between",
+                }}
               >
-                <Ionicons
-                  name={activeTab === "dashboard" ? "home" : "home-outline"}
-                  size={22}
-                  color={activeTab === "dashboard" ? "#2563EB" : "#6B7280"}
+                <View style={{ flex: 1 }}>
+                  <View className="px-4 py-5 border-b border-slate-800 flex-row items-center">
+                    {user?.logo ? (
+                      <Image
+                        source={{ uri: user.logo }}
+                        style={{ width: 38, height: 38, borderRadius: 10, marginRight: 10, borderWidth: 1, borderColor: "#3B82F6" }}
+                      />
+                    ) : (
+                      <View className="w-9 h-9 rounded-xl bg-blue-600 items-center justify-center mr-2.5">
+                        <Ionicons name="storefront" size={18} color="#FFFFFF" />
+                      </View>
+                    )}
+                    <View className="flex-1">
+                      <Text className="text-white text-sm font-extrabold uppercase tracking-wide" numberOfLines={1}>
+                        {user?.businessName || "BillingApp"}
+                      </Text>
+                      <Text className="text-slate-400 text-[11px]" numberOfLines={1}>
+                        {user?.phone || "POS Workspace"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="px-3 pt-4 pb-2">
+                    <TouchableOpacity
+                      onPress={() => {
+                        setEditingInvoice(null);
+                        setIsCreatingInvoice(true);
+                      }}
+                      activeOpacity={0.85}
+                      className={`py-3 px-3.5 rounded-xl flex-row items-center justify-center shadow ${
+                        isCreatingInvoice ? "bg-emerald-600" : "bg-blue-600"
+                      }`}
+                    >
+                      <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+                      <Text className="text-white font-extrabold text-sm ml-2">New Bill / POS</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView className="flex-1 px-3 pt-2" showsVerticalScrollIndicator={false}>
+                    {NAV_TABS.map((item) => {
+                      const isActive = !isCreatingInvoice && activeTab === item.key;
+                      return (
+                        <TouchableOpacity
+                          key={item.key}
+                          onPress={() => navigateTab(item.key)}
+                          className={`flex-row items-center px-3.5 py-3 rounded-xl mb-1 ${
+                            isActive ? "bg-blue-600/20 border border-blue-500/40" : ""
+                          }`}
+                        >
+                          <Ionicons
+                            name={isActive ? item.icon : item.iconOutline}
+                            size={19}
+                            color={isActive ? "#60A5FA" : "#94A3B8"}
+                          />
+                          <Text
+                            className={`text-sm font-bold ml-3 ${
+                              isActive ? "text-white" : "text-slate-300"
+                            }`}
+                          >
+                            {item.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                <View className="p-3 border-t border-slate-800">
+                  <TouchableOpacity
+                    onPress={handleLogout}
+                    className="flex-row items-center px-3.5 py-2.5 rounded-xl"
+                  >
+                    <Ionicons name="log-out-outline" size={19} color="#F87171" />
+                    <Text className="text-red-400 font-bold text-sm ml-3">Logout</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Main Content Workspace */}
+            <View style={{ flex: 1 }}>
+              {isCreatingInvoice ? (
+                <InvoiceScreen
+                  user={user}
+                  editingInvoice={editingInvoice}
+                  onBack={() => {
+                    setIsCreatingInvoice(false);
+                    setEditingInvoice(null);
+                  }}
+                  onInvoiceSaved={handleInvoiceSaved}
                 />
-                <Text
-                  className={`text-[10px] font-bold mt-0.5 ${
-                    activeTab === "dashboard" ? "text-blue-600" : "text-gray-500"
-                  }`}
-                >
-                  Dashboard
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setActiveTab("reports")}
-                className="items-center py-1 flex-1"
-              >
-                <Ionicons
-                  name={activeTab === "reports" ? "bar-chart" : "bar-chart-outline"}
-                  size={22}
-                  color={activeTab === "reports" ? "#2563EB" : "#6B7280"}
-                />
-                <Text
-                  className={`text-[10px] font-bold mt-0.5 ${
-                    activeTab === "reports" ? "text-blue-600" : "text-gray-500"
-                  }`}
-                >
-                  Reports
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setActiveTab("party")}
-                className="items-center py-1 flex-1"
-              >
-                <Ionicons
-                  name={activeTab === "party" ? "people" : "people-outline"}
-                  size={22}
-                  color={activeTab === "party" ? "#2563EB" : "#6B7280"}
-                />
-                <Text
-                  className={`text-[10px] font-bold mt-0.5 ${
-                    activeTab === "party" ? "text-blue-600" : "text-gray-500"
-                  }`}
-                >
-                  Party
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setActiveTab("inventory")}
-                className="items-center py-1 flex-1"
-              >
-                <Ionicons
-                  name={activeTab === "inventory" ? "cube" : "cube-outline"}
-                  size={22}
-                  color={activeTab === "inventory" ? "#2563EB" : "#6B7280"}
-                />
-                <Text
-                  className={`text-[10px] font-bold mt-0.5 ${
-                    activeTab === "inventory" ? "text-blue-600" : "text-gray-500"
-                  }`}
-                >
-                  Inventory
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setActiveTab("setting")}
-                className="items-center py-1 flex-1"
-              >
-                <Ionicons
-                  name={activeTab === "setting" ? "settings" : "settings-outline"}
-                  size={22}
-                  color={activeTab === "setting" ? "#2563EB" : "#6B7280"}
-                />
-                <Text
-                  className={`text-[10px] font-bold mt-0.5 ${
-                    activeTab === "setting" ? "text-blue-600" : "text-gray-500"
-                  }`}
-                >
-                  Settings
-                </Text>
-              </TouchableOpacity>
+              ) : (
+                <View style={{ flex: 1 }}>
+                  {visitedTabs.dashboard && (
+                    <View style={{ flex: 1, display: activeTab === "dashboard" ? "flex" : "none" }}>
+                      <DashboardScreen
+                        user={user}
+                        isActive={activeTab === "dashboard" && !isCreatingInvoice}
+                        onOpenDrawer={() => setDrawerVisible(true)}
+                        onNavigateTab={navigateTab}
+                        onCreateInvoice={() => {
+                          setEditingInvoice(null);
+                          setIsCreatingInvoice(true);
+                        }}
+                        onEditInvoice={(inv) => {
+                          setEditingInvoice(inv);
+                          setIsCreatingInvoice(true);
+                        }}
+                      />
+                    </View>
+                  )}
+
+                  {visitedTabs.party && (
+                    <View style={{ flex: 1, display: activeTab === "party" ? "flex" : "none" }}>
+                      <PartyScreen
+                        user={user}
+                        isActive={activeTab === "party" && !isCreatingInvoice}
+                        onProfileUpdated={(updated) => {
+                          setUser(updated);
+                          setAuthToken(getAuthToken(), updated);
+                        }}
+                        onOpenDrawer={() => setDrawerVisible(true)}
+                        onBack={() => navigateTab("dashboard")}
+                      />
+                    </View>
+                  )}
+
+                  {visitedTabs.inventory && (
+                    <View style={{ flex: 1, display: activeTab === "inventory" ? "flex" : "none" }}>
+                      <InventoryScreen
+                        isActive={activeTab === "inventory" && !isCreatingInvoice}
+                        onOpenDrawer={() => setDrawerVisible(true)}
+                        onBack={() => navigateTab("dashboard")}
+                      />
+                    </View>
+                  )}
+
+                  {visitedTabs.reports && (
+                    <View style={{ flex: 1, display: activeTab === "reports" ? "flex" : "none" }}>
+                      <ReportsScreen
+                        isActive={activeTab === "reports" && !isCreatingInvoice}
+                        onOpenDrawer={() => setDrawerVisible(true)}
+                        onBack={() => navigateTab("dashboard")}
+                      />
+                    </View>
+                  )}
+
+                  {visitedTabs.marketing && (
+                    <View style={{ flex: 1, display: activeTab === "marketing" ? "flex" : "none" }}>
+                      <MarketingScreen
+                        user={user}
+                        isActive={activeTab === "marketing" && !isCreatingInvoice}
+                        onOpenDrawer={() => setDrawerVisible(true)}
+                        onBack={() => navigateTab("dashboard")}
+                      />
+                    </View>
+                  )}
+
+                  {visitedTabs.setting && (
+                    <View style={{ flex: 1, display: activeTab === "setting" ? "flex" : "none" }}>
+                      <SettingsScreen
+                        user={user}
+                        initialTab="profile"
+                        onOpenDrawer={() => setDrawerVisible(true)}
+                        onBack={() => navigateTab("dashboard")}
+                        onLogout={handleLogout}
+                        onProfileUpdated={(updated) => {
+                          setUser(updated);
+                          setAuthToken(getAuthToken(), updated);
+                        }}
+                      />
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Mobile Bottom Tab Bar (Phone Only) */}
+              {!isWide && !isCreatingInvoice && (
+                <View className="bg-white border-t border-gray-200 flex-row justify-around py-2 shadow-lg">
+                  {phoneBottomTabs.map((tab) => {
+                    const isActive = activeTab === tab.key;
+                    return (
+                      <TouchableOpacity
+                        key={tab.key}
+                        onPress={() => navigateTab(tab.key)}
+                        className="items-center py-1 flex-1"
+                      >
+                        <Ionicons
+                          name={isActive ? tab.icon : tab.iconOutline}
+                          size={22}
+                          color={isActive ? "#2563EB" : "#6B7280"}
+                        />
+                        <Text
+                          className={`text-[10px] font-bold mt-0.5 ${
+                            isActive ? "text-blue-600" : "text-gray-500"
+                          }`}
+                        >
+                          {tab.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </View>
-          )}
+          </View>
+
           <SideDrawerModal
             visible={drawerVisible}
             onClose={() => setDrawerVisible(false)}
             user={user}
-            onNavigateTab={(tab) => {
-              setActiveTab(tab);
-              setIsCreatingInvoice(false);
-            }}
+            onNavigateTab={navigateTab}
             onLogout={handleLogout}
           />
         </SafeAreaView>

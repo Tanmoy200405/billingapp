@@ -21,16 +21,21 @@ import {
 import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shareBackendPdf, printTestSlip } from "../utils/receiptPdfGenerator";
-import { getCachedData, setCachedData } from "../utils/localCache";
+import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
+import { useResponsive, ResponsiveContainer } from "../utils/responsive";
+
 export default function DashboardScreen({
   user,
+  isActive = true,
   onOpenDrawer,
   onNavigateTab,
   onCreateInvoice,
   onEditInvoice,
 }) {
-  const [stats, setStats] = useState(null);
-  const [recentTransactions, setRecentTransactions] = useState([]);
+  const { isWide, isDesktop, headerTopPadding } = useResponsive();
+  const memDash = getMemoryCachedData("dashboard_stats");
+  const [stats, setStats] = useState(memDash?.stats || null);
+  const [recentTransactions, setRecentTransactions] = useState(memDash?.recentTransactions || []);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showBtGuide, setShowBtGuide] = useState(false);
@@ -133,7 +138,12 @@ export default function DashboardScreen({
     }
   };
   useEffect(() => {
-    fetchDashboardData();
+    if (isActive) {
+      fetchDashboardData();
+    }
+  }, [isActive]);
+
+  useEffect(() => {
     AsyncStorage.getItem("billFormatOptions").then((res) => {
       if (res) {
         try {
@@ -166,10 +176,22 @@ export default function DashboardScreen({
   };
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-gray-100">
-      <View className="bg-blue-600 px-4 pt-10 pb-4 flex-row items-center justify-between shadow-md">
-        <TouchableOpacity onPress={onOpenDrawer} className="p-1">
-          <Ionicons name="menu" size={26} color="#FFFFFF" />
-        </TouchableOpacity>
+      <View
+        style={{ paddingTop: headerTopPadding }}
+        className="bg-blue-600 px-4 pb-4 flex-row items-center justify-between shadow-md"
+      >
+        {!isWide ? (
+          <TouchableOpacity onPress={onOpenDrawer} className="p-1">
+            <Ionicons name="menu" size={26} color="#FFFFFF" />
+          </TouchableOpacity>
+        ) : (
+          <View className="flex-row items-center">
+            <Ionicons name="speedometer-outline" size={20} color="#BFDBFE" />
+            <Text className="text-blue-100 text-xs font-bold ml-1.5 uppercase tracking-wider">
+              Dashboard Overview
+            </Text>
+          </View>
+        )}
         <View className="flex-row items-center">
           {user?.logo ? (
             <Image
@@ -195,60 +217,66 @@ export default function DashboardScreen({
       </View>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 12, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: isWide ? 20 : 12, paddingBottom: 100 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View className="bg-white rounded-2xl p-3.5 mb-3.5 border border-blue-300 shadow-xs flex-row items-center justify-between">
-          <View className="flex-row items-center flex-1 mr-2">
-            <View className="w-10 h-10 rounded-xl bg-blue-600 items-center justify-center mr-3 shadow-xs">
-              <Ionicons name="bluetooth" size={22} color="#FFFFFF" />
-            </View>
-            <View className="flex-1">
-              <View className="flex-row items-center">
-                <Text className="text-xs font-black text-gray-900 uppercase tracking-wider">
-                  Thermal Printer
-                </Text>
-                <View className="ml-2 bg-emerald-100 px-1.5 py-0.2 rounded-full flex-row items-center">
-                  <View className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1" />
-                  <Text className="text-[9px] font-bold text-emerald-800">Ready</Text>
+        <ResponsiveContainer maxWidth={1200}>
+          <View style={isWide ? { flexDirection: "row", gap: 16, alignItems: "stretch", marginBottom: 16 } : undefined}>
+            <View
+              style={isWide ? { flex: 1, marginBottom: 0 } : undefined}
+              className="bg-white rounded-2xl p-3.5 mb-3.5 border border-blue-300 shadow-xs flex-row items-center justify-between"
+            >
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="w-10 h-10 rounded-xl bg-blue-600 items-center justify-center mr-3 shadow-xs">
+                  <Ionicons name="bluetooth" size={22} color="#FFFFFF" />
+                </View>
+                <View className="flex-1">
+                  <View className="flex-row items-center">
+                    <Text className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                      Thermal Printer
+                    </Text>
+                    <View className="ml-2 bg-emerald-100 px-1.5 py-0.2 rounded-full flex-row items-center">
+                      <View className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1" />
+                      <Text className="text-[9px] font-bold text-emerald-800">Ready</Text>
+                    </View>
+                  </View>
+                  <Text className="text-[11px] text-gray-500 font-medium mt-0.5">
+                    58mm / 80mm Bluetooth printer connection
+                  </Text>
                 </View>
               </View>
-              <Text className="text-[11px] text-gray-500 font-medium mt-0.5">
-                58mm / 80mm Bluetooth printer connection
-              </Text>
+              <View className="flex-row items-center gap-1.5">
+                <TouchableOpacity
+                  onPress={handleTestSlip}
+                  disabled={testingPrinter}
+                  className="bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded-xl flex-row items-center active:bg-blue-100"
+                >
+                  {testingPrinter ? (
+                    <ActivityIndicator size="small" color="#2563EB" />
+                  ) : (
+                    <>
+                      <Ionicons name="print-outline" size={13} color="#2563EB" />
+                      <Text className="text-blue-700 text-[11px] font-bold ml-1">Test Print</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowBtGuide(true)}
+                  className="bg-blue-600 px-3 py-1.5 rounded-xl flex-row items-center shadow-xs"
+                >
+                  <Ionicons name="bluetooth-outline" size={13} color="#FFFFFF" />
+                  <Text className="text-white text-[11px] font-bold ml-1">Connect</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-          <View className="flex-row items-center gap-1.5">
             <TouchableOpacity
-              onPress={handleTestSlip}
-              disabled={testingPrinter}
-              className="bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded-xl flex-row items-center active:bg-blue-100"
+              onPress={() => (onNavigateTab ? onNavigateTab("reports") : onRefresh())}
+              activeOpacity={0.85}
+              style={isWide ? { flex: 1.4, marginBottom: 0 } : undefined}
+              className="bg-white rounded-2xl p-4 mb-4 border border-blue-200 shadow-sm"
             >
-              {testingPrinter ? (
-                <ActivityIndicator size="small" color="#2563EB" />
-              ) : (
-                <>
-                  <Ionicons name="print-outline" size={13} color="#2563EB" />
-                  <Text className="text-blue-700 text-[11px] font-bold ml-1">Test Print</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setShowBtGuide(true)}
-              className="bg-blue-600 px-3 py-1.5 rounded-xl flex-row items-center shadow-xs"
-            >
-              <Ionicons name="bluetooth-outline" size={13} color="#FFFFFF" />
-              <Text className="text-white text-[11px] font-bold ml-1">Connect</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        <TouchableOpacity
-          onPress={() => (onNavigateTab ? onNavigateTab("reports") : onRefresh())}
-          activeOpacity={0.85}
-          className="bg-white rounded-2xl p-4 mb-4 border border-blue-200 shadow-sm"
-        >
           <View className="flex-row items-center justify-between mb-3">
             <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
               Reports Overview
@@ -295,6 +323,7 @@ export default function DashboardScreen({
             </View>
           </View>
         </TouchableOpacity>
+        </View>
         <View className="flex-row items-center justify-between mb-2 px-1">
           <View>
             <Text className="text-xs font-extrabold text-gray-700 uppercase tracking-widest">
@@ -332,28 +361,29 @@ export default function DashboardScreen({
             </Text>
           </TouchableOpacity>
         ) : (
-          recentTransactions.map((tx) => (
-            <TouchableOpacity
-              key={tx._id}
-              activeOpacity={0.8}
-              onPress={async () => {
-                setBillLoading(true);
-                try {
-                  const res = await api.invoices.getOne(tx._id);
-                  if (res && res.success && res.invoice) {
-                    setSelectedBill(res.invoice);
-                  } else {
-                    // fallback to tx data if full invoice not available
+          <View style={isWide ? { flexDirection: "row", flexWrap: "wrap", gap: 12 } : undefined}>
+            {recentTransactions.map((tx) => (
+              <TouchableOpacity
+                key={tx._id}
+                activeOpacity={0.8}
+                style={isWide ? { width: isDesktop ? "48.9%" : "48.6%", marginBottom: 0 } : undefined}
+                onPress={async () => {
+                  setBillLoading(true);
+                  try {
+                    const res = await api.invoices.getOne(tx._id);
+                    if (res && res.success && res.invoice) {
+                      setSelectedBill(res.invoice);
+                    } else {
+                      setSelectedBill(tx);
+                    }
+                  } catch {
                     setSelectedBill(tx);
+                  } finally {
+                    setBillLoading(false);
                   }
-                } catch {
-                  setSelectedBill(tx);
-                } finally {
-                  setBillLoading(false);
-                }
-              }}
-              className="bg-white rounded-xl p-3.5 mb-2.5 border border-gray-200 shadow-sm flex-row items-center justify-between active:bg-blue-50"
-            >
+                }}
+                className="bg-white rounded-xl p-3.5 mb-2.5 border border-gray-200 shadow-sm flex-row items-center justify-between active:bg-blue-50"
+              >
               <View className="flex-1 pr-2">
                 <View className="flex-row items-center">
                   <Text className="text-sm font-extrabold text-gray-900 mr-2">
@@ -430,8 +460,10 @@ export default function DashboardScreen({
                 </View>
               </View>
             </TouchableOpacity>
-          ))
+          ))}
+          </View>
         )}
+        </ResponsiveContainer>
       </ScrollView>
       <View
         pointerEvents="box-none"
@@ -460,13 +492,15 @@ export default function DashboardScreen({
 
       {/* Bill Detail Modal */}
       <Modal visible={!!selectedBill} animationType="slide" transparent={true} onRequestClose={() => setSelectedBill(null)}>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" }}>
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={1}
-            onPress={() => setSelectedBill(null)}
-          />
-          <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, height: "82%", maxHeight: "90%", width: "100%", display: "flex", flexDirection: "column" }}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: isWide ? "center" : "flex-end", alignItems: isWide ? "center" : "stretch", padding: isWide ? 24 : 0 }}>
+          {!isWide && (
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={1}
+              onPress={() => setSelectedBill(null)}
+            />
+          )}
+          <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: isWide ? 24 : 0, borderBottomRightRadius: isWide ? 24 : 0, height: isWide ? "auto" : "82%", maxHeight: "90%", width: "100%", maxWidth: isWide ? 560 : undefined, display: "flex", flexDirection: "column" }}>
             {/* Header */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }}>
               <View>

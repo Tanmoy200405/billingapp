@@ -3,6 +3,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const memoryCache = new Map();
 
 /**
+ * Synchronous in-memory lookup for zero-frame-delay initial state hydration.
+ */
+export function getMemoryCachedData(key) {
+  return memoryCache.has(key) ? memoryCache.get(key) : null;
+}
+
+/**
  * Retrieve cached JSON data immediately from memory (0ms) or AsyncStorage.
  */
 export async function getCachedData(key) {
@@ -37,3 +44,13 @@ export async function removeCachedData(key) {
   } catch {}
 }
 
+export async function clearAllLocalCache() {
+  memoryCache.clear();
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const cacheKeys = keys.filter((k) => k.startsWith("cache_"));
+    if (cacheKeys.length > 0) {
+      await AsyncStorage.multiRemove(cacheKeys);
+    }
+  } catch {}
+}

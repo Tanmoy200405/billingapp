@@ -13,17 +13,21 @@ import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 import { api } from "../config/api";
 import { downloadReportFile } from "../utils/reportDownloader";
 import { shareBackendPdf } from "../utils/receiptPdfGenerator";
-export default function ReportsScreen({ onOpenDrawer, onBack }) {
+import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
+import { useResponsive, ResponsiveContainer } from "../utils/responsive";
+
+export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack }) {
+  const { isWide, headerTopPadding } = useResponsive();
   const [reportType, setReportType] = useState("sales");
   const [period, setPeriod] = useState("today");
   const [topDays, setTopDays] = useState(365);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [salesData, setSalesData] = useState(null);
-  const [inventoryItems, setInventoryItems] = useState([]);
-  const [parties, setParties] = useState([]);
-  const [topItemsData, setTopItemsData] = useState([]);
-  const [overallTopData, setOverallTopData] = useState([]);
+  const [salesData, setSalesData] = useState(() => getMemoryCachedData("reports_sales_today"));
+  const [inventoryItems, setInventoryItems] = useState(() => getMemoryCachedData("items_all") || []);
+  const [parties, setParties] = useState(() => getMemoryCachedData("parties_all") || []);
+  const [topItemsData, setTopItemsData] = useState(() => getMemoryCachedData("reports_topItems_365")?.topItems || []);
+  const [overallTopData, setOverallTopData] = useState(() => getMemoryCachedData("reports_topItems_365")?.overallTop || []);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   // Category sales modal state
@@ -33,14 +37,27 @@ export default function ReportsScreen({ onOpenDrawer, onBack }) {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("All");
 
   const loadData = async () => {
-    setLoading(true);
+    let hasCached = false;
     try {
       if (reportType === "sales") {
+        const c = await getCachedData(`reports_sales_${period}`);
+        if (c) {
+          setSalesData(c);
+          hasCached = true;
+        }
+        if (!hasCached) setLoading(true);
         const res = await api.reports.getSales(`period=${period}`);
         if (res.success) {
           setSalesData(res);
+          setCachedData(`reports_sales_${period}`, res);
         }
       } else if (reportType === "inventory") {
+        const c = await getCachedData("items_all");
+        if (Array.isArray(c) && c.length > 0) {
+          setInventoryItems(c);
+          hasCached = true;
+        }
+        if (!hasCached) setLoading(true);
         const res = await api.items.getAll();
         if (res.success && Array.isArray(res.items)) {
           const sorted = [...res.items].sort((a, b) =>
@@ -50,17 +67,35 @@ export default function ReportsScreen({ onOpenDrawer, onBack }) {
             })
           );
           setInventoryItems(sorted);
+          setCachedData("items_all", sorted);
         }
       } else if (reportType === "parties") {
+        const c = await getCachedData("parties_all");
+        if (Array.isArray(c) && c.length > 0) {
+          setParties(c);
+          hasCached = true;
+        }
+        if (!hasCached) setLoading(true);
         const res = await api.parties.getAll();
         if (res.success && res.parties) {
           setParties(res.parties);
+          setCachedData("parties_all", res.parties);
         }
       } else if (reportType === "topItems") {
+        const c = await getCachedData(`reports_topItems_${topDays}`);
+        if (c) {
+          setTopItemsData(c.topItems || []);
+          setOverallTopData(c.overallTop || []);
+          hasCached = true;
+        }
+        if (!hasCached) setLoading(true);
         const res = await api.reports.getTopItems(topDays);
         if (res && res.success) {
-          setTopItemsData(res.data || res.topItems || []);
-          setOverallTopData(res.overallTop || []);
+          const topList = res.data || res.topItems || [];
+          const overallList = res.overallTop || [];
+          setTopItemsData(topList);
+          setOverallTopData(overallList);
+          setCachedData(`reports_topItems_${topDays}`, { topItems: topList, overallTop: overallList });
         }
       }
     } catch (err) {
@@ -71,8 +106,10 @@ export default function ReportsScreen({ onOpenDrawer, onBack }) {
   };
 
   useEffect(() => {
-    loadData();
-  }, [reportType, period, topDays]);
+    if (isActive) {
+      loadData();
+    }
+  }, [reportType, period, topDays, isActive]);
 
   const handleOpenCategorySales = async () => {
     setShowCategoryModal(true);
@@ -122,11 +159,14 @@ export default function ReportsScreen({ onOpenDrawer, onBack }) {
   };
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
-      <View className="bg-blue-600 px-4 pt-10 pb-4 flex-row items-center justify-between shadow-md">
+      <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-4 shadow-md">
+        <ResponsiveContainer maxWidth={1120} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View className="flex-row items-center">
-          <TouchableOpacity onPress={onOpenDrawer} className="mr-3 p-1">
-            <Ionicons name="menu" size={26} color="#FFFFFF" />
-          </TouchableOpacity>
+          {!isWide && (
+            <TouchableOpacity onPress={onOpenDrawer} className="mr-3 p-1">
+              <Ionicons name="menu" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
           <View>
             <Text className="text-white text-lg font-black tracking-wide">
               Reports & Downloads
@@ -143,8 +183,10 @@ export default function ReportsScreen({ onOpenDrawer, onBack }) {
         >
           <Ionicons name="refresh" size={18} color="#FFFFFF" />
         </TouchableOpacity>
+        </ResponsiveContainer>
       </View>
-      <View className="bg-white border-b border-gray-200 px-2 py-2 flex-row justify-around">
+      <View className="bg-white border-b border-gray-200 px-2 py-2">
+        <ResponsiveContainer maxWidth={1120} style={{ flexDirection: "row", justifyContent: "space-around" }}>
         <TouchableOpacity
           onPress={() => setReportType("sales")}
           className={`flex-1 py-2 rounded-xl items-center flex-row justify-center mx-1 ${
@@ -221,15 +263,17 @@ export default function ReportsScreen({ onOpenDrawer, onBack }) {
             Top Sellers
           </Text>
         </TouchableOpacity>
+        </ResponsiveContainer>
       </View>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 14, paddingBottom: 120, flexGrow: 1 }}
+        contentContainerStyle={{ padding: isWide ? 20 : 14, paddingBottom: 120, flexGrow: 1 }}
         showsVerticalScrollIndicator={true}
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled={true}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} />}
       >
+        <ResponsiveContainer maxWidth={1120}>
         {reportType === "sales" && (
           <View className="flex-row gap-2 mb-4">
             {[
@@ -656,12 +700,13 @@ export default function ReportsScreen({ onOpenDrawer, onBack }) {
             ))
           )}
         </View>
+        </ResponsiveContainer>
       </ScrollView>
 
       {/* Bill Detail Modal in Reports */}
       <Modal visible={!!selectedInvoice} animationType="slide" transparent={true} onRequestClose={() => setSelectedInvoice(null)}>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" }}>
-          <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "88%" }}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: isWide ? "center" : "flex-end", alignItems: isWide ? "center" : "stretch", padding: isWide ? 24 : 0 }}>
+          <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: isWide ? 24 : 0, borderBottomRightRadius: isWide ? 24 : 0, maxHeight: "88%", width: "100%", maxWidth: isWide ? 560 : undefined }}>
             {/* Header */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 18, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }}>
               <View>
@@ -777,8 +822,8 @@ export default function ReportsScreen({ onOpenDrawer, onBack }) {
         transparent={true}
         onRequestClose={() => setShowCategoryModal(false)}
       >
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}>
-          <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "90%", flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: isWide ? "center" : "flex-end", alignItems: isWide ? "center" : "stretch", padding: isWide ? 24 : 0 }}>
+          <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: isWide ? 24 : 0, borderBottomRightRadius: isWide ? 24 : 0, maxHeight: "90%", flex: 1, width: "100%", maxWidth: isWide ? 680 : undefined }}>
             {/* Header */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 18, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", backgroundColor: "#4F46E5", borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
               <View style={{ flex: 1 }}>

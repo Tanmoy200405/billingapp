@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { setCachedData, clearAllLocalCache } from "../utils/localCache";
 
 const TOKEN_KEY = "billing_auth_token";
 const USER_KEY = "billing_user_data";
@@ -86,6 +87,9 @@ export const getStoredSession = async () => {
 
 export const clearAuthToken = async () => {
   authToken = null;
+  getCache.clear();
+  inFlightGets.clear();
+  clearAllLocalCache().catch(() => {});
   if (typeof localStorage !== "undefined") {
     try {
       localStorage.removeItem(TOKEN_KEY);
@@ -112,41 +116,137 @@ export const setApiBaseUrl = (url) => {
 
 export const getApiBaseUrl = () => currentBaseUrl;
 
+const GET_CACHE_TTL_MS = 12000;
+const getCache = new Map();
+const inFlightGets = new Map();
+
+export const invalidateClientApiCache = (prefix = "") => {
+  if (!prefix) {
+    getCache.clear();
+    return;
+  }
+  for (const key of getCache.keys()) {
+    if (key.includes(prefix)) {
+      getCache.delete(key);
+    }
+  }
+};
+
 const request = async (endpoint, options = {}) => {
   const url = `${currentBaseUrl}${endpoint}`;
+  const method = (options.method || "GET").toUpperCase();
+  const useCache = method === "GET" && !options.skipCache && !endpoint.startsWith("/whatsapp/");
+
+  if (useCache) {
+    const cachedEntry = getCache.get(url);
+    if (cachedEntry && Date.now() < cachedEntry.expiresAt) {
+      return cachedEntry.data;
+    }
+    if (inFlightGets.has(url)) {
+      return inFlightGets.get(url);
+    }
+  }
+
   const headers = {
     "Content-Type": "application/json",
     ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     ...options.headers,
   };
 
-  try {
-    const response = await fetch(url, { ...options, headers });
-    let data;
+  const executeFetch = async () => {
+    const timeoutMs =
+      endpoint.includes("import") || endpoint.includes("pdf") || endpoint.includes("whatsapp")
+        ? 45000
+        : 15000;
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
     try {
-      data = await response.json();
-    } catch {
-      data = {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        data = {
+          success: false,
+          message: `Server returned HTTP ${response.status}`,
+        };
+      }
+
+      if (!response.ok && data && !data.message) {
+        data.message = `Request failed with status ${response.status}`;
+      }
+
+      if (data && data.error && data.message && !data.message.includes(data.error)) {
+        data.message = `${data.message} (${data.error})`;
+      }
+
+      if (response.ok && data?.success !== false) {
+        if (useCache) {
+          getCache.set(url, {
+            data,
+            expiresAt: Date.now() + GET_CACHE_TTL_MS,
+          });
+        } else if (method !== "GET") {
+          // Mutating write: clear stale client RAM cache so subsequent reads get fresh totals/lists
+          invalidateClientApiCache();
+        }
+      }
+
+      return data;
+    } catch (error) {
+      return {
         success: false,
-        message: `Server returned HTTP ${response.status}`,
+        message:
+          error?.name === "AbortError"
+            ? "Request timed out. Please check your connection."
+            : error.message || "Network connection error",
       };
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (useCache) inFlightGets.delete(url);
     }
+  };
 
-    if (!response.ok && data && !data.message) {
-      data.message = `Request failed with status ${response.status}`;
-    }
-
-    if (data && data.error && data.message && !data.message.includes(data.error)) {
-      data.message = `${data.message} (${data.error})`;
-    }
-
-    return data;
-  } catch (error) {
-    return {
-      success: false,
-      message: error.message || "Network connection error",
-    };
+  if (useCache) {
+    const pendingPromise = executeFetch();
+    inFlightGets.set(url, pendingPromise);
+    return pendingPromise;
   }
+
+  return executeFetch();
+};
+
+export const prefetchCoreData = async () => {
+  if (!authToken) return;
+  try {
+    const [dashRes, itemsRes, catsRes, partiesRes] = await Promise.allSettled([
+      api.dashboard.getStats(),
+      api.items.getAll(),
+      api.items.getCategories(),
+      api.parties.getAll(),
+    ]);
+
+    if (dashRes.status === "fulfilled" && dashRes.value?.success) {
+      setCachedData("dashboard_stats", {
+        stats: dashRes.value.stats,
+        recentTransactions: dashRes.value.recentTransactions || [],
+      });
+    }
+    if (itemsRes.status === "fulfilled" && itemsRes.value?.success) {
+      setCachedData("items_all", itemsRes.value.items || []);
+    }
+    if (catsRes.status === "fulfilled" && catsRes.value?.success) {
+      setCachedData("items_categories", catsRes.value.categories || []);
+    }
+    if (partiesRes.status === "fulfilled" && partiesRes.value?.success) {
+      setCachedData("parties_all", partiesRes.value.parties || []);
+    }
+  } catch {}
 };
 
 const uploadPdfFile = async (endpoint, fileOrUri) => {

@@ -22,7 +22,8 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../config/api";
 import { downloadReportFile } from "../utils/reportDownloader";
-import { getCachedData, setCachedData } from "../utils/localCache";
+import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
+import { useResponsive, ResponsiveContainer } from "../utils/responsive";
 
 function SafeProductImage({ uri }) {
   const [hasError, setHasError] = useState(false);
@@ -44,8 +45,9 @@ function SafeProductImage({ uri }) {
   );
 }
 
-export default function InventoryScreen({ onOpenDrawer, onBack }) {
-  const [items, setItems] = useState([]);
+export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack }) {
+  const { isWide, gridColumns, headerTopPadding } = useResponsive();
+  const [items, setItems] = useState(() => getMemoryCachedData("items_all") || []);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterLowStock, setFilterLowStock] = useState(false);
@@ -54,7 +56,7 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
   const [editingItem, setEditingItem] = useState(null);
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
-  const [categories, setCategories] = useState(["General"]);
+  const [categories, setCategories] = useState(() => getMemoryCachedData("items_categories") || ["General"]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
@@ -82,14 +84,14 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
 
   const loadCategories = useCallback(async () => {
     try {
-      const cached = await getCachedData("item_categories");
+      const cached = await getCachedData("items_categories");
       if (Array.isArray(cached) && cached.length > 0) {
         setCategories(cached);
       }
       const res = await api.items.getCategories();
       if (res && res.success && Array.isArray(res.categories) && res.categories.length > 0) {
         setCategories(res.categories);
-        setCachedData("item_categories", res.categories);
+        setCachedData("items_categories", res.categories);
       }
     } catch {}
   }, []);
@@ -131,8 +133,11 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
   }, [search, filterLowStock, selectedCategory]);
 
   useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
+    if (isActive) {
+      loadCategories();
+      loadItems();
+    }
+  }, [isActive]);
 
   useEffect(() => {
     loadItems();
@@ -400,13 +405,16 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
 
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
-      <View className="bg-blue-600 px-4 pt-10 pb-3">
+      <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-3">
+        <ResponsiveContainer maxWidth={1200}>
         <View className="flex-row items-center justify-between mb-2.5">
           <View className="flex-row items-center flex-1 pr-2">
-            <TouchableOpacity onPress={onOpenDrawer} className="mr-2 p-1">
-              <Ionicons name="menu" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            {onBack ? (
+            {!isWide && (
+              <TouchableOpacity onPress={onOpenDrawer} className="mr-2 p-1">
+                <Ionicons name="menu" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+            {onBack && !isWide ? (
               <TouchableOpacity
                 onPress={onBack}
                 className="flex-row items-center bg-white/20 px-2.5 py-1 rounded-lg mr-2"
@@ -422,55 +430,57 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
           </View>
         </View>
 
-        {/* ── 2 Primary Actions: 1. Add Category  2. Add Food / Item ── */}
-        <View className="flex-row gap-2 mb-2">
-          <TouchableOpacity
-            onPress={handleOpenCategoryModal}
-            className="flex-1 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
-          >
-            <Ionicons name="folder-outline" size={17} color="#FFFFFF" />
-            <Text className="text-white font-extrabold text-xs ml-1.5">+ Add Category</Text>
-          </TouchableOpacity>
+        <View style={isWide ? { flexDirection: "row", gap: 8, marginBottom: 10, alignItems: "center" } : undefined}>
+          {/* ── 2 Primary Actions: 1. Add Category  2. Add Food / Item ── */}
+          <View style={isWide ? { flex: 1, flexDirection: "row", gap: 8 } : undefined} className={!isWide ? "flex-row gap-2 mb-2" : ""}>
+            <TouchableOpacity
+              onPress={handleOpenCategoryModal}
+              className="flex-1 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
+            >
+              <Ionicons name="folder-outline" size={17} color="#FFFFFF" />
+              <Text className="text-white font-extrabold text-xs ml-1.5">+ Add Category</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleOpenAdd}
-            className="flex-1 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
-          >
-            <Ionicons name="fast-food-outline" size={17} color="#FFFFFF" />
-            <Text className="text-white font-extrabold text-xs ml-1.5">+ Add Food / Item</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={handleOpenAdd}
+              className="flex-1 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
+            >
+              <Ionicons name="fast-food-outline" size={17} color="#FFFFFF" />
+              <Text className="text-white font-extrabold text-xs ml-1.5">+ Add Food / Item</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View className="flex-row gap-2 mb-2.5">
-          <TouchableOpacity
-            onPress={handleImportPdf}
-            disabled={importingPdf}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 py-2 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
-          >
-            {importingPdf ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="document-attach" size={15} color="#FFFFFF" />
-                <Text className="text-white font-bold text-xs ml-1.5">Add by PDF</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <View style={isWide ? { flex: 0.9, flexDirection: "row", gap: 8 } : undefined} className={!isWide ? "flex-row gap-2 mb-2.5" : ""}>
+            <TouchableOpacity
+              onPress={handleImportPdf}
+              disabled={importingPdf}
+              className="flex-1 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
+            >
+              {importingPdf ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="document-attach" size={15} color="#FFFFFF" />
+                  <Text className="text-white font-bold text-xs ml-1.5">Add by PDF</Text>
+                </>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleDownloadInventoryPdf}
-            disabled={downloadingReport}
-            className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-3 rounded-xl flex-row items-center justify-center"
-          >
-            {downloadingReport ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="document-text-outline" size={14} color="#FFFFFF" />
-                <Text className="text-white font-bold text-xs ml-1.5">PDF Report</Text>
-              </>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleDownloadInventoryPdf}
+              disabled={downloadingReport}
+              className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2.5 px-3 rounded-xl flex-row items-center justify-center"
+            >
+              {downloadingReport ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="document-text-outline" size={14} color="#FFFFFF" />
+                  <Text className="text-white font-bold text-xs ml-1.5">PDF Report</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View className="flex-row bg-white rounded-xl px-3 py-2 items-center shadow-xs">
@@ -494,10 +504,12 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
             </TouchableOpacity>
           ) : null}
         </View>
+        </ResponsiveContainer>
       </View>
 
       {/* Category Filter Chips Bar */}
       <View className="bg-white border-b border-gray-100 px-3 py-2">
+        <ResponsiveContainer maxWidth={1200}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
           <TouchableOpacity
             onPress={() => setSelectedCategory("All")}
@@ -544,9 +556,11 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
             <Text className="text-xs font-bold text-blue-700 ml-1">+ Category</Text>
           </TouchableOpacity>
         </ScrollView>
+        </ResponsiveContainer>
       </View>
 
-      <View className="flex-row bg-white border-b border-gray-200 px-3 py-2">
+      <View className="bg-white border-b border-gray-200 px-3 py-2">
+        <ResponsiveContainer maxWidth={1200} style={{ flexDirection: "row" }}>
         <TouchableOpacity
           onPress={() => setFilterLowStock(false)}
           className={`px-3 py-1.5 rounded-full mr-2 ${
@@ -576,6 +590,7 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
             Low Stock Alerts
           </Text>
         </TouchableOpacity>
+        </ResponsiveContainer>
       </View>
 
       {loading && items.length === 0 ? (
@@ -584,10 +599,13 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
         </View>
       ) : (
         <FlatList
-          style={{ flex: 1 }}
+          key={`inv-cols-${gridColumns}`}
+          numColumns={gridColumns}
+          columnWrapperStyle={gridColumns > 1 ? { gap: 12 } : undefined}
+          style={{ flex: 1, width: "100%", maxWidth: 1200, alignSelf: "center" }}
           data={items}
           keyExtractor={(item, index) => item?._id || `item-${index}`}
-          contentContainerStyle={{ padding: 12, paddingBottom: 120, flexGrow: 1 }}
+          contentContainerStyle={{ padding: isWide ? 16 : 12, paddingBottom: 120, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           nestedScrollEnabled={true}
@@ -619,7 +637,10 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
           renderItem={({ item }) => {
             if (!item) return null;
             return (
-              <View className="bg-white rounded-xl p-4 mb-3 border border-gray-200 shadow-sm flex-row items-center justify-between">
+              <View
+                style={gridColumns > 1 ? { flex: 1, maxWidth: `${100 / gridColumns - 1}%` } : undefined}
+                className="bg-white rounded-xl p-4 mb-3 border border-gray-200 shadow-sm flex-row items-center justify-between"
+              >
                 <View className="flex-row items-center flex-1 pr-2">
                   <SafeProductImage uri={item.imageUrl} />
                   <View className="flex-1">

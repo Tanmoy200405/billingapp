@@ -19,6 +19,8 @@ import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { api } from "../config/api";
 import { shareCataloguePdf, CATALOGUE_STYLES } from "../utils/cataloguePdfGenerator";
 import { showToast } from "../utils/toast";
+import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
+import { useResponsive, ResponsiveContainer } from "../utils/responsive";
 
 // ─── 3-Colour Palette ────────────────────────────────────────────────
 const C = {
@@ -71,8 +73,9 @@ const MARKETING_TEMPLATES = [
   },
 ];
 
-export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
-  const [catalogues, setCatalogues] = useState([]);
+export default function MarketingScreen({ user, isActive = true, onOpenDrawer, onBack }) {
+  const { isWide, headerTopPadding } = useResponsive();
+  const [catalogues, setCatalogues] = useState(() => getMemoryCachedData("items_all") || []);
   const [selectedCatStyle, setSelectedCatStyle] = useState("modern_minimal");
   const [generatingCatalogue, setGeneratingCatalogue] = useState(false);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -90,14 +93,25 @@ export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
   const [sentMap, setSentMap] = useState({});
 
   useEffect(() => {
-    loadMenuItems();
-  }, []);
+    if (isActive) {
+      loadMenuItems();
+    }
+  }, [isActive]);
 
   const loadMenuItems = async () => {
-    setLoadingItems(true);
+    let hasCached = false;
+    const cached = await getCachedData("items_all");
+    if (Array.isArray(cached) && cached.length > 0) {
+      setCatalogues(cached);
+      hasCached = true;
+    }
+    if (!hasCached) setLoadingItems(true);
     try {
       const res = await api.items.getAll();
-      if (res?.success) setCatalogues(res.items || []);
+      if (res?.success && Array.isArray(res.items)) {
+        setCatalogues(res.items);
+        setCachedData("items_all", res.items);
+      }
     } catch {} finally {
       setLoadingItems(false);
     }
@@ -234,12 +248,15 @@ export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
   return (
     <View style={{ flex: 1, backgroundColor: C.slate50 }}>
       {/* ── Header (Deep Navy) ── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerTopPadding }]}>
+        <ResponsiveContainer maxWidth={1120}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <TouchableOpacity onPress={onOpenDrawer} style={{ padding: 6, marginRight: 8 }}>
-            <Ionicons name="menu" size={24} color={C.white} />
-          </TouchableOpacity>
-          {onBack && (
+          {!isWide && (
+            <TouchableOpacity onPress={onOpenDrawer} style={{ padding: 6, marginRight: 8 }}>
+              <Ionicons name="menu" size={24} color={C.white} />
+            </TouchableOpacity>
+          )}
+          {onBack && !isWide && (
             <TouchableOpacity onPress={onBack} style={styles.backBtn}>
               <Ionicons name="arrow-back" size={14} color={C.white} />
               <Text style={{ color: C.white, fontSize: 12, fontWeight: "700", marginLeft: 4 }}>Back</Text>
@@ -250,6 +267,7 @@ export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
             <Text style={styles.headerSubtitle}>Broadcasts · Catalogues · VIP Retention</Text>
           </View>
         </View>
+        </ResponsiveContainer>
       </View>
 
       <KeyboardAvoidingView
@@ -258,14 +276,15 @@ export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
+          contentContainerStyle={{ padding: isWide ? 20 : 16, paddingBottom: 110 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handlePullRefresh} tintColor={C.navy} colors={[C.navy]} />}
         >
+        <ResponsiveContainer maxWidth={1120} style={isWide ? { flexDirection: "row", gap: 16, alignItems: "flex-start" } : undefined}>
         {/* ── Card 1: WhatsApp Bulk & VIP Broadcast ── */}
-        <View style={styles.card}>
+        <View style={[styles.card, isWide && { flex: 1.15, marginBottom: 0 }]}>
           <View style={styles.cardHeader}>
             <View style={[styles.iconCircle, { backgroundColor: C.navyLight }]}>
               <FontAwesome5 name="bullhorn" size={16} color={C.navy} />
@@ -392,7 +411,7 @@ export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
         </View>
 
         {/* ── Card 2: Catalogue PDF Generator ── */}
-        <View style={styles.card}>
+        <View style={[styles.card, isWide && { flex: 1, marginBottom: 0 }]}>
           <View style={styles.cardHeader}>
             <View style={[styles.iconCircle, { backgroundColor: C.emeraldLight }]}>
               <Ionicons name="document-text" size={18} color={C.emerald} />
@@ -459,6 +478,7 @@ export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
             )}
           </TouchableOpacity>
         </View>
+        </ResponsiveContainer>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -469,8 +489,8 @@ export default function MarketingScreen({ user, onOpenDrawer, onBack }) {
         animationType="slide"
         onRequestClose={() => setQueueModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.queueModalCard}>
+        <View style={[styles.modalOverlay, isWide && { justifyContent: "center", alignItems: "center", padding: 24 }]}>
+          <View style={[styles.queueModalCard, isWide && { width: "100%", maxWidth: 560, borderRadius: 24 }]}>
             {/* Modal Header */}
             <View style={styles.queueModalHeader}>
               <View>
