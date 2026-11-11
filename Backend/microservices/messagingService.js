@@ -1,6 +1,7 @@
 import express from "express";
 import connectDB from "../config/dbConnect.js";
 import whatsappRoutes from "../routes/whatsappRoutes.js";
+import adminRoutes from "../routes/adminRoutes.js";
 import {
   initAllWhatsAppSessions,
   getWhatsAppStatus,
@@ -55,6 +56,7 @@ const app = createServiceApp({
     server.use("/internal", internalRouter);
 
     server.use("/api/whatsapp", whatsappRoutes);
+    server.use("/api/admin", adminRoutes);
   },
 });
 

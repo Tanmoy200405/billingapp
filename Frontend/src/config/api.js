@@ -318,7 +318,7 @@ const uploadPdfFile = async (endpoint, fileOrUri) => {
 
 export const api = {
   auth: {
-    sendOtp: (phone, channel = "whatsapp", email = "") =>
+    sendOtp: (phone, channel = "whatsapp", email = "", purpose = "login") =>
       request("/auth/send-otp", {
         method: "POST",
         body: JSON.stringify({
@@ -326,6 +326,7 @@ export const api = {
           identifier: phone,
           ...(email ? { email } : {}),
           channel,
+          purpose,
         }),
       }),
     verifyOtp: (phone, code) =>

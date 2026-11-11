@@ -22,7 +22,7 @@ const keepAliveAgent = new http.Agent({
 function resolveTarget(urlPath = "/") {
   if (urlPath.startsWith("/api/invoices")) return SERVICE_TARGETS.billing;
   if (urlPath.startsWith("/api/reports")) return SERVICE_TARGETS.reports;
-  if (urlPath.startsWith("/api/whatsapp")) return SERVICE_TARGETS.messaging;
+  if (urlPath.startsWith("/api/whatsapp") || urlPath.startsWith("/api/admin")) return SERVICE_TARGETS.messaging;
   return SERVICE_TARGETS.core;
 }
 
