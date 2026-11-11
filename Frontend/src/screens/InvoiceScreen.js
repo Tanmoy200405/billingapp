@@ -19,6 +19,7 @@ import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shareBillAsPdf, shareBackendPdf, printBill } from "../utils/receiptPdfGenerator";
+import { getCachedData, setCachedData } from "../utils/localCache";
 
 export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInvoice }) {
   // Step 1: "items" (first select items) | Step 2: "invoice" (customer & payment)
@@ -127,16 +128,30 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
           setPrintTarget(parsed.printTarget);
         }
       }
-    } catch {}
+    } catch { }
   };
 
   const loadPartiesAndItems = async () => {
+    const [cachedParties, cachedItems] = await Promise.all([
+      getCachedData("parties_customers"),
+      getCachedData("items_all"),
+    ]);
+    if (Array.isArray(cachedParties) && cachedParties.length > 0) {
+      setParties(cachedParties);
+    }
+    if (Array.isArray(cachedItems) && cachedItems.length > 0) {
+      setItems(cachedItems);
+    }
+
     const [pRes, iRes] = await Promise.all([
       api.parties.getAll("type=customer"),
       api.items.getAll(),
     ]);
-    if (pRes.success) setParties(pRes.parties || []);
-    if (iRes.success && Array.isArray(iRes.items)) {
+    if (pRes && pRes.success) {
+      setParties(pRes.parties || []);
+      setCachedData("parties_customers", pRes.parties || []);
+    }
+    if (iRes && iRes.success && Array.isArray(iRes.items)) {
       const sorted = [...iRes.items].sort((a, b) =>
         String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
           numeric: true,
@@ -144,6 +159,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
         })
       );
       setItems(sorted);
+      setCachedData("items_all", sorted);
     }
   };
 
@@ -339,7 +355,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     if (res && res.success && res.invoice) {
       setCreatedInvoice(res.invoice);
       setWhatsappUrl(res.whatsappUrl || "");
-      setWhatsappSent(Boolean(res.whatsappSent));
+      setWhatsappSent(Boolean(res.whatsappSent || res.whatsappQueued));
       setShowReceiptModal(true);
       setKotSent(false);
 
@@ -456,7 +472,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     .filter((i) => {
       const matchSearch = itemSearch
         ? i.name?.toLowerCase().includes(itemSearch.toLowerCase()) ||
-          (i.barcode || "").toLowerCase().includes(itemSearch.toLowerCase())
+        (i.barcode || "").toLowerCase().includes(itemSearch.toLowerCase())
         : true;
       const matchCategory = selectedCategory === "All" || (i.category || "General") === selectedCategory;
       return matchSearch && matchCategory;
@@ -490,8 +506,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               {editingInvoice
                 ? `Edit Bill #${editingInvoice.invoiceNumber}`
                 : currentStep === "items"
-                ? "1. Select Items"
-                : "2. Finalize Invoice"}
+                  ? "1. Select Items"
+                  : "2. Finalize Invoice"}
             </Text>
             <Text className="text-blue-100 text-[11px]">
               {currentStep === "items"
@@ -544,16 +560,14 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                   <TouchableOpacity
                     key={cat}
                     onPress={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-full mr-2 border ${
-                      selectedCategory === cat
+                    className={`px-3 py-1.5 rounded-full mr-2 border ${selectedCategory === cat
                         ? "bg-blue-600 border-blue-600"
                         : "bg-gray-100 border-gray-200"
-                    }`}
+                      }`}
                   >
                     <Text
-                      className={`text-xs font-bold ${
-                        selectedCategory === cat ? "text-white" : "text-gray-700"
-                      }`}
+                      className={`text-xs font-bold ${selectedCategory === cat ? "text-white" : "text-gray-700"
+                        }`}
                     >
                       {cat}
                     </Text>
@@ -585,11 +599,10 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               const qtyInCart = getCartItemQty(item._id);
               return (
                 <View
-                  className={`flex-row items-center justify-between p-3.5 mb-2.5 rounded-xl border bg-white ${
-                    qtyInCart > 0
+                  className={`flex-row items-center justify-between p-3.5 mb-2.5 rounded-xl border bg-white ${qtyInCart > 0
                       ? "border-blue-400 bg-blue-50/40 shadow-sm"
                       : "border-gray-200 shadow-xs"
-                  }`}
+                    }`}
                 >
                   <View className="flex-row items-center flex-1 pr-2">
                     {item.imageUrl ? (
@@ -613,9 +626,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                         </Text>
                         {item.stock !== undefined ? (
                           <Text
-                            className={`text-[10px] font-semibold ${
-                              item.stock > 5 ? "text-emerald-700" : "text-amber-700"
-                            }`}
+                            className={`text-[10px] font-semibold ${item.stock > 5 ? "text-emerald-700" : "text-amber-700"
+                              }`}
                           >
                             Stock: {item.stock}
                           </Text>
@@ -676,9 +688,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 setCurrentStep("invoice");
               }}
               disabled={cart.length === 0}
-              className={`px-5 py-3 rounded-xl flex-row items-center shadow ${
-                cart.length > 0 ? "bg-emerald-600" : "bg-gray-300"
-              }`}
+              className={`px-5 py-3 rounded-xl flex-row items-center shadow ${cart.length > 0 ? "bg-emerald-600" : "bg-gray-300"
+                }`}
             >
               <Text className="text-white font-bold text-sm mr-2">
                 Proceed to Invoice
@@ -702,335 +713,330 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             keyboardDismissMode="on-drag"
             contentContainerStyle={{ paddingBottom: 120 }}
           >
-          {/* Customer Details Card */}
-          <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
-            <View className="flex-row justify-between items-center mb-3">
-              <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Customer Details
-              </Text>
-              <TouchableOpacity onPress={() => setShowPartyModal(true)}>
-                <Text className="text-xs font-bold text-blue-600">
-                  {selectedParty ? "Pick Another" : "Pick from Contacts"}
+            {/* Customer Details Card */}
+            <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
+              <View className="flex-row justify-between items-center mb-3">
+                <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Customer Details
                 </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View className="mb-3">
-              <Text className="text-xs font-bold text-gray-700 mb-1">Customer Name</Text>
-              <TextInput
-                className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 font-semibold"
-                placeholder="Walk-in Customer or name"
-                value={customerName}
-                onChangeText={setCustomerName}
-              />
-            </View>
-
-            <View className="mb-2">
-              <Text className="text-xs font-bold text-gray-700 mb-1">
-                Customer WhatsApp / Phone Number
-              </Text>
-              <TextInput
-                className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900"
-                placeholder="10-digit mobile number for WhatsApp PDF bill"
-                keyboardType="phone-pad"
-                value={customerPhone}
-                onChangeText={handlePhoneChange}
-                maxLength={15}
-              />
-            </View>
-
-            {/* Visit Count & Customer Profile Badge */}
-            {activeCustomer ? (
-              <View className="bg-amber-50 border border-amber-300 rounded-xl p-3 my-2">
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center">
-                    <Ionicons name="person-circle" size={24} color="#D97706" />
-                    <View className="ml-2">
-                      <Text className="text-sm font-extrabold text-amber-950">
-                        {activeCustomer.name}
-                      </Text>
-                      <Text className="text-[11px] font-bold text-amber-800">
-                        Total Visits: <Text className="font-extrabold text-amber-900 text-xs">{activeCustomer.visitCount || 1}</Text> • Total Spent: Rs. {activeCustomer.totalSpent || 0}
-                      </Text>
-                    </View>
-                  </View>
-                  {(activeCustomer.isRegular || (activeCustomer.visitCount || 0) >= (user?.vipVisitThreshold || 3)) ? (
-                    <View className="bg-amber-200 px-2 py-0.5 rounded-full">
-                      <Text className="text-[10px] font-extrabold text-amber-900">VIP / Regular</Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            ) : null}
-
-            {customerPhone.trim().length >= 10 ? (
-              <View className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex-row items-center mt-1">
-                <MaterialIcons name="send" size={16} color="#059669" />
-                <Text className="text-emerald-800 text-xs font-bold ml-1.5 flex-1">
-                  Bill will be sent to WhatsApp: {customerPhone.trim()}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Discount & Free Foods Section */}
-            <View className="mt-3 pt-3 border-t border-gray-200">
-              <Text className="text-xs font-bold text-gray-700 mb-2">
-                Custom Discount & Free Foods
-              </Text>
-              <View className="flex-row gap-2 mb-2">
-                <View className="flex-1">
-                  <Text className="text-[11px] font-semibold text-gray-600 mb-1">
-                    Discount (%):
-                  </Text>
-                  <TextInput
-                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-sm font-bold text-emerald-800"
-                    placeholder="e.g. 10"
-                    keyboardType="numeric"
-                    value={customDiscount}
-                    onChangeText={setCustomDiscount}
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-[11px] font-semibold text-gray-600 mb-1">
-                    Free Food / Gift:
-                  </Text>
-                  <TextInput
-                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-sm font-bold text-blue-900"
-                    placeholder="e.g. Cold Drink / Dessert"
-                    value={customFreebie}
-                    onChangeText={setCustomFreebie}
-                  />
-                </View>
-              </View>
-              {appliedDiscountPercent > 0 ? (
-                <Text className="text-[11px] font-bold text-emerald-700">
-                  🎉 {appliedDiscountPercent}% Discount Applied (-Rs. {regularDiscountAmount})
-                </Text>
-              ) : null}
-              {customFreebie ? (
-                <Text className="text-[11px] font-bold text-blue-700 mt-0.5">
-                  🎁 Complimentary: {customFreebie}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-
-          {/* Billed Items Summary Card */}
-          <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
-            <View className="flex-row justify-between items-center mb-3">
-              <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Billed Items ({cart.length})
-              </Text>
-              <TouchableOpacity onPress={() => setCurrentStep("items")}>
-                <Text className="text-xs font-bold text-blue-600">+ Add / Change Items</Text>
-              </TouchableOpacity>
-            </View>
-
-            {cart.map((c, index) => (
-              <View
-                key={c._id}
-                className="flex-row items-center justify-between py-2.5 border-b border-gray-100 last:border-b-0"
-              >
-                <View className="flex-1 pr-2">
-                  <Text className="text-sm font-bold text-gray-900">
-                    {index + 1}. {c.name}
-                  </Text>
-                  <Text className="text-xs text-gray-500 mt-0.5">
-                    Rs. {c.sellingPrice} / {c.unit}
-                  </Text>
-                </View>
-
-                <View className="flex-row items-center mr-3">
-                  <TouchableOpacity
-                    onPress={() => updateQuantity(c._id, -1)}
-                    className="w-7 h-7 rounded-lg bg-gray-100 items-center justify-center"
-                  >
-                    <Ionicons name="remove" size={16} color="#374151" />
-                  </TouchableOpacity>
-                  <Text className="text-sm font-bold text-gray-900 w-8 text-center">
-                    {c.quantity}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => updateQuantity(c._id, 1)}
-                    className="w-7 h-7 rounded-lg bg-blue-100 items-center justify-center"
-                  >
-                    <Ionicons name="add" size={16} color="#2563EB" />
-                  </TouchableOpacity>
-                </View>
-
-                <Text className="text-sm font-extrabold text-gray-900 w-16 text-right">
-                  Rs. {c.sellingPrice * c.quantity}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Payment Mode Selection Card */}
-          <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
-            <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-              Payment Mode
-            </Text>
-            <View className="flex-row gap-2 flex-wrap">
-              {["CASH", "UPI", "UPI/CASH", "BANK", "CHEQUE", "CREDIT"].map((mode) => (
-                <TouchableOpacity
-                  key={mode}
-                  onPress={() => handlePaymentModeChange(mode)}
-                  className={`px-3 py-2 rounded-xl border ${
-                    paymentMode === mode
-                      ? "bg-blue-600 border-blue-600"
-                      : "bg-gray-100 border-gray-200"
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-bold ${
-                      paymentMode === mode ? "text-white" : "text-gray-700"
-                    }`}
-                  >
-                    {mode}
+                <TouchableOpacity onPress={() => setShowPartyModal(true)}>
+                  <Text className="text-xs font-bold text-blue-600">
+                    {selectedParty ? "Pick Another" : "Pick from Contacts"}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+              </View>
 
-            {paymentMode === "UPI/CASH" ? (
-              <View className="mt-3 bg-blue-50/70 border border-blue-200 rounded-xl p-3">
-                <Text className="text-xs font-bold text-blue-900 mb-2">
-                  Split Payment (Cash + UPI)
+              <View className="mb-3">
+                <Text className="text-xs font-bold text-gray-700 mb-1">Customer Name</Text>
+                <TextInput
+                  className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 font-semibold"
+                  placeholder="Walk-in Customer or name"
+                  value={customerName}
+                  onChangeText={setCustomerName}
+                />
+              </View>
+
+              <View className="mb-2">
+                <Text className="text-xs font-bold text-gray-700 mb-1">
+                  Customer WhatsApp / Phone Number
                 </Text>
-                <View className="flex-row gap-3">
+                <TextInput
+                  className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900"
+                  placeholder="10-digit mobile number for WhatsApp PDF bill"
+                  keyboardType="phone-pad"
+                  value={customerPhone}
+                  onChangeText={handlePhoneChange}
+                  maxLength={15}
+                />
+              </View>
+
+              {/* Visit Count & Customer Profile Badge */}
+              {activeCustomer ? (
+                <View className="bg-amber-50 border border-amber-300 rounded-xl p-3 my-2">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center">
+                      <Ionicons name="person-circle" size={24} color="#D97706" />
+                      <View className="ml-2">
+                        <Text className="text-sm font-extrabold text-amber-950">
+                          {activeCustomer.name}
+                        </Text>
+                        <Text className="text-[11px] font-bold text-amber-800">
+                          Total Visits: <Text className="font-extrabold text-amber-900 text-xs">{activeCustomer.visitCount || 1}</Text> • Total Spent: Rs. {activeCustomer.totalSpent || 0}
+                        </Text>
+                      </View>
+                    </View>
+                    {(activeCustomer.isRegular || (activeCustomer.visitCount || 0) >= (user?.vipVisitThreshold || 3)) ? (
+                      <View className="bg-amber-200 px-2 py-0.5 rounded-full">
+                        <Text className="text-[10px] font-extrabold text-amber-900">VIP / Regular</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              ) : null}
+
+              {customerPhone.trim().length >= 10 ? (
+                <View className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex-row items-center mt-1">
+                  <MaterialIcons name="send" size={16} color="#059669" />
+                  <Text className="text-emerald-800 text-xs font-bold ml-1.5 flex-1">
+                    Bill will be sent to WhatsApp: {customerPhone.trim()}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Discount & Free Foods Section */}
+              <View className="mt-3 pt-3 border-t border-gray-200">
+                <Text className="text-xs font-bold text-gray-700 mb-2">
+                  Custom Discount & Free Foods
+                </Text>
+                <View className="flex-row gap-2 mb-2">
                   <View className="flex-1">
-                    <Text className="text-xs font-semibold text-gray-700 mb-1">
-                      Cash Amount (Rs)
+                    <Text className="text-[11px] font-semibold text-gray-600 mb-1">
+                      Discount (%):
                     </Text>
                     <TextInput
-                      className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-bold text-gray-900"
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-sm font-bold text-emerald-800"
+                      placeholder="e.g. 10"
                       keyboardType="numeric"
-                      value={cashAmount}
-                      onChangeText={handleCashAmountChange}
-                      placeholder="0"
+                      value={customDiscount}
+                      onChangeText={setCustomDiscount}
                     />
                   </View>
                   <View className="flex-1">
-                    <Text className="text-xs font-semibold text-gray-700 mb-1">
-                      UPI Amount (Rs)
+                    <Text className="text-[11px] font-semibold text-gray-600 mb-1">
+                      Free Food / Gift:
                     </Text>
                     <TextInput
-                      className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-bold text-gray-900"
-                      keyboardType="numeric"
-                      value={upiAmount}
-                      onChangeText={setUpiAmount}
-                      placeholder="0"
+                      className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-sm font-bold text-blue-900"
+                      placeholder="e.g. Cold Drink / Dessert"
+                      value={customFreebie}
+                      onChangeText={setCustomFreebie}
                     />
                   </View>
                 </View>
-                <Text className="text-[11px] text-gray-500 mt-2">
-                  Total: Rs. {(Number(cashAmount) || 0) + (Number(upiAmount) || 0)} / Rs. {grandTotal}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Grand Total Summary */}
-          <View className="bg-white rounded-xl p-4 mb-6 border border-gray-200 shadow-sm">
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-xs text-gray-600">Subtotal</Text>
-              <Text className="text-xs font-bold text-gray-800">Rs. {subtotal}</Text>
-            </View>
-
-            {regularDiscountAmount > 0 ? (
-              <View className="flex-row justify-between mb-2">
-                <Text className="text-xs text-emerald-700 font-bold">
-                  Discount ({appliedDiscountPercent}%)
-                </Text>
-                <Text className="text-xs font-bold text-emerald-700">
-                  -Rs. {regularDiscountAmount}
-                </Text>
-              </View>
-            ) : null}
-
-            {customFreebie || activeCustomer?.assignedFreebie ? (
-              <View className="flex-row justify-between mb-2">
-                <Text className="text-xs text-blue-700 font-bold">Free Food / Gift</Text>
-                <Text className="text-xs font-bold text-blue-700">
-                  {customFreebie || activeCustomer?.assignedFreebie}
-                </Text>
-              </View>
-            ) : null}
-
-            <View className="h-px bg-gray-200 my-2" />
-
-            <View className="flex-row justify-between items-center">
-              <Text className="text-base font-extrabold text-gray-900">Grand Total</Text>
-              <Text className="text-xl font-extrabold text-blue-900">Rs. {grandTotal}</Text>
-            </View>
-          </View>
-
-          {/* Print Target Option while Creating Invoice */}
-          <View className="bg-white rounded-xl p-3.5 mb-4 border border-blue-200 shadow-sm">
-            <View className="flex-row items-center justify-between mb-2">
-              <View className="flex-row items-center">
-                <Ionicons name="print-outline" size={16} color="#2563EB" />
-                <Text className="text-xs font-bold text-gray-800 uppercase tracking-wider ml-1.5">
-                  Print Target
-                </Text>
-              </View>
-              <Text className="text-[10px] text-blue-600 font-semibold">
-                Auto-reflects on Thermal Printer
-              </Text>
-            </View>
-
-            <View className="flex-row bg-gray-100 p-1 rounded-xl border border-gray-200">
-              {[
-                { key: "both", label: "Both (Bill+KOT)", icon: "copy-outline" },
-                { key: "customer", label: "Customer", icon: "receipt-outline" },
-                { key: "cooker", label: "Cooker KOT", icon: "restaurant-outline" },
-                { key: "none", label: "No Print", icon: "close-circle-outline" },
-              ].map((t) => (
-                <TouchableOpacity
-                  key={t.key}
-                  onPress={() => setPrintTarget(t.key)}
-                  className={`flex-1 py-1.5 rounded-lg flex-row items-center justify-center ${
-                    printTarget === t.key
-                      ? "bg-white shadow-xs border border-blue-300"
-                      : "bg-transparent"
-                  }`}
-                >
-                  <Ionicons
-                    name={t.icon}
-                    size={12}
-                    color={printTarget === t.key ? "#2563EB" : "#6B7280"}
-                  />
-                  <Text
-                    className={`text-[10px] font-bold ml-0.5 ${
-                      printTarget === t.key ? "text-blue-700" : "text-gray-600"
-                    }`}
-                  >
-                    {t.label}
+                {appliedDiscountPercent > 0 ? (
+                  <Text className="text-[11px] font-bold text-emerald-700">
+                    🎉 {appliedDiscountPercent}% Discount Applied (-Rs. {regularDiscountAmount})
                   </Text>
+                ) : null}
+                {customFreebie ? (
+                  <Text className="text-[11px] font-bold text-blue-700 mt-0.5">
+                    🎁 Complimentary: {customFreebie}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Billed Items Summary Card */}
+            <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
+              <View className="flex-row justify-between items-center mb-3">
+                <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Billed Items ({cart.length})
+                </Text>
+                <TouchableOpacity onPress={() => setCurrentStep("items")}>
+                  <Text className="text-xs font-bold text-blue-600">+ Add / Change Items</Text>
                 </TouchableOpacity>
+              </View>
+
+              {cart.map((c, index) => (
+                <View
+                  key={c._id}
+                  className="flex-row items-center justify-between py-2.5 border-b border-gray-100 last:border-b-0"
+                >
+                  <View className="flex-1 pr-2">
+                    <Text className="text-sm font-bold text-gray-900">
+                      {index + 1}. {c.name}
+                    </Text>
+                    <Text className="text-xs text-gray-500 mt-0.5">
+                      Rs. {c.sellingPrice} / {c.unit}
+                    </Text>
+                  </View>
+
+                  <View className="flex-row items-center mr-3">
+                    <TouchableOpacity
+                      onPress={() => updateQuantity(c._id, -1)}
+                      className="w-7 h-7 rounded-lg bg-gray-100 items-center justify-center"
+                    >
+                      <Ionicons name="remove" size={16} color="#374151" />
+                    </TouchableOpacity>
+                    <Text className="text-sm font-bold text-gray-900 w-8 text-center">
+                      {c.quantity}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => updateQuantity(c._id, 1)}
+                      className="w-7 h-7 rounded-lg bg-blue-100 items-center justify-center"
+                    >
+                      <Ionicons name="add" size={16} color="#2563EB" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text className="text-sm font-extrabold text-gray-900 w-16 text-right">
+                    Rs. {c.sellingPrice * c.quantity}
+                  </Text>
+                </View>
               ))}
             </View>
-          </View>
 
-          {/* Finalize Button */}
-          <TouchableOpacity
-            onPress={handleGenerateInvoice}
-            disabled={loading || cart.length === 0}
-            className={`w-full py-4 rounded-xl items-center shadow-md mb-8 ${
-              cart.length > 0 ? "bg-emerald-600" : "bg-gray-300"
-            }`}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <View className="flex-row items-center">
-                <Ionicons name="checkmark-done-circle" size={20} color="#FFFFFF" />
-                <Text className="text-white font-bold text-base ml-2">
-                  {editingInvoice ? "Update & Save Invoice" : "Generate & Save Invoice"} (Rs. {grandTotal})
+            {/* Payment Mode Selection Card */}
+            <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
+              <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                Payment Mode
+              </Text>
+              <View className="flex-row gap-2 flex-wrap">
+                {["CASH", "UPI", "UPI/CASH", "BANK", "CHEQUE", "CREDIT"].map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    onPress={() => handlePaymentModeChange(mode)}
+                    className={`px-3 py-2 rounded-xl border ${paymentMode === mode
+                        ? "bg-blue-600 border-blue-600"
+                        : "bg-gray-100 border-gray-200"
+                      }`}
+                  >
+                    <Text
+                      className={`text-xs font-bold ${paymentMode === mode ? "text-white" : "text-gray-700"
+                        }`}
+                    >
+                      {mode}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {paymentMode === "UPI/CASH" ? (
+                <View className="mt-3 bg-blue-50/70 border border-blue-200 rounded-xl p-3">
+                  <Text className="text-xs font-bold text-blue-900 mb-2">
+                    Split Payment (Cash + UPI)
+                  </Text>
+                  <View className="flex-row gap-3">
+                    <View className="flex-1">
+                      <Text className="text-xs font-semibold text-gray-700 mb-1">
+                        Cash Amount (Rs)
+                      </Text>
+                      <TextInput
+                        className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-bold text-gray-900"
+                        keyboardType="numeric"
+                        value={cashAmount}
+                        onChangeText={handleCashAmountChange}
+                        placeholder="0"
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-xs font-semibold text-gray-700 mb-1">
+                        UPI Amount (Rs)
+                      </Text>
+                      <TextInput
+                        className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-bold text-gray-900"
+                        keyboardType="numeric"
+                        value={upiAmount}
+                        onChangeText={setUpiAmount}
+                        placeholder="0"
+                      />
+                    </View>
+                  </View>
+                  <Text className="text-[11px] text-gray-500 mt-2">
+                    Total: Rs. {(Number(cashAmount) || 0) + (Number(upiAmount) || 0)} / Rs. {grandTotal}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Grand Total Summary */}
+            <View className="bg-white rounded-xl p-4 mb-6 border border-gray-200 shadow-sm">
+              <View className="flex-row justify-between mb-2">
+                <Text className="text-xs text-gray-600">Subtotal</Text>
+                <Text className="text-xs font-bold text-gray-800">Rs. {subtotal}</Text>
+              </View>
+
+              {regularDiscountAmount > 0 ? (
+                <View className="flex-row justify-between mb-2">
+                  <Text className="text-xs text-emerald-700 font-bold">
+                    Discount ({appliedDiscountPercent}%)
+                  </Text>
+                  <Text className="text-xs font-bold text-emerald-700">
+                    -Rs. {regularDiscountAmount}
+                  </Text>
+                </View>
+              ) : null}
+
+              {customFreebie || activeCustomer?.assignedFreebie ? (
+                <View className="flex-row justify-between mb-2">
+                  <Text className="text-xs text-blue-700 font-bold">Free Food / Gift</Text>
+                  <Text className="text-xs font-bold text-blue-700">
+                    {customFreebie || activeCustomer?.assignedFreebie}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View className="h-px bg-gray-200 my-2" />
+
+              <View className="flex-row justify-between items-center">
+                <Text className="text-base font-extrabold text-gray-900">Grand Total</Text>
+                <Text className="text-xl font-extrabold text-blue-900">Rs. {grandTotal}</Text>
+              </View>
+            </View>
+
+            {/* Print Target Option while Creating Invoice */}
+            <View className="bg-white rounded-xl p-3.5 mb-4 border border-blue-200 shadow-sm">
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center">
+                  <Ionicons name="print-outline" size={16} color="#2563EB" />
+                  <Text className="text-xs font-bold text-gray-800 uppercase tracking-wider ml-1.5">
+                    Print Target
+                  </Text>
+                </View>
+                <Text className="text-[10px] text-blue-600 font-semibold">
+                  Auto-reflects on Thermal Printer
                 </Text>
               </View>
-            )}
-          </TouchableOpacity>
+
+              <View className="flex-row bg-gray-100 p-1 rounded-xl border border-gray-200">
+                {[
+                  { key: "both", label: "Both (Bill+KOT)", icon: "copy-outline" },
+                  { key: "customer", label: "Customer", icon: "receipt-outline" },
+                  { key: "cooker", label: "Cooker KOT", icon: "restaurant-outline" },
+                  { key: "none", label: "No Print", icon: "close-circle-outline" },
+                ].map((t) => (
+                  <TouchableOpacity
+                    key={t.key}
+                    onPress={() => setPrintTarget(t.key)}
+                    className={`flex-1 py-1.5 rounded-lg flex-row items-center justify-center ${printTarget === t.key
+                        ? "bg-white shadow-xs border border-blue-300"
+                        : "bg-transparent"
+                      }`}
+                  >
+                    <Ionicons
+                      name={t.icon}
+                      size={12}
+                      color={printTarget === t.key ? "#2563EB" : "#6B7280"}
+                    />
+                    <Text
+                      className={`text-[10px] font-bold ml-0.5 ${printTarget === t.key ? "text-blue-700" : "text-gray-600"
+                        }`}
+                    >
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Finalize Button */}
+            <TouchableOpacity
+              onPress={handleGenerateInvoice}
+              disabled={loading || cart.length === 0}
+              className={`w-full py-4 rounded-xl items-center shadow-md mb-8 ${cart.length > 0 ? "bg-emerald-600" : "bg-gray-300"
+                }`}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <View className="flex-row items-center">
+                  <Ionicons name="checkmark-done-circle" size={20} color="#FFFFFF" />
+                  <Text className="text-white font-bold text-base ml-2">
+                    {editingInvoice ? "Update & Save Invoice" : "Generate & Save Invoice"} (Rs. {grandTotal})
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       )}
@@ -1215,11 +1221,10 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                   <TouchableOpacity
                     key={t.key}
                     onPress={() => setPrintTarget(t.key)}
-                    className={`flex-1 py-1.5 rounded-lg flex-row items-center justify-center ${
-                      printTarget === t.key
+                    className={`flex-1 py-1.5 rounded-lg flex-row items-center justify-center ${printTarget === t.key
                         ? "bg-white shadow-xs border border-gray-200"
                         : "bg-transparent"
-                    }`}
+                      }`}
                   >
                     <Ionicons
                       name={t.icon}
@@ -1227,9 +1232,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                       color={printTarget === t.key ? "#2563EB" : "#6B7280"}
                     />
                     <Text
-                      className={`text-[10px] font-bold ml-0.5 ${
-                        printTarget === t.key ? "text-blue-700" : "text-gray-600"
-                      }`}
+                      className={`text-[10px] font-bold ml-0.5 ${printTarget === t.key ? "text-blue-700" : "text-gray-600"
+                        }`}
                     >
                       {t.label}
                     </Text>
@@ -1253,10 +1257,10 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                     {printTarget === "both"
                       ? "Print Both (2 Customer + 1 Cooker KOT)"
                       : printTarget === "customer"
-                      ? "Print Customer Copies Only"
-                      : printTarget === "cooker"
-                      ? "Print Cooker KOT Slip Only"
-                      : "Thermal Print (Tap to Print Both)"}
+                        ? "Print Customer Copies Only"
+                        : printTarget === "cooker"
+                          ? "Print Cooker KOT Slip Only"
+                          : "Thermal Print (Tap to Print Both)"}
                   </Text>
                 </>
               )}

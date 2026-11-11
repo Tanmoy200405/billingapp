@@ -22,6 +22,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../config/api";
 import { downloadReportFile } from "../utils/reportDownloader";
+import { getCachedData, setCachedData } from "../utils/localCache";
 
 function SafeProductImage({ uri }) {
   const [hasError, setHasError] = useState(false);
@@ -81,16 +82,30 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
 
   const loadCategories = useCallback(async () => {
     try {
+      const cached = await getCachedData("item_categories");
+      if (Array.isArray(cached) && cached.length > 0) {
+        setCategories(cached);
+      }
       const res = await api.items.getCategories();
       if (res && res.success && Array.isArray(res.categories) && res.categories.length > 0) {
         setCategories(res.categories);
+        setCachedData("item_categories", res.categories);
       }
     } catch {}
   }, []);
 
   const loadItems = useCallback(async () => {
+    const isUnfiltered = !search && !filterLowStock && (!selectedCategory || selectedCategory === "All");
     try {
-      setLoading(true);
+      let hasCached = false;
+      if (isUnfiltered) {
+        const cached = await getCachedData("items_all");
+        if (Array.isArray(cached) && cached.length > 0) {
+          setItems(cached);
+          hasCached = true;
+        }
+      }
+      if (!hasCached) setLoading(true);
       let queryParts = [];
       if (search) queryParts.push(`search=${encodeURIComponent(search)}`);
       if (filterLowStock) queryParts.push("lowStock=true");
@@ -100,12 +115,16 @@ export default function InventoryScreen({ onOpenDrawer, onBack }) {
       const query = queryParts.join("&");
       const res = await api.items.getAll(query);
       if (res && res.success && Array.isArray(res.items)) {
-        setItems(sortItemsNaturally(res.items));
-      } else {
+        const sorted = sortItemsNaturally(res.items);
+        setItems(sorted);
+        if (isUnfiltered) {
+          setCachedData("items_all", sorted);
+        }
+      } else if (!hasCached) {
         setItems([]);
       }
     } catch {
-      setItems([]);
+      if (!isUnfiltered) setItems([]);
     } finally {
       setLoading(false);
     }

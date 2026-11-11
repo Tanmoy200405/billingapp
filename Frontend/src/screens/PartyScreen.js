@@ -23,6 +23,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../config/api";
 import { downloadReportFile } from "../utils/reportDownloader";
+import { getCachedData, setCachedData } from "../utils/localCache";
 export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBack }) {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -102,7 +103,16 @@ export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBa
   };
 
   const loadParties = useCallback(async () => {
-    setLoading(true);
+    const isUnfiltered = !search && filterType !== "customer" && filterType !== "supplier";
+    let hasCached = false;
+    if (isUnfiltered) {
+      const cached = await getCachedData("parties_all");
+      if (Array.isArray(cached) && cached.length > 0) {
+        setParties(cached);
+        hasCached = true;
+      }
+    }
+    if (!hasCached) setLoading(true);
     let query = search ? `search=${encodeURIComponent(search)}` : "";
     if (filterType === "customer" || filterType === "supplier") {
       query += `${query ? "&" : ""}type=${filterType}`;
@@ -111,6 +121,9 @@ export default function PartyScreen({ user, onProfileUpdated, onOpenDrawer, onBa
     setLoading(false);
     if (res && res.success && res.parties) {
       setParties(res.parties);
+      if (isUnfiltered) {
+        setCachedData("parties_all", res.parties);
+      }
     }
   }, [search, filterType]);
   useEffect(() => {

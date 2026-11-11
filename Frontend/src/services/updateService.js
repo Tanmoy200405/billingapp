@@ -3,7 +3,7 @@ import * as Updates from "expo-updates";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiBaseUrl } from "../config/api";
 
-export const CURRENT_APP_VERSION = "1.0.8";
+export const CURRENT_APP_VERSION = "1.0.9";
 export const GITHUB_RELEASES_URL = "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
 
 /**
@@ -14,7 +14,7 @@ export async function markUpdateSeen(version) {
     if (version) {
       await AsyncStorage.setItem("seen_update_version", String(version));
     }
-  } catch {}
+  } catch { }
 }
 
 /**
@@ -86,7 +86,7 @@ export async function checkForAppUpdates(manual = false) {
               if (seen === data.latestVersion) {
                 return { hasUpdate: false, type: null };
               }
-            } catch {}
+            } catch { }
           }
 
           return {

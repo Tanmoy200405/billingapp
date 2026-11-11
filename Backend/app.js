@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import path from "path";
 import fs from "fs";
@@ -17,6 +18,8 @@ import dashboardRoutes from "./routes/dashboardRoutes.js";
 import whatsappRoutes from "./routes/whatsappRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import { initWhatsApp } from "./services/whatsappService.js";
+import { startQueueWorker } from "./services/jobQueueService.js";
+import { getAwsMessagingStatus } from "./services/awsMessagingService.js";
 
 connectDB().catch((err) =>
   console.warn("Initial DB connection attempt notice:", err.message)
@@ -26,6 +29,7 @@ if (!process.env.VERCEL) {
   initWhatsApp().catch((err) =>
     console.warn("WhatsApp initialization notice:", err.message)
   );
+  startQueueWorker();
 }
 
 const app = express();
@@ -38,6 +42,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(compression({ threshold: 512 }));
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 app.use(express.raw({ type: "application/pdf", limit: "100mb" }));
@@ -62,6 +67,7 @@ app.get("/api/health", (req, res) => {
       readyState: mongoose.connection.readyState,
       hasUri: Boolean(process.env.MONGODB_URI),
     },
+    awsMessaging: getAwsMessagingStatus(),
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
@@ -78,12 +84,12 @@ app.get("/api/app-version", (req, res) => {
   const defaultApkUrl = "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
   res.status(200).json({
     success: true,
-    latestVersion: process.env.APP_LATEST_VERSION || "1.0.8",
+    latestVersion: process.env.APP_LATEST_VERSION || "1.0.9",
     minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
     apkUrl: process.env.APP_APK_URL || defaultApkUrl,
     releaseNotes:
       process.env.APP_RELEASE_NOTES ||
-      "Version 1.0.8: Hosted on AWS EC2 (24/7 uptime, faster speed), GitHub direct APK updates, clean thermal bill format, and VIP setup fix.",
+      "Version 1.0.9: AWS SQS/SNS/SES messaging integration, instant zero-latency local cache & gzip compression, and async background bill delivery.",
     forceUpdate: false,
     timestamp: new Date().toISOString(),
   });

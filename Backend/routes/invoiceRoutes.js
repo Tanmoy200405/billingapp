@@ -7,6 +7,8 @@ import User from "../models/User.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { sendWhatsAppMessage, sendWhatsAppDocument, normalizeWhatsAppNumber } from "../services/whatsappService.js";
 import { generateInvoicePdfBuffer } from "../services/pdfService.js";
+import { enqueueJob } from "../services/jobQueueService.js";
+import { invalidateUserCache } from "../services/cacheService.js";
 const router = express.Router();
 router.get("/public/:id/pdf", async (req, res) => {
   try {
@@ -521,26 +523,19 @@ router.post("/", async (req, res) => {
       `👍 *Okay* ➔ ${okayUrl}\n` +
       `👎 *Needs Improvement* ➔ ${needsImpUrl}\n\n` +
       `_Thank you! Visit again._ ✨`;
-    let pdfBuffer = null;
-    try {
-      pdfBuffer = await generateInvoicePdfBuffer(invoice, business);
-    } catch (pdfErr) {
-      console.warn("PDF generation warning:", pdfErr.message);
-    }
-    let autoSent = false;
+    invalidateUserCache(req.user._id);
+
+    let whatsappQueued = false;
     if (req.body.autoSendWhatsApp && destinationPhone) {
-      autoSent = await sendAutomaticWhatsAppBill(
+      await enqueueJob("INVOICE_WHATSAPP_PDF", {
+        invoiceId: invoice._id.toString(),
+        userId: req.user._id.toString(),
         destinationPhone,
         whatsappText,
-        pdfBuffer,
-        invoiceNumber,
-        business.businessName || "My Store"
-      );
-      if (autoSent) {
-        invoice.whatsappSent = true;
-        await invoice.save();
-      }
+      });
+      whatsappQueued = true;
     }
+
     const whatsappUrl = destinationPhone
       ? `https://wa.me/${destinationPhone}?text=${encodeURIComponent(whatsappText)}`
       : "";
@@ -548,7 +543,8 @@ router.post("/", async (req, res) => {
       success: true,
       message: "Invoice created successfully",
       invoice,
-      whatsappSent: autoSent,
+      whatsappSent: false,
+      whatsappQueued,
       whatsappText,
       whatsappUrl,
       publicPdfUrl,
@@ -835,6 +831,8 @@ router.put("/:id", async (req, res) => {
       await customer.save().catch(() => {});
     }
 
+    invalidateUserCache(req.user._id);
+
     return res.status(200).json({
       success: true,
       message: `Invoice #${existing.invoiceNumber} updated successfully`,
@@ -888,6 +886,7 @@ router.delete("/:id", async (req, res) => {
     }
 
     await Invoice.deleteOne({ _id: invoice._id });
+    invalidateUserCache(req.user._id);
 
     return res.status(200).json({
       success: true,

@@ -3,6 +3,7 @@ import Invoice from "../models/Invoice.js";
 import Party from "../models/Party.js";
 import Item from "../models/Item.js";
 import { protect } from "../middleware/authMiddleware.js";
+import { getCache, setCache } from "../services/cacheService.js";
 
 const router = express.Router();
 
@@ -11,6 +12,9 @@ router.use(protect);
 router.get("/stats", async (req, res) => {
   try {
     const userId = req.user._id;
+    const cacheKey = `${userId}:dashboard:stats`;
+    const cached = getCache(cacheKey);
+    if (cached) return res.status(200).json(cached);
 
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -99,7 +103,7 @@ router.get("/stats", async (req, res) => {
       totalReceivable: 0,
     };
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       stats: {
         todaySalesTotal,
@@ -112,7 +116,9 @@ router.get("/stats", async (req, res) => {
         allTimeInvoicesCount,
       },
       recentTransactions,
-    });
+    };
+    setCache(cacheKey, payload, 15000);
+    return res.status(200).json(payload);
   } catch (error) {
     console.error("Dashboard stats error:", error.message);
     return res.status(500).json({

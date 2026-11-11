@@ -4,6 +4,8 @@ import Party from "../models/Party.js";
 import Invoice from "../models/Invoice.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { sendWhatsAppMessage, getWhatsAppStatus } from "../services/whatsappService.js";
+import { enqueueJob } from "../services/jobQueueService.js";
+import { getCache, setCache, invalidateUserCache } from "../services/cacheService.js";
 
 const require = createRequire(import.meta.url);
 const { PDFParse } = require("pdf-parse");
@@ -132,29 +134,17 @@ router.post("/broadcast-offer", async (req, res) => {
     const canServerSend = waStatus.status === "connected";
 
     if (autoSendViaServer && canServerSend) {
-      let sentCount = 0;
-      let failedCount = 0;
-      for (const rec of formattedResults) {
-        try {
-          const r = await sendWhatsAppMessage(rec.phone, rec.messageText);
-          if (r?.success) {
-            sentCount++;
-          } else {
-            failedCount++;
-          }
-        } catch (e) {
-          failedCount++;
-        }
-        // Polite delay between sends so WhatsApp does not disconnect socket
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-      }
+      await enqueueJob("BULK_WHATSAPP_BROADCAST", {
+        recipients: formattedResults,
+      });
       return res.status(200).json({
         success: true,
         mode: "server",
+        queued: true,
         total: formattedResults.length,
-        sentCount,
-        failedCount,
-        message: `Successfully sent ${sentCount} of ${formattedResults.length} messages directly via WhatsApp!`,
+        sentCount: formattedResults.length,
+        failedCount: 0,
+        message: `Queued ${formattedResults.length} WhatsApp broadcast messages for instant background delivery!`,
         recipients: formattedResults,
       });
     }
@@ -247,7 +237,7 @@ router.post("/send-bulk-vip-offer", async (req, res) => {
       try {
         const direct = await sendWhatsAppMessage(phone, message);
         if (direct.success) sentDirectly = true;
-      } catch {}
+      } catch { }
       results.push({ name: party.name, phone, whatsappUrl, message, sentDirectly });
     }
 
@@ -391,6 +381,7 @@ async function upsertPartiesBulk(userId, rawEntries) {
     await Party.bulkWrite(bulkOps.slice(i, i + CHUNK_SIZE), { ordered: false });
   }
 
+  invalidateUserCache(userId);
   return { addedCount, updatedCount, skippedCount };
 }
 
@@ -399,8 +390,8 @@ router.post("/bulk-import", async (req, res) => {
     const rawParties = Array.isArray(req.body.parties)
       ? req.body.parties
       : Array.isArray(req.body)
-      ? req.body
-      : [];
+        ? req.body
+        : [];
 
     if (!rawParties.length) {
       return res.status(400).json({ success: false, message: "No parties provided for import" });
@@ -437,8 +428,8 @@ function parsePartiesFromPdfText(text) {
     if (!str) return null;
     // Match optional +91/91/0 followed by 10 digits allowing spaces or dashes inside
     const match = str.match(/(?:\+?91[\s\-]?)?(?:0[\s\-]?)?([6-9](?:[\s\-]?\d){9})\b/) ||
-                  str.match(/(?:\+?91[\s\-]?)?(\d{5}[\s\-]?\d{5})\b/) ||
-                  str.match(/\b(\d{10})\b/);
+      str.match(/(?:\+?91[\s\-]?)?(\d{5}[\s\-]?\d{5})\b/) ||
+      str.match(/\b(\d{10})\b/);
     if (!match) return null;
     const digits = match[1].replace(/[^0-9]/g, "");
     if (digits.length === 10 && digits !== "0000000000") {
@@ -671,6 +662,7 @@ router.post("/upsert-by-phone", async (req, res) => {
       party.name = name.trim();
       await party.save();
     }
+    invalidateUserCache(req.user._id);
     return res.status(200).json({ success: true, party });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to upsert customer", error: error.message });
@@ -680,6 +672,14 @@ router.post("/upsert-by-phone", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const { type, isRegular, search } = req.query;
+    const isUnfiltered = !type && isRegular === undefined && !search;
+    const cacheKey = `${req.user._id}:parties:all`;
+
+    if (isUnfiltered) {
+      const cached = getCache(cacheKey);
+      if (cached) return res.status(200).json(cached);
+    }
+
     const filter = { userId: req.user._id };
 
     if (type) {
@@ -699,11 +699,17 @@ router.get("/", async (req, res) => {
       .sort({ isRegular: -1, visitCount: -1, lastVisitDate: -1, createdAt: -1 })
       .lean();
 
-    return res.status(200).json({
+    const responsePayload = {
       success: true,
       count: parties.length,
       parties,
-    });
+    };
+
+    if (isUnfiltered) {
+      setCache(cacheKey, responsePayload, 30000);
+    }
+
+    return res.status(200).json(responsePayload);
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -779,6 +785,7 @@ router.post("/", async (req, res) => {
       customDiscountPercent: Number(customDiscountPercent) || 0,
       assignedFreebie: assignedFreebie ? assignedFreebie.trim() : "",
     });
+    invalidateUserCache(req.user._id);
 
     return res.status(201).json({
       success: true,
@@ -840,6 +847,7 @@ router.put("/:id", async (req, res) => {
         message: "Party not found",
       });
     }
+    invalidateUserCache(req.user._id);
 
     return res.status(200).json({
       success: true,
@@ -879,6 +887,7 @@ router.put("/:id/regular-perks", async (req, res) => {
     if (loyaltyNotes !== undefined) party.loyaltyNotes = loyaltyNotes.trim();
 
     await party.save();
+    invalidateUserCache(req.user._id);
 
     return res.status(200).json({
       success: true,
@@ -941,6 +950,7 @@ router.delete("/:id", async (req, res) => {
         message: "Party not found",
       });
     }
+    invalidateUserCache(req.user._id);
 
     return res.status(200).json({
       success: true,

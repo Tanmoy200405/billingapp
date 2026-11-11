@@ -21,6 +21,7 @@ import {
 import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shareBackendPdf, printTestSlip } from "../utils/receiptPdfGenerator";
+import { getCachedData, setCachedData } from "../utils/localCache";
 export default function DashboardScreen({
   user,
   onOpenDrawer,
@@ -112,13 +113,23 @@ export default function DashboardScreen({
   };
 
   const fetchDashboardData = async () => {
-    setLoading(true);
+    const cached = await getCachedData("dashboard_stats");
+    if (cached) {
+      if (cached.stats) setStats(cached.stats);
+      if (cached.recentTransactions) setRecentTransactions(cached.recentTransactions);
+    } else {
+      setLoading(true);
+    }
     const res = await api.dashboard.getStats();
     setLoading(false);
     setRefreshing(false);
-    if (res.success) {
+    if (res && res.success) {
       setStats(res.stats);
       setRecentTransactions(res.recentTransactions || []);
+      setCachedData("dashboard_stats", {
+        stats: res.stats,
+        recentTransactions: res.recentTransactions || [],
+      });
     }
   };
   useEffect(() => {
@@ -128,7 +139,7 @@ export default function DashboardScreen({
         try {
           const parsed = JSON.parse(res);
           if (parsed.paperWidth) setPrinterPaperSize(parsed.paperWidth);
-        } catch {}
+        } catch { }
       }
     });
   }, []);
@@ -366,26 +377,24 @@ export default function DashboardScreen({
                 ) : null}
                 <View className="flex-row items-center gap-1.5 mt-2">
                   <View
-                    className={`px-2 py-0.5 rounded border ${
-                      tx.paymentMode === "CASH"
+                    className={`px-2 py-0.5 rounded border ${tx.paymentMode === "CASH"
                         ? "bg-emerald-50 border-emerald-300"
                         : tx.paymentMode === "UPI"
-                        ? "bg-purple-50 border-purple-300"
-                        : tx.paymentMode === "UPI/CASH"
-                        ? "bg-amber-50 border-amber-300"
-                        : "bg-blue-50 border-blue-300"
-                    }`}
+                          ? "bg-purple-50 border-purple-300"
+                          : tx.paymentMode === "UPI/CASH"
+                            ? "bg-amber-50 border-amber-300"
+                            : "bg-blue-50 border-blue-300"
+                      }`}
                   >
                     <Text
-                      className={`text-[10px] font-bold ${
-                        tx.paymentMode === "CASH"
+                      className={`text-[10px] font-bold ${tx.paymentMode === "CASH"
                           ? "text-emerald-700"
                           : tx.paymentMode === "UPI"
-                          ? "text-purple-700"
-                          : tx.paymentMode === "UPI/CASH"
-                          ? "text-amber-800"
-                          : "text-blue-700"
-                      }`}
+                            ? "text-purple-700"
+                            : tx.paymentMode === "UPI/CASH"
+                              ? "text-amber-800"
+                              : "text-blue-700"
+                        }`}
                     >
                       {tx.paymentMode}
                     </Text>

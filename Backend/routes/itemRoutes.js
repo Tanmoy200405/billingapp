@@ -3,6 +3,7 @@ import { createRequire } from "module";
 import Item from "../models/Item.js";
 import Category from "../models/Category.js";
 import { protect } from "../middleware/authMiddleware.js";
+import { getCache, setCache, invalidateUserCache } from "../services/cacheService.js";
 
 const require = createRequire(import.meta.url);
 const { PDFParse } = require("pdf-parse");
@@ -14,6 +15,14 @@ router.use(protect);
 router.get("/", async (req, res) => {
   try {
     const { search, category, lowStock } = req.query;
+    const isUnfiltered = !search && (!category || category === "All") && lowStock !== "true";
+    const cacheKey = `${req.user._id}:items:all`;
+
+    if (isUnfiltered) {
+      const cached = getCache(cacheKey);
+      if (cached) return res.status(200).json(cached);
+    }
+
     const filter = { userId: req.user._id };
 
     if (category && category !== "All") {
@@ -45,11 +54,17 @@ router.get("/", async (req, res) => {
       })
     );
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       count: items.length,
       items,
-    });
+    };
+
+    if (isUnfiltered) {
+      setCache(cacheKey, payload, 30000);
+    }
+
+    return res.status(200).json(payload);
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -61,11 +76,15 @@ router.get("/", async (req, res) => {
 
 router.get("/categories", async (req, res) => {
   try {
+    const cacheKey = `${req.user._id}:items:categories`;
+    const cached = getCache(cacheKey);
+    if (cached) return res.status(200).json(cached);
+
     const itemCategories = await Item.distinct("category", { userId: req.user._id });
     let savedCategories = [];
     try {
       savedCategories = (await Category.find({ userId: req.user._id }).lean()).map((c) => c.name);
-    } catch {}
+    } catch { }
 
     const combined = Array.from(new Set([...savedCategories, ...itemCategories].filter(Boolean)));
     if (!combined.length) {
@@ -79,10 +98,12 @@ router.get("/categories", async (req, res) => {
       })
     );
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       categories: combined,
-    });
+    };
+    setCache(cacheKey, payload, 30000);
+    return res.status(200).json(payload);
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -116,6 +137,7 @@ router.post("/categories", async (req, res) => {
       userId: req.user._id,
       name,
     });
+    invalidateUserCache(req.user._id, "items");
 
     return res.status(201).json({
       success: true,
@@ -252,6 +274,7 @@ async function upsertItemsBulk(userId, rawEntries) {
     await Item.bulkWrite(bulkOps.slice(i, i + CHUNK_SIZE), { ordered: false });
   }
 
+  invalidateUserCache(userId);
   return { addedCount, updatedCount, skippedCount };
 }
 
@@ -260,8 +283,8 @@ router.post("/bulk-import", async (req, res) => {
     const rawItems = Array.isArray(req.body.items)
       ? req.body.items
       : Array.isArray(req.body)
-      ? req.body
-      : [];
+        ? req.body
+        : [];
 
     if (!rawItems.length) {
       return res.status(400).json({ success: false, message: "No items provided for import" });
@@ -460,6 +483,7 @@ router.post("/", async (req, res) => {
       lowStockThreshold: Number(lowStockThreshold) || 5,
       imageUrl,
     });
+    invalidateUserCache(req.user._id);
 
     return res.status(201).json({
       success: true,
@@ -517,6 +541,7 @@ router.put("/:id", async (req, res) => {
         message: "Item not found",
       });
     }
+    invalidateUserCache(req.user._id);
 
     return res.status(200).json({
       success: true,
@@ -545,6 +570,7 @@ router.delete("/:id", async (req, res) => {
         message: "Item not found",
       });
     }
+    invalidateUserCache(req.user._id);
 
     return res.status(200).json({
       success: true,

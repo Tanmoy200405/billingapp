@@ -5,6 +5,12 @@ import User from "../models/User.js";
 import Otp from "../models/Otp.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { sendWhatsAppMessage } from "../services/whatsappService.js";
+import { enqueueJob } from "../services/jobQueueService.js";
+import {
+  isSnsSmsEnabled,
+  isSesConfigured,
+  sendEmailViaSes,
+} from "../services/awsMessagingService.js";
 const router = express.Router();
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
@@ -46,6 +52,8 @@ router.post("/send-otp", async (req, res) => {
       expiresAt,
     });
     let sentViaWhatsApp = false;
+    let sentViaSms = false;
+    let sentViaEmail = false;
     try {
       const fullNumber = `91${cleanPhone}`;
       const waMsg = `*Billing App Verification Code*\n\nYour 6-digit login OTP is: *${code}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
@@ -54,14 +62,33 @@ router.post("/send-otp", async (req, res) => {
         sentViaWhatsApp = true;
       }
     } catch {}
+    if ((!sentViaWhatsApp || channel === "sms") && isSnsSmsEnabled()) {
+      await enqueueJob("SEND_SMS", {
+        phone: cleanPhone,
+        message: `Your Billing App login OTP is ${code}. Valid for 10 minutes. Do not share.`,
+      });
+      sentViaSms = true;
+    }
+    if (channel === "email" && req.body.email && isSesConfigured()) {
+      const emailRes = await sendEmailViaSes({
+        to: req.body.email,
+        subject: "Billing App Login OTP",
+        text: `Your 6-digit login OTP is: ${code}. Valid for 10 minutes.`,
+      }).catch(() => null);
+      if (emailRes?.sent) sentViaEmail = true;
+    }
     return res.status(200).json({
       success: true,
       message: sentViaWhatsApp
         ? `OTP code sent to your WhatsApp (+91 ${cleanPhone})`
+        : sentViaSms
+        ? `OTP code sent via SMS (+91 ${cleanPhone})`
         : `Verification code generated for +91 ${cleanPhone}`,
       code,
       phone: cleanPhone,
       sentViaWhatsApp,
+      sentViaSms,
+      sentViaEmail,
     });
   } catch (error) {
     return res.status(500).json({
