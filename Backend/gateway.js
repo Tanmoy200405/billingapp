@@ -112,12 +112,12 @@ const server = http.createServer(async (req, res) => {
       "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
     return sendJson(res, 200, {
       success: true,
-      latestVersion: process.env.APP_LATEST_VERSION || "1.0.9",
+      latestVersion: process.env.APP_LATEST_VERSION || "1.1.0",
       minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
       apkUrl: process.env.APP_APK_URL || defaultApkUrl,
       releaseNotes:
         process.env.APP_RELEASE_NOTES ||
-        "Version 1.0.9: Microservices API gateway, AWS SQS/SNS/SES messaging, multi-user WhatsApp linking, and instant responsive Web/Tablet UI.",
+        "Version 1.1.0: WhatsApp-only quick register, Forgot Password & secure OTP Email Reset, offline billing queue sync, Gmail SMTP/SES email, and <20 MB APK.",
       forceUpdate: false,
       timestamp: new Date().toISOString(),
     });
