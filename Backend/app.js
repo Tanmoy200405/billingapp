@@ -68,33 +68,22 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/download-apk", (req, res) => {
-  const candidates = [
-    path.resolve(process.cwd(), "../Frontend/BillingApp-release.apk"),
-    path.resolve(process.cwd(), "../Frontend/android/app/build/outputs/apk/release/app-release.apk"),
-    path.resolve(process.cwd(), "BillingApp-release.apk"),
-  ];
-  const target = candidates.find((p) => fs.existsSync(p));
-  if (target) {
-    res.setHeader("Content-Disposition", "attachment; filename=BillingApp-release.apk");
-    res.setHeader("Content-Type", "application/vnd.android.package-archive");
-    return res.sendFile(target);
-  }
-  return res.status(404).json({ success: false, message: "APK not found on server." });
+  const githubApkUrl =
+    process.env.APP_APK_URL ||
+    "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
+  return res.redirect(302, githubApkUrl);
 });
 
 app.get("/api/app-version", (req, res) => {
-  const host = req.get("host") || "localhost:5000";
-  const protocol = req.protocol || "http";
-  const defaultApkUrl = "https://billingapp-backend-hcan.onrender.com/api/download-apk";
-  const fallbackApkUrl = `${protocol}://${host}/api/download-apk`;
+  const defaultApkUrl = "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
   res.status(200).json({
     success: true,
-    latestVersion: process.env.APP_LATEST_VERSION || "1.0.7",
+    latestVersion: process.env.APP_LATEST_VERSION || "1.0.8",
     minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
-    apkUrl: process.env.APP_APK_URL || defaultApkUrl || fallbackApkUrl,
+    apkUrl: process.env.APP_APK_URL || defaultApkUrl,
     releaseNotes:
       process.env.APP_RELEASE_NOTES ||
-      "Version 1.0.7: Clean commercial thermal bill format (no barcode), end-to-end VIP setup sync fix, and UI polish across screens.",
+      "Version 1.0.8: Hosted on AWS EC2 (24/7 uptime, faster speed), GitHub direct APK updates, clean thermal bill format, and VIP setup fix.",
     forceUpdate: false,
     timestamp: new Date().toISOString(),
   });

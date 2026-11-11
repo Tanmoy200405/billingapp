@@ -3,8 +3,8 @@ import * as Updates from "expo-updates";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiBaseUrl } from "../config/api";
 
-export const CURRENT_APP_VERSION = "1.0.7";
-export const GITHUB_RELEASES_URL = "https://billingapp-backend-hcan.onrender.com/api/download-apk";
+export const CURRENT_APP_VERSION = "1.0.8";
+export const GITHUB_RELEASES_URL = "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
 
 /**
  * Mark a version as seen so repeat background notification popups are suppressed

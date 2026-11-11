@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const TOKEN_KEY = "billing_auth_token";
 const USER_KEY = "billing_user_data";
 let authToken = null;
-export const RENDER_API_URL = "https://billingapp-backend-hcan.onrender.com/api";
+export const RENDER_API_URL = "https://billingapi.duckdns.org/api";
 export const VERCEL_API_URL = RENDER_API_URL; // kept for compatibility
 export const CLOUDFLARE_API_URL = RENDER_API_URL;
 export const DEFAULT_API_URL = RENDER_API_URL;

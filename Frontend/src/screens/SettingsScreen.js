@@ -24,6 +24,7 @@ import {
   applyOtaUpdate,
   openApkDownload,
   CURRENT_APP_VERSION,
+  GITHUB_RELEASES_URL,
 } from "../services/updateService";
 import { printTestSlip, INVOICE_STYLES } from "../utils/receiptPdfGenerator";
 export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, onProfileUpdated, initialTab = "profile" }) {
@@ -358,15 +359,15 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
           );
         } else {
           Alert.alert(
-            `New Version ${update.version || "1.0.1"} Available!`,
-            `${update.notes || "A new update is ready for download."}\n\nDirect Download Link:\n${update.apkUrl || "https://billingapp-backend-hcan.onrender.com/api/download-apk"}`,
+            `New Version ${update.version || CURRENT_APP_VERSION} Available!`,
+            `${update.notes || "A new update is ready for download."}\n\nDirect Download Link:\n${update.apkUrl || GITHUB_RELEASES_URL}`,
             [
               { text: "Cancel", style: "cancel" },
               {
                 text: "Download APK",
                 onPress: () =>
                   openApkDownload(
-                    update.apkUrl || "https://billingapp-backend-hcan.onrender.com/api/download-apk"
+                    update.apkUrl || GITHUB_RELEASES_URL
                   ),
               },
             ]
@@ -641,14 +642,14 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 ) : (
                   <>
                     <Ionicons name="cloud-download-outline" size={18} color="#2563EB" />
-                    <Text className="text-blue-600 font-bold text-xs ml-1.5">Check for App Updates (v1.0.1)</Text>
+                    <Text className="text-blue-600 font-bold text-xs ml-1.5">Check for App Updates (v{CURRENT_APP_VERSION})</Text>
                   </>
                 )}
               </TouchableOpacity>
 
               <View className="p-3 bg-blue-50/60 rounded-xl border border-blue-100">
                 <View className="flex-row items-center justify-between mb-1">
-                  <Text className="text-xs font-bold text-gray-800">Latest Release: v1.0.1</Text>
+                  <Text className="text-xs font-bold text-gray-800">Latest Release: v{CURRENT_APP_VERSION}</Text>
                   <View className="bg-emerald-100 px-2 py-0.5 rounded-full">
                     <Text className="text-[10px] font-extrabold text-emerald-800">APK Available</Text>
                   </View>
@@ -658,19 +659,19 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 </Text>
                 <TouchableOpacity
                   onPress={() =>
-                    openApkDownload("https://billingapp-backend-hcan.onrender.com/api/download-apk")
+                    openApkDownload(GITHUB_RELEASES_URL)
                   }
                   className="bg-blue-600 py-2 px-3 rounded-lg flex-row items-center justify-center shadow-sm"
                 >
                   <Ionicons name="download-outline" size={15} color="#FFFFFF" />
-                  <Text className="text-white text-xs font-bold ml-1.5">Download v1.0.1 APK</Text>
+                  <Text className="text-white text-xs font-bold ml-1.5">Download v{CURRENT_APP_VERSION} APK</Text>
                 </TouchableOpacity>
                 <Text
                   numberOfLines={1}
                   className="text-[10px] text-gray-400 mt-1.5 text-center"
                   selectable
                 >
-                  https://billingapp-backend-hcan.onrender.com/api/download-apk
+                  {GITHUB_RELEASES_URL}
                 </Text>
               </View>
             </View>

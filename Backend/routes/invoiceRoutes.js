@@ -473,7 +473,7 @@ router.post("/", async (req, res) => {
       await customer.save();
     }
     const business = req.user;
-    const backendBase = process.env.BACKEND_PUBLIC_URL || "https://billingapp-backend-hcan.onrender.com";
+    const backendBase = process.env.BACKEND_PUBLIC_URL || "https://billingapi.duckdns.org";
     const publicPdfUrl = `${backendBase}/api/invoices/public/${invoice._id}/pdf`;
     const itemsSummary = processedItems
       .map((it, idx) => `• ${it.name} x ${it.quantity} = Rs.${it.total}`)
@@ -578,7 +578,7 @@ router.post("/:id/send-whatsapp", async (req, res) => {
       });
     }
     const business = req.user;
-    const backendBase = process.env.BACKEND_PUBLIC_URL || "https://billingapp-backend-hcan.onrender.com";
+    const backendBase = process.env.BACKEND_PUBLIC_URL || "https://billingapi.duckdns.org";
     const publicPdfUrl = `${backendBase}/api/invoices/public/${invoice._id}/pdf`;
     const itemsSummary = (invoice.items || [])
       .map((it) => `• ${it.name} x ${it.quantity} = Rs.${it.total}`)

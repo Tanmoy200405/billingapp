@@ -115,7 +115,7 @@ function stopKeepAlive() {
 function startServerSelfPing() {
   if (selfPingStarted) return;
   selfPingStarted = true;
-  const backendUrl = process.env.BACKEND_PUBLIC_URL || "https://billingapp-backend-hcan.onrender.com";
+  const backendUrl = process.env.BACKEND_PUBLIC_URL || "https://billingapi.duckdns.org";
   setInterval(async () => {
     try {
       await fetch(`${backendUrl}/api/whatsapp/status`);
