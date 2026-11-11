@@ -23,6 +23,16 @@ import * as FileSystem from "expo-file-system/legacy";
 import { api } from "../config/api";
 import { downloadReportFile } from "../utils/reportDownloader";
 import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
+import {
+  subscribeOfflineItemOps,
+  applyOfflineItemOpsToList,
+  queueOfflineItemCreate,
+  queueOfflineItemUpdate,
+  queueOfflineItemDelete,
+  queueOfflineCategoryAdd,
+  syncAllOfflineData,
+  isNetworkErrorMessage,
+} from "../utils/offlineQueue";
 import { useResponsive, ResponsiveContainer } from "../utils/responsive";
 
 function SafeProductImage({ uri }) {
@@ -60,6 +70,23 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
+  const [pendingItemOps, setPendingItemOps] = useState([]);
+  const [syncingOfflineItems, setSyncingOfflineItems] = useState(false);
+
+  const showNotice = (title, msg) => {
+    if (Platform.OS === "web") {
+      window.alert(`${title}: ${msg}`);
+    } else {
+      Alert.alert(title, msg);
+    }
+  };
+
+  useEffect(() => {
+    const unsub = subscribeOfflineItemOps((ops) => {
+      setPendingItemOps(Array.isArray(ops) ? ops : []);
+    });
+    return unsub;
+  }, []);
 
   const [formName, setFormName] = useState("");
   const [formCategory, setFormCategory] = useState("General");
@@ -96,18 +123,36 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
     } catch {}
   }, []);
 
+  const filterItemsLocally = (list) => {
+    let filtered = Array.isArray(list) ? list : [];
+    if (selectedCategory && selectedCategory !== "All") {
+      filtered = filtered.filter((it) => (it.category || "General") === selectedCategory);
+    }
+    if (filterLowStock) {
+      filtered = filtered.filter((it) => Number(it.stock ?? 0) <= Number(it.lowStockAlert ?? 5));
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (it) =>
+          String(it.name || "").toLowerCase().includes(q) ||
+          String(it.barcode || "").toLowerCase().includes(q)
+      );
+    }
+    return sortItemsNaturally(filtered);
+  };
+
   const loadItems = useCallback(async () => {
     const isUnfiltered = !search && !filterLowStock && (!selectedCategory || selectedCategory === "All");
     try {
-      let hasCached = false;
-      if (isUnfiltered) {
-        const cached = await getCachedData("items_all");
-        if (Array.isArray(cached) && cached.length > 0) {
-          setItems(cached);
-          hasCached = true;
-        }
+      const cached = await getCachedData("items_all");
+      const hasCached = Array.isArray(cached) && cached.length > 0;
+      if (hasCached) {
+        setItems(isUnfiltered ? cached : filterItemsLocally(cached));
+      } else {
+        setLoading(true);
       }
-      if (!hasCached) setLoading(true);
+
       let queryParts = [];
       if (search) queryParts.push(`search=${encodeURIComponent(search)}`);
       if (filterLowStock) queryParts.push("lowStock=true");
@@ -117,7 +162,8 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
       const query = queryParts.join("&");
       const res = await api.items.getAll(query);
       if (res && res.success && Array.isArray(res.items)) {
-        const sorted = sortItemsNaturally(res.items);
+        const merged = isUnfiltered ? await applyOfflineItemOpsToList(res.items) : res.items;
+        const sorted = sortItemsNaturally(merged);
         setItems(sorted);
         if (isUnfiltered) {
           setCachedData("items_all", sorted);
@@ -126,11 +172,30 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
         setItems([]);
       }
     } catch {
-      if (!isUnfiltered) setItems([]);
+      const cached = await getCachedData("items_all");
+      if (Array.isArray(cached)) {
+        setItems(isUnfiltered ? cached : filterItemsLocally(cached));
+      } else if (!isUnfiltered) {
+        setItems([]);
+      }
     } finally {
       setLoading(false);
     }
   }, [search, filterLowStock, selectedCategory]);
+
+  const handleSyncOfflineItemsNow = async () => {
+    if (syncingOfflineItems) return;
+    setSyncingOfflineItems(true);
+    try {
+      const result = await syncAllOfflineData(api);
+      if (result.itemsSynced > 0) {
+        await loadCategories();
+        await loadItems();
+      }
+    } finally {
+      setSyncingOfflineItems(false);
+    }
+  };
 
   useEffect(() => {
     if (isActive) {
@@ -268,27 +333,32 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
     Keyboard.dismiss();
     const cat = newCategoryName.trim();
     if (!cat) {
-      Alert.alert("Required", "Please enter a category name");
+      showNotice("Required", "Please enter a category name");
       return;
     }
     setSavingCategory(true);
     try {
-      const res = await api.items.addCategory(cat);
+      let res = await api.items.addCategory(cat).catch((err) => ({ success: false, message: err.message }));
+      if (!res || (!res.success && isNetworkErrorMessage(res.message))) {
+        res = await queueOfflineCategoryAdd(cat);
+      }
       if (res && res.success) {
         setNewCategoryName("");
         setCategoryModalVisible(false);
         await loadCategories();
         setSelectedCategory(cat);
         setFormCategory(cat);
-        Alert.alert(
-          "Category Ready!",
-          `Category "${cat}" has been added. You can now add food to "${cat}".`
+        showNotice(
+          res.offlineQueued ? "Saved Offline" : "Category Ready!",
+          res.offlineQueued
+            ? `Category "${cat}" added offline & will sync when online.`
+            : `Category "${cat}" has been added. You can now add food to "${cat}".`
         );
       } else {
-        Alert.alert("Notice", res?.message || "Failed to add category");
+        showNotice("Notice", res?.message || "Failed to add category");
       }
     } catch (e) {
-      Alert.alert("Error", e.message || "Failed to add category");
+      showNotice("Error", e.message || "Failed to add category");
     } finally {
       setSavingCategory(false);
     }
@@ -321,8 +391,41 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
     setModalVisible(true);
   };
 
+  const executeDeleteItem = async (item) => {
+    try {
+      const isLocalOnly = String(item._id).startsWith("offline_item_");
+      let res = isLocalOnly
+        ? await queueOfflineItemDelete(item._id)
+        : await api.items.delete(item._id).catch((err) => ({ success: false, message: err.message }));
+
+      if (!res || (!res.success && isNetworkErrorMessage(res.message))) {
+        res = await queueOfflineItemDelete(item._id);
+      }
+
+      if (res && res.success) {
+        loadItems();
+        showNotice(
+          res.offlineQueued ? "Deleted Offline" : "Deleted",
+          res.offlineQueued
+            ? `"${item.name}" removed locally & will delete on server when online.`
+            : `"${item.name}" has been removed from inventory.`
+        );
+      } else {
+        showNotice("Error", res?.message || "Failed to delete item");
+      }
+    } catch (e) {
+      showNotice("Error", e.message || "Failed to delete item");
+    }
+  };
+
   const handleDeleteItem = async (item) => {
     if (!item || !item._id) return;
+    if (Platform.OS === "web") {
+      if (window.confirm(`Are you sure you want to delete "${item.name}"? This cannot be undone.`)) {
+        executeDeleteItem(item);
+      }
+      return;
+    }
     Alert.alert(
       "Delete Item",
       `Are you sure you want to delete "${item.name}"? This cannot be undone.`,
@@ -331,19 +434,7 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
         {
           text: "Delete",
           style: "destructive",
-          onPress: async () => {
-            try {
-              const res = await api.items.delete(item._id);
-              if (res && res.success) {
-                loadItems();
-                Alert.alert("Deleted", `"${item.name}" has been removed from inventory.`);
-              } else {
-                Alert.alert("Error", res?.message || "Failed to delete item");
-              }
-            } catch (e) {
-              Alert.alert("Error", e.message || "Failed to delete item");
-            }
-          },
+          onPress: () => executeDeleteItem(item),
         },
       ]
     );
@@ -352,7 +443,7 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
   const handleSaveItem = async () => {
     Keyboard.dismiss();
     if (!formName.trim() || !formSellingPrice.trim()) {
-      Alert.alert("Required Fields", "Please enter Item Name and Selling Price");
+      showNotice("Required Fields", "Please enter Item Name and Selling Price");
       return;
     }
 
@@ -370,22 +461,46 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
     };
 
     let res;
-    if (editingItem) {
-      res = await api.items.update(editingItem._id, payload);
-    } else {
-      res = await api.items.create(payload);
+    try {
+      if (editingItem) {
+        const isLocalOnly = String(editingItem._id).startsWith("offline_item_");
+        res = isLocalOnly
+          ? await queueOfflineItemUpdate(editingItem._id, payload)
+          : await api.items.update(editingItem._id, payload).catch((err) => ({ success: false, message: err.message }));
+        if (!res || (!res.success && isNetworkErrorMessage(res.message))) {
+          res = await queueOfflineItemUpdate(editingItem._id, payload);
+        }
+      } else {
+        res = await api.items.create(payload).catch((err) => ({ success: false, message: err.message }));
+        if (!res || (!res.success && isNetworkErrorMessage(res.message))) {
+          res = await queueOfflineItemCreate(payload);
+        }
+      }
+    } catch (err) {
+      res = editingItem
+        ? await queueOfflineItemUpdate(editingItem._id, payload)
+        : await queueOfflineItemCreate(payload);
     }
 
     if (res && res.success) {
       setModalVisible(false);
       resetForm();
       loadItems();
-      Alert.alert(
-        "Success",
-        editingItem ? "Item updated successfully" : "Item added to inventory"
-      );
+      if (res.offlineQueued) {
+        showNotice(
+          "Saved Offline",
+          editingItem
+            ? `"${payload.name}" updated locally & will sync when online!`
+            : `"${payload.name}" added offline — ready to bill now & will sync when online!`
+        );
+      } else {
+        showNotice(
+          "Success",
+          editingItem ? "Item updated successfully" : "Item added to inventory"
+        );
+      }
     } else {
-      Alert.alert("Error", res?.message || "Failed to save item");
+      showNotice("Error", res?.message || "Failed to save item");
     }
   };
 
@@ -593,6 +708,30 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
         </ResponsiveContainer>
       </View>
 
+      {pendingItemOps.length > 0 ? (
+        <View className="bg-amber-50 border-b border-amber-200 px-4 py-2.5">
+          <ResponsiveContainer maxWidth={1200} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View className="flex-row items-center flex-1 pr-2">
+              <Ionicons name="cloud-offline-outline" size={16} color="#B45309" />
+              <Text className="text-xs font-bold text-amber-900 ml-2">
+                {pendingItemOps.length} Offline Menu Change{pendingItemOps.length > 1 ? "s" : ""} Pending Sync
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleSyncOfflineItemsNow}
+              disabled={syncingOfflineItems}
+              className="bg-amber-600 px-3 py-1 rounded-lg flex-row items-center"
+            >
+              {syncingOfflineItems ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text className="text-white text-[11px] font-bold">Sync Now</Text>
+              )}
+            </TouchableOpacity>
+          </ResponsiveContainer>
+        </View>
+      ) : null}
+
       {loading && items.length === 0 ? (
         <View className="flex-1 items-center justify-center py-20">
           <ActivityIndicator size="large" color="#2563EB" />
@@ -644,9 +783,16 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
                 <View className="flex-row items-center flex-1 pr-2">
                   <SafeProductImage uri={item.imageUrl} />
                   <View className="flex-1">
-                    <Text className="text-base font-extrabold text-gray-900">
-                      {item.name || "Untitled Item"}
-                    </Text>
+                    <View className="flex-row items-center flex-wrap gap-1.5">
+                      <Text className="text-base font-extrabold text-gray-900">
+                        {item.name || "Untitled Item"}
+                      </Text>
+                      {item.isOfflinePending ? (
+                        <View className="bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
+                          <Text className="text-[9px] font-extrabold text-amber-800 uppercase">Offline</Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <View className="flex-row items-center gap-2 mt-0.5">
                       <Text className="text-xs text-gray-500 font-medium">
                         {item.category || "General"}

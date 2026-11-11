@@ -7,7 +7,7 @@ import "./global.css";
 import { api, setAuthToken, getStoredSession, getAuthToken, clearAuthToken, prefetchCoreData } from "./src/config/api";
 import { THEME } from "./src/config/theme";
 import { useResponsive } from "./src/utils/responsive";
-import { syncOfflineInvoices, getPendingOfflineInvoices } from "./src/utils/offlineQueue";
+import { syncAllOfflineData } from "./src/utils/offlineQueue";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
@@ -84,14 +84,10 @@ export default function App() {
 
     const trySyncOfflineQueue = async () => {
       try {
-        const pending = await getPendingOfflineInvoices();
-        if (pending.length > 0 && getAuthToken()) {
-          await syncOfflineInvoices(
-            (payload) => api.invoices.create(payload),
-            () => {
-              prefetchCoreData().catch(() => {});
-            }
-          );
+        if (getAuthToken()) {
+          await syncAllOfflineData(api, () => {
+            prefetchCoreData().catch(() => {});
+          });
         }
       } catch {}
     };

@@ -20,7 +20,7 @@ import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shareBillAsPdf, shareBackendPdf, printBill } from "../utils/receiptPdfGenerator";
 import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
-import { queueOfflineInvoice, isNetworkErrorMessage } from "../utils/offlineQueue";
+import { queueOfflineInvoice, isNetworkErrorMessage, applyOfflineItemOpsToList } from "../utils/offlineQueue";
 import { useResponsive } from "../utils/responsive";
 
 export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInvoice }) {
@@ -155,7 +155,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       setCachedData("parties_customers", pRes.parties || []);
     }
     if (iRes && iRes.success && Array.isArray(iRes.items)) {
-      const sorted = [...iRes.items].sort((a, b) =>
+      const mergedItems = await applyOfflineItemOpsToList(iRes.items);
+      const sorted = [...mergedItems].sort((a, b) =>
         String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
           numeric: true,
           sensitivity: "base",

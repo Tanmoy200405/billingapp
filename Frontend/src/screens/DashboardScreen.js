@@ -22,7 +22,7 @@ import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shareBackendPdf, printTestSlip } from "../utils/receiptPdfGenerator";
 import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
-import { subscribeOfflineQueue, syncOfflineInvoices } from "../utils/offlineQueue";
+import { subscribeOfflineQueue, syncAllOfflineData } from "../utils/offlineQueue";
 import { useResponsive, ResponsiveContainer } from "../utils/responsive";
 
 export default function DashboardScreen({
@@ -58,8 +58,8 @@ export default function DashboardScreen({
     if (syncingOffline) return;
     setSyncingOffline(true);
     try {
-      const result = await syncOfflineInvoices((payload) => api.invoices.create(payload));
-      if (result.synced > 0) {
+      const result = await syncAllOfflineData(api);
+      if (result.itemsSynced > 0 || result.invoicesSynced > 0) {
         await fetchDashboardData();
       }
     } finally {
