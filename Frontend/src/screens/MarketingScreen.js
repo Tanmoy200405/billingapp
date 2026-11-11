@@ -21,23 +21,24 @@ import { shareCataloguePdf, CATALOGUE_STYLES } from "../utils/cataloguePdfGenera
 import { showToast } from "../utils/toast";
 import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
 import { useResponsive, ResponsiveContainer } from "../utils/responsive";
+import { THEME } from "../config/theme";
 
-// ─── 3-Colour Palette ────────────────────────────────────────────────
+// ─── Unified Theme Palette ───────────────────────────────────────────
 const C = {
-  navy: "#1E3A8A",      // Primary Theme
-  navyDark: "#172554",  // Deep Navy for headers
-  navyLight: "#EFF6FF", // Soft Navy tint for chips/cards
-  emerald: "#059669",   // Action / WhatsApp / Success
-  emeraldLight: "#ECFDF5", // Soft emerald tint
-  white: "#FFFFFF",     // Clean card & background
-  slate50: "#F8FAFC",   // Clean surface
-  slate100: "#F1F5F9",  // Subtle divider
-  slate200: "#E2E8F0",  // Crisp border
-  slate400: "#94A3B8",  // Subtle icons
-  slate600: "#475569",  // Secondary text
-  slate900: "#0F172A",  // Deep readable text
-  amber: "#D97706",     // VIP gold accent
-  amberLight: "#FEF3C7",
+  navy: THEME.primary,          // Primary Brand Blue (#2563EB)
+  navyDark: THEME.primary,      // Unified Header Blue (#2563EB)
+  navyLight: THEME.primaryLight,// Soft Blue tint (#EFF6FF)
+  emerald: THEME.success,       // Action / WhatsApp / Success (#059669)
+  emeraldLight: THEME.successLight,
+  white: THEME.card,
+  slate50: THEME.surface,
+  slate100: THEME.surfaceMuted,
+  slate200: THEME.border,
+  slate400: "#94A3B8",
+  slate600: THEME.textSecondary,
+  slate900: THEME.textPrimary,
+  amber: THEME.warning,
+  amberLight: THEME.warningLight,
 };
 
 const MARKETING_TEMPLATES = [
@@ -112,14 +113,14 @@ export default function MarketingScreen({ user, isActive = true, onOpenDrawer, o
         setCatalogues(res.items);
         setCachedData("items_all", res.items);
       }
-    } catch {} finally {
+    } catch { } finally {
       setLoadingItems(false);
     }
   };
 
   const handlePullRefresh = async () => {
     setRefreshing(true);
-    await loadMenuItems().catch(() => {});
+    await loadMenuItems().catch(() => { });
     setRefreshing(false);
   };
 
@@ -250,23 +251,23 @@ export default function MarketingScreen({ user, isActive = true, onOpenDrawer, o
       {/* ── Header (Deep Navy) ── */}
       <View style={[styles.header, { paddingTop: headerTopPadding }]}>
         <ResponsiveContainer maxWidth={1120}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {!isWide && (
-            <TouchableOpacity onPress={onOpenDrawer} style={{ padding: 6, marginRight: 8 }}>
-              <Ionicons name="menu" size={24} color={C.white} />
-            </TouchableOpacity>
-          )}
-          {onBack && !isWide && (
-            <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={14} color={C.white} />
-              <Text style={{ color: C.white, fontSize: 12, fontWeight: "700", marginLeft: 4 }}>Back</Text>
-            </TouchableOpacity>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Marketing & Growth</Text>
-            <Text style={styles.headerSubtitle}>Broadcasts · Catalogues · VIP Retention</Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {!isWide && (
+              <TouchableOpacity onPress={onOpenDrawer} style={{ padding: 6, marginRight: 8 }}>
+                <Ionicons name="menu" size={24} color={C.white} />
+              </TouchableOpacity>
+            )}
+            {onBack && !isWide && (
+              <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={14} color={C.white} />
+                <Text style={{ color: C.white, fontSize: 12, fontWeight: "700", marginLeft: 4 }}>Back</Text>
+              </TouchableOpacity>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle}>Marketing & Growth</Text>
+              <Text style={styles.headerSubtitle}>Broadcasts · Catalogues · VIP Retention</Text>
+            </View>
           </View>
-        </View>
         </ResponsiveContainer>
       </View>
 
@@ -282,203 +283,203 @@ export default function MarketingScreen({ user, isActive = true, onOpenDrawer, o
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handlePullRefresh} tintColor={C.navy} colors={[C.navy]} />}
         >
-        <ResponsiveContainer maxWidth={1120} style={isWide ? { flexDirection: "row", gap: 16, alignItems: "flex-start" } : undefined}>
-        {/* ── Card 1: WhatsApp Bulk & VIP Broadcast ── */}
-        <View style={[styles.card, isWide && { flex: 1.15, marginBottom: 0 }]}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.iconCircle, { backgroundColor: C.navyLight }]}>
-              <FontAwesome5 name="bullhorn" size={16} color={C.navy} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.cardTitle}>WhatsApp Broadcast</Text>
-              <Text style={styles.cardSubtitle}>Dispatch offers to all customers or VIP-only</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: C.emeraldLight }]}>
-              <Text style={[styles.badgeText, { color: C.emerald }]}>Verified Direct</Text>
-            </View>
-          </View>
+          <ResponsiveContainer maxWidth={1120} style={isWide ? { flexDirection: "row", gap: 16, alignItems: "flex-start" } : undefined}>
+            {/* ── Card 1: WhatsApp Bulk & VIP Broadcast ── */}
+            <View style={[styles.card, isWide && { flex: 1.15, marginBottom: 0 }]}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.iconCircle, { backgroundColor: C.navyLight }]}>
+                  <FontAwesome5 name="bullhorn" size={16} color={C.navy} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.cardTitle}>WhatsApp Broadcast</Text>
+                  <Text style={styles.cardSubtitle}>Dispatch offers to all customers or VIP-only</Text>
+                </View>
+                <View style={[styles.badge, { backgroundColor: C.emeraldLight }]}>
+                  <Text style={[styles.badgeText, { color: C.emerald }]}>Verified Direct</Text>
+                </View>
+              </View>
 
-          {/* Audience Selector */}
-          <Text style={styles.fieldLabel}>Select Target Audience:</Text>
-          <View style={styles.audienceRow}>
-            <TouchableOpacity
-              onPress={() => setBroadcastAudience("all")}
-              style={[
-                styles.audienceOption,
-                broadcastAudience === "all" && { backgroundColor: C.navy, borderColor: C.navy },
-              ]}
-            >
-              <Ionicons
-                name="people"
-                size={16}
-                color={broadcastAudience === "all" ? C.white : C.slate600}
-              />
-              <Text
-                style={[
-                  styles.audienceOptionText,
-                  broadcastAudience === "all" && { color: C.white, fontWeight: "800" },
-                ]}
-              >
-                All Customers
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setBroadcastAudience("vips")}
-              style={[
-                styles.audienceOption,
-                broadcastAudience === "vips" && { backgroundColor: C.amber, borderColor: C.amber },
-              ]}
-            >
-              <Ionicons
-                name="star"
-                size={16}
-                color={broadcastAudience === "vips" ? C.white : C.amber}
-              />
-              <Text
-                style={[
-                  styles.audienceOptionText,
-                  broadcastAudience === "vips" && { color: C.white, fontWeight: "800" },
-                ]}
-              >
-                👑 VIP Only
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {broadcastAudience === "vips" ? (
-            <View style={styles.vipNoticeBox}>
-              <Ionicons name="sparkles" size={16} color={C.amber} />
-              <Text style={styles.vipNoticeText}>
-                Targets all regular patrons, frequent repeat buyers, and customers with custom discounts.
-              </Text>
-            </View>
-          ) : (
-            <View style={[styles.vipNoticeBox, { backgroundColor: C.navyLight, borderColor: "#BFDBFE" }]}>
-              <Ionicons name="information-circle" size={16} color={C.navy} />
-              <Text style={[styles.vipNoticeText, { color: C.navy }]}>
-                Targets all registered parties and walk-in invoice customers with valid phone numbers.
-              </Text>
-            </View>
-          )}
-
-          {/* Template Quick Chips */}
-          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Quick Message Templates:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-            {MARKETING_TEMPLATES.map((tmpl) => (
-              <TouchableOpacity
-                key={tmpl.id}
-                onPress={() => handleApplyTemplate(tmpl)}
-                style={styles.templateChip}
-              >
-                <Text style={styles.templateChipText}>{tmpl.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Message Input */}
-          <Text style={styles.fieldLabel}>Your Broadcast Message:</Text>
-          <TextInput
-            multiline
-            numberOfLines={4}
-            style={styles.messageInput}
-            placeholder="Type your announcement, festival offer, or discount here..."
-            placeholderTextColor={C.slate400}
-            value={customBroadcastMsg}
-            onChangeText={setCustomBroadcastMsg}
-          />
-
-          {/* Send Broadcast Button */}
-          <TouchableOpacity
-            onPress={handleStartBroadcast}
-            disabled={broadcasting}
-            style={[styles.primaryButton, { backgroundColor: broadcasting ? C.slate400 : C.emerald }]}
-          >
-            {broadcasting ? (
-              <ActivityIndicator size="small" color={C.white} />
-            ) : (
-              <>
-                <FontAwesome5 name="whatsapp" size={18} color={C.white} />
-                <Text style={styles.primaryButtonText}>
-                  Launch Broadcast to {broadcastAudience === "vips" ? "VIP Members" : "All Customers"}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <Text style={styles.guaranteeNote}>
-            🛡️ Safe Multi-Customer Queue · No dropped messages · Sends to every customer
-          </Text>
-        </View>
-
-        {/* ── Card 2: Catalogue PDF Generator ── */}
-        <View style={[styles.card, isWide && { flex: 1, marginBottom: 0 }]}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.iconCircle, { backgroundColor: C.emeraldLight }]}>
-              <Ionicons name="document-text" size={18} color={C.emerald} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.cardTitle}>Product Catalogue PDF</Text>
-              <Text style={styles.cardSubtitle}>Share elegant product brochures directly to WhatsApp</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: C.navyLight }]}>
-              <Text style={[styles.badgeText, { color: C.navy }]}>{CATALOGUE_STYLES.length} Themes</Text>
-            </View>
-          </View>
-
-          <Text style={styles.fieldLabel}>Select PDF Presentation Theme:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-            {CATALOGUE_STYLES.map((cat) => {
-              const isSelected = selectedCatStyle === cat.id;
-              return (
+              {/* Audience Selector */}
+              <Text style={styles.fieldLabel}>Select Target Audience:</Text>
+              <View style={styles.audienceRow}>
                 <TouchableOpacity
-                  key={cat.id}
-                  onPress={() => setSelectedCatStyle(cat.id)}
+                  onPress={() => setBroadcastAudience("all")}
                   style={[
-                    styles.themeCard,
-                    isSelected && { borderColor: C.navy, borderWidth: 2, backgroundColor: C.navyLight },
+                    styles.audienceOption,
+                    broadcastAudience === "all" && { backgroundColor: C.navy, borderColor: C.navy },
                   ]}
                 >
-                  <View style={{ backgroundColor: cat.color || C.navy, height: 4, borderRadius: 2, marginBottom: 6 }} />
-                  <Text style={[styles.themeCardTitle, isSelected && { color: C.navy, fontWeight: "800" }]}>
-                    {cat.name}
-                  </Text>
-                  <Text style={styles.themeCardDesc} numberOfLines={2}>
-                    {cat.description}
+                  <Ionicons
+                    name="people"
+                    size={16}
+                    color={broadcastAudience === "all" ? C.white : C.slate600}
+                  />
+                  <Text
+                    style={[
+                      styles.audienceOptionText,
+                      broadcastAudience === "all" && { color: C.white, fontWeight: "800" },
+                    ]}
+                  >
+                    All Customers
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
 
-          <View style={styles.stockStatusRow}>
-            <Ionicons name="cube-outline" size={16} color={C.navy} />
-            <Text style={styles.stockStatusText}>
-              {loadingItems ? "Counting inventory..." : `${catalogues.length} active products ready in inventory`}
-            </Text>
-            <TouchableOpacity onPress={loadMenuItems} style={styles.refreshChip}>
-              <Text style={styles.refreshChipText}>Refresh</Text>
-            </TouchableOpacity>
-          </View>
+                <TouchableOpacity
+                  onPress={() => setBroadcastAudience("vips")}
+                  style={[
+                    styles.audienceOption,
+                    broadcastAudience === "vips" && { backgroundColor: C.amber, borderColor: C.amber },
+                  ]}
+                >
+                  <Ionicons
+                    name="star"
+                    size={16}
+                    color={broadcastAudience === "vips" ? C.white : C.amber}
+                  />
+                  <Text
+                    style={[
+                      styles.audienceOptionText,
+                      broadcastAudience === "vips" && { color: C.white, fontWeight: "800" },
+                    ]}
+                  >
+                    👑 VIP Only
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-          <TouchableOpacity
-            onPress={handleShareCatalogue}
-            disabled={generatingCatalogue || !catalogues.length}
-            style={[
-              styles.primaryButton,
-              { backgroundColor: catalogues.length ? C.navy : C.slate400, marginTop: 10 },
-            ]}
-          >
-            {generatingCatalogue ? (
-              <ActivityIndicator size="small" color={C.white} />
-            ) : (
-              <>
-                <Ionicons name="share-social-outline" size={18} color={C.white} />
-                <Text style={styles.primaryButtonText}>Generate & Share Catalogue PDF</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-        </ResponsiveContainer>
+              {broadcastAudience === "vips" ? (
+                <View style={styles.vipNoticeBox}>
+                  <Ionicons name="sparkles" size={16} color={C.amber} />
+                  <Text style={styles.vipNoticeText}>
+                    Targets all regular patrons, frequent repeat buyers, and customers with custom discounts.
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.vipNoticeBox, { backgroundColor: C.navyLight, borderColor: "#BFDBFE" }]}>
+                  <Ionicons name="information-circle" size={16} color={C.navy} />
+                  <Text style={[styles.vipNoticeText, { color: C.navy }]}>
+                    Targets all registered parties and walk-in invoice customers with valid phone numbers.
+                  </Text>
+                </View>
+              )}
+
+              {/* Template Quick Chips */}
+              <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Quick Message Templates:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {MARKETING_TEMPLATES.map((tmpl) => (
+                  <TouchableOpacity
+                    key={tmpl.id}
+                    onPress={() => handleApplyTemplate(tmpl)}
+                    style={styles.templateChip}
+                  >
+                    <Text style={styles.templateChipText}>{tmpl.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Message Input */}
+              <Text style={styles.fieldLabel}>Your Broadcast Message:</Text>
+              <TextInput
+                multiline
+                numberOfLines={4}
+                style={styles.messageInput}
+                placeholder="Type your announcement, festival offer, or discount here..."
+                placeholderTextColor={C.slate400}
+                value={customBroadcastMsg}
+                onChangeText={setCustomBroadcastMsg}
+              />
+
+              {/* Send Broadcast Button */}
+              <TouchableOpacity
+                onPress={handleStartBroadcast}
+                disabled={broadcasting}
+                style={[styles.primaryButton, { backgroundColor: broadcasting ? C.slate400 : C.emerald }]}
+              >
+                {broadcasting ? (
+                  <ActivityIndicator size="small" color={C.white} />
+                ) : (
+                  <>
+                    <FontAwesome5 name="whatsapp" size={18} color={C.white} />
+                    <Text style={styles.primaryButtonText}>
+                      Launch Broadcast to {broadcastAudience === "vips" ? "VIP Members" : "All Customers"}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <Text style={styles.guaranteeNote}>
+                🛡️ Safe Multi-Customer Queue · No dropped messages · Sends to every customer
+              </Text>
+            </View>
+
+            {/* ── Card 2: Catalogue PDF Generator ── */}
+            <View style={[styles.card, isWide && { flex: 1, marginBottom: 0 }]}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.iconCircle, { backgroundColor: C.emeraldLight }]}>
+                  <Ionicons name="document-text" size={18} color={C.emerald} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.cardTitle}>Product Catalogue PDF</Text>
+                  <Text style={styles.cardSubtitle}>Share elegant product brochures directly to WhatsApp</Text>
+                </View>
+                <View style={[styles.badge, { backgroundColor: C.navyLight }]}>
+                  <Text style={[styles.badgeText, { color: C.navy }]}>{CATALOGUE_STYLES.length} Themes</Text>
+                </View>
+              </View>
+
+              <Text style={styles.fieldLabel}>Select PDF Presentation Theme:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {CATALOGUE_STYLES.map((cat) => {
+                  const isSelected = selectedCatStyle === cat.id;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      onPress={() => setSelectedCatStyle(cat.id)}
+                      style={[
+                        styles.themeCard,
+                        isSelected && { borderColor: C.navy, borderWidth: 2, backgroundColor: C.navyLight },
+                      ]}
+                    >
+                      <View style={{ backgroundColor: cat.color || C.navy, height: 4, borderRadius: 2, marginBottom: 6 }} />
+                      <Text style={[styles.themeCardTitle, isSelected && { color: C.navy, fontWeight: "800" }]}>
+                        {cat.name}
+                      </Text>
+                      <Text style={styles.themeCardDesc} numberOfLines={2}>
+                        {cat.description}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.stockStatusRow}>
+                <Ionicons name="cube-outline" size={16} color={C.navy} />
+                <Text style={styles.stockStatusText}>
+                  {loadingItems ? "Counting inventory..." : `${catalogues.length} active products ready in inventory`}
+                </Text>
+                <TouchableOpacity onPress={loadMenuItems} style={styles.refreshChip}>
+                  <Text style={styles.refreshChipText}>Refresh</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                onPress={handleShareCatalogue}
+                disabled={generatingCatalogue || !catalogues.length}
+                style={[
+                  styles.primaryButton,
+                  { backgroundColor: catalogues.length ? C.navy : C.slate400, marginTop: 10 },
+                ]}
+              >
+                {generatingCatalogue ? (
+                  <ActivityIndicator size="small" color={C.white} />
+                ) : (
+                  <>
+                    <Ionicons name="share-social-outline" size={18} color={C.white} />
+                    <Text style={styles.primaryButtonText}>Generate & Share Catalogue PDF</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ResponsiveContainer>
         </ScrollView>
       </KeyboardAvoidingView>
 

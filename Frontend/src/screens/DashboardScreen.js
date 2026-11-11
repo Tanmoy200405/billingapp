@@ -175,7 +175,7 @@ export default function DashboardScreen({
     }
   };
   return (
-    <View style={{ flex: 1 }} className="flex-1 bg-gray-100">
+    <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       <View
         style={{ paddingTop: headerTopPadding }}
         className="bg-blue-600 px-4 pb-4 flex-row items-center justify-between shadow-md"

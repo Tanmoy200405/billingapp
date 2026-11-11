@@ -404,7 +404,7 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
   };
 
   return (
-    <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
+    <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-3">
         <ResponsiveContainer maxWidth={1200}>
         <View className="flex-row items-center justify-between mb-2.5">
@@ -454,7 +454,7 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
             <TouchableOpacity
               onPress={handleImportPdf}
               disabled={importingPdf}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs"
+              className="flex-1 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 py-2.5 px-3 rounded-xl flex-row items-center justify-center shadow-xs border border-blue-500"
             >
               {importingPdf ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />

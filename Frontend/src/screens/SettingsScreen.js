@@ -386,7 +386,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
     }
   };
   return (
-    <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
+    <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-3">
         <ResponsiveContainer maxWidth={920} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View className="flex-row items-center">

@@ -109,7 +109,7 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
       style={{ flex: 1 }}
     >
       <ScrollView
-        style={{ flex: 1, backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF" }}
+        style={{ flex: 1, backgroundColor: isWide ? "#F8FAFC" : "#FFFFFF" }}
         contentContainerStyle={{
           flexGrow: 1,
           justifyContent: isWide ? "center" : "space-between",

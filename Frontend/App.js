@@ -5,6 +5,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, BackHandler, Alert, Im
 import { Ionicons } from "@expo/vector-icons";
 import "./global.css";
 import { api, setAuthToken, getStoredSession, getAuthToken, clearAuthToken, prefetchCoreData } from "./src/config/api";
+import { THEME } from "./src/config/theme";
 import { useResponsive } from "./src/utils/responsive";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
@@ -166,12 +167,12 @@ export default function App() {
         </View>
       )}
       {currentScreen === "welcome" && (
-        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? THEME.surface : THEME.card }}>
           <WelcomeScreen onNavigate={(screen) => setCurrentScreen(screen)} />
         </SafeAreaView>
       )}
       {currentScreen === "login" && (
-        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? THEME.surface : THEME.card }}>
           <LoginScreen
             onNavigate={(screen) => setCurrentScreen(screen)}
             onLoginSuccess={handleLoginSuccess}
@@ -179,7 +180,7 @@ export default function App() {
         </SafeAreaView>
       )}
       {currentScreen === "register" && (
-        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? THEME.surface : THEME.card }}>
           <RegisterScreen
             onNavigate={(screen) => setCurrentScreen(screen)}
             onRegisterSuccess={handleLoginSuccess}
@@ -187,28 +188,31 @@ export default function App() {
         </SafeAreaView>
       )}
       {currentScreen === "main" && (
-        <SafeAreaView style={{ flex: 1, backgroundColor: isWide ? "#1E3A8A" : "#2563EB" }}>
-          <View style={{ flex: 1, flexDirection: isWide ? "row" : "column", backgroundColor: "#F3F4F6" }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: THEME.primary }}>
+          <View style={{ flex: 1, flexDirection: isWide ? "row" : "column", backgroundColor: THEME.surface }}>
             {/* Persistent Sidebar for Tablet & Web */}
             {isWide && (
               <View
                 style={{
                   width: isDesktop ? 244 : 206,
-                  backgroundColor: "#0F172A",
+                  backgroundColor: THEME.card,
                   borderRightWidth: 1,
-                  borderRightColor: "#1E293B",
+                  borderRightColor: THEME.border,
                   justifyContent: "space-between",
                 }}
               >
                 <View style={{ flex: 1 }}>
-                  <View className="px-4 py-5 border-b border-slate-800 flex-row items-center">
+                  <View
+                    style={{ backgroundColor: THEME.primary }}
+                    className="px-4 py-5 flex-row items-center"
+                  >
                     {user?.logo ? (
                       <Image
                         source={{ uri: user.logo }}
-                        style={{ width: 38, height: 38, borderRadius: 10, marginRight: 10, borderWidth: 1, borderColor: "#3B82F6" }}
+                        style={{ width: 38, height: 38, borderRadius: 10, marginRight: 10, borderWidth: 1, borderColor: "#FFFFFF" }}
                       />
                     ) : (
-                      <View className="w-9 h-9 rounded-xl bg-blue-600 items-center justify-center mr-2.5">
+                      <View className="w-9 h-9 rounded-xl bg-white/20 items-center justify-center mr-2.5 border border-white/30">
                         <Ionicons name="storefront" size={18} color="#FFFFFF" />
                       </View>
                     )}
@@ -216,7 +220,7 @@ export default function App() {
                       <Text className="text-white text-sm font-extrabold uppercase tracking-wide" numberOfLines={1}>
                         {user?.businessName || "BillingApp"}
                       </Text>
-                      <Text className="text-slate-400 text-[11px]" numberOfLines={1}>
+                      <Text className="text-blue-100 text-[11px]" numberOfLines={1}>
                         {user?.phone || "POS Workspace"}
                       </Text>
                     </View>
@@ -229,9 +233,10 @@ export default function App() {
                         setIsCreatingInvoice(true);
                       }}
                       activeOpacity={0.85}
-                      className={`py-3 px-3.5 rounded-xl flex-row items-center justify-center shadow ${
-                        isCreatingInvoice ? "bg-emerald-600" : "bg-blue-600"
-                      }`}
+                      style={{
+                        backgroundColor: isCreatingInvoice ? THEME.success : THEME.primary,
+                      }}
+                      className="py-3 px-3.5 rounded-xl flex-row items-center justify-center shadow-sm"
                     >
                       <Ionicons name="add-circle" size={18} color="#FFFFFF" />
                       <Text className="text-white font-extrabold text-sm ml-2">New Bill / POS</Text>
@@ -245,19 +250,25 @@ export default function App() {
                         <TouchableOpacity
                           key={item.key}
                           onPress={() => navigateTab(item.key)}
-                          className={`flex-row items-center px-3.5 py-3 rounded-xl mb-1 ${
-                            isActive ? "bg-blue-600/20 border border-blue-500/40" : ""
-                          }`}
+                          style={
+                            isActive
+                              ? {
+                                  backgroundColor: THEME.primaryLight,
+                                  borderWidth: 1,
+                                  borderColor: THEME.primaryBorder,
+                                }
+                              : undefined
+                          }
+                          className="flex-row items-center px-3.5 py-3 rounded-xl mb-1"
                         >
                           <Ionicons
                             name={isActive ? item.icon : item.iconOutline}
                             size={19}
-                            color={isActive ? "#60A5FA" : "#94A3B8"}
+                            color={isActive ? THEME.primary : THEME.textMuted}
                           />
                           <Text
-                            className={`text-sm font-bold ml-3 ${
-                              isActive ? "text-white" : "text-slate-300"
-                            }`}
+                            style={{ color: isActive ? THEME.primaryDark : THEME.textSecondary }}
+                            className="text-sm font-bold ml-3"
                           >
                             {item.label}
                           </Text>
@@ -267,13 +278,13 @@ export default function App() {
                   </ScrollView>
                 </View>
 
-                <View className="p-3 border-t border-slate-800">
+                <View style={{ borderTopWidth: 1, borderTopColor: THEME.border }} className="p-3">
                   <TouchableOpacity
                     onPress={handleLogout}
-                    className="flex-row items-center px-3.5 py-2.5 rounded-xl"
+                    className="flex-row items-center px-3.5 py-2.5 rounded-xl bg-red-50/60"
                   >
-                    <Ionicons name="log-out-outline" size={19} color="#F87171" />
-                    <Text className="text-red-400 font-bold text-sm ml-3">Logout</Text>
+                    <Ionicons name="log-out-outline" size={19} color={THEME.danger} />
+                    <Text style={{ color: THEME.danger }} className="font-bold text-sm ml-3">Logout</Text>
                   </TouchableOpacity>
                 </View>
               </View>

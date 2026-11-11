@@ -49,3 +49,4 @@ export function ResponsiveContainer({ children, maxWidth = 1200, style }) {
     </View>
   );
 }
+

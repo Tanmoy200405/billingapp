@@ -490,7 +490,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
   const showInvoicePane = isWide || currentStep === "invoice";
 
   return (
-    <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
+    <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       {/* ────────────────── HEADER ────────────────── */}
       <View
         style={{ paddingTop: headerTopPadding }}

@@ -434,7 +434,7 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
     return `${count} visits`;
   };
   return (
-    <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
+    <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-4">
         <ResponsiveContainer maxWidth={1200}>
         <View className="flex-row items-center justify-between mb-2.5">

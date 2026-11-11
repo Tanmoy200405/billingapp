@@ -158,7 +158,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
     }
   };
   return (
-    <View style={{ flex: 1 }} className="flex-1 bg-gray-50">
+    <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-4 shadow-md">
         <ResponsiveContainer maxWidth={1120} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View className="flex-row items-center">
@@ -185,22 +185,22 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
         </TouchableOpacity>
         </ResponsiveContainer>
       </View>
-      <View className="bg-white border-b border-gray-200 px-2 py-2">
+      <View className="bg-white border-b border-slate-200 px-2 py-2">
         <ResponsiveContainer maxWidth={1120} style={{ flexDirection: "row", justifyContent: "space-around" }}>
         <TouchableOpacity
           onPress={() => setReportType("sales")}
           className={`flex-1 py-2 rounded-xl items-center flex-row justify-center mx-1 ${
-            reportType === "sales" ? "bg-blue-600 shadow-sm" : "bg-gray-100"
+            reportType === "sales" ? "bg-blue-600 shadow-sm" : "bg-slate-100"
           }`}
         >
           <Ionicons
             name="bar-chart"
             size={14}
-            color={reportType === "sales" ? "#FFFFFF" : "#4B5563"}
+            color={reportType === "sales" ? "#FFFFFF" : "#475569"}
           />
           <Text
             className={`text-xs font-bold ml-1.5 ${
-              reportType === "sales" ? "text-white" : "text-gray-700"
+              reportType === "sales" ? "text-white" : "text-slate-700"
             }`}
           >
             Sales
@@ -209,17 +209,17 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
         <TouchableOpacity
           onPress={() => setReportType("inventory")}
           className={`flex-1 py-2 rounded-xl items-center flex-row justify-center mx-1 ${
-            reportType === "inventory" ? "bg-emerald-600 shadow-sm" : "bg-gray-100"
+            reportType === "inventory" ? "bg-blue-600 shadow-sm" : "bg-slate-100"
           }`}
         >
           <Ionicons
             name="cube"
             size={14}
-            color={reportType === "inventory" ? "#FFFFFF" : "#4B5563"}
+            color={reportType === "inventory" ? "#FFFFFF" : "#475569"}
           />
           <Text
             className={`text-xs font-bold ml-1.5 ${
-              reportType === "inventory" ? "text-white" : "text-gray-700"
+              reportType === "inventory" ? "text-white" : "text-slate-700"
             }`}
           >
             Inventory
@@ -228,17 +228,17 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
         <TouchableOpacity
           onPress={() => setReportType("parties")}
           className={`flex-1 py-2 rounded-xl items-center flex-row justify-center mx-1 ${
-            reportType === "parties" ? "bg-purple-600 shadow-sm" : "bg-gray-100"
+            reportType === "parties" ? "bg-blue-600 shadow-sm" : "bg-slate-100"
           }`}
         >
           <Ionicons
             name="people"
             size={14}
-            color={reportType === "parties" ? "#FFFFFF" : "#4B5563"}
+            color={reportType === "parties" ? "#FFFFFF" : "#475569"}
           />
           <Text
             className={`text-xs font-bold ml-1.5 ${
-              reportType === "parties" ? "text-white" : "text-gray-700"
+              reportType === "parties" ? "text-white" : "text-slate-700"
             }`}
           >
             Customers
@@ -247,17 +247,17 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
         <TouchableOpacity
           onPress={() => setReportType("topItems")}
           className={`flex-1 py-2 rounded-xl items-center flex-row justify-center mx-1 ${
-            reportType === "topItems" ? "bg-orange-500 shadow-sm" : "bg-gray-100"
+            reportType === "topItems" ? "bg-blue-600 shadow-sm" : "bg-slate-100"
           }`}
         >
           <Ionicons
             name="trophy"
             size={14}
-            color={reportType === "topItems" ? "#FFFFFF" : "#4B5563"}
+            color={reportType === "topItems" ? "#FFFFFF" : "#475569"}
           />
           <Text
             className={`text-xs font-bold ml-1.5 ${
-              reportType === "topItems" ? "text-white" : "text-gray-700"
+              reportType === "topItems" ? "text-white" : "text-slate-700"
             }`}
           >
             Top Sellers
@@ -825,7 +825,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: isWide ? "center" : "flex-end", alignItems: isWide ? "center" : "stretch", padding: isWide ? 24 : 0 }}>
           <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: isWide ? 24 : 0, borderBottomRightRadius: isWide ? 24 : 0, maxHeight: "90%", flex: 1, width: "100%", maxWidth: isWide ? 680 : undefined }}>
             {/* Header */}
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 18, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", backgroundColor: "#4F46E5", borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 18, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", backgroundColor: "#2563EB", borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons name="pie-chart" size={20} color="#FFFFFF" />
@@ -833,7 +833,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                     Category-Wise Sales Per Day
                   </Text>
                 </View>
-                <Text style={{ fontSize: 11, color: "#E0E7FF", marginTop: 2, fontWeight: "600" }}>
+                <Text style={{ fontSize: 11, color: "#DBEAFE", marginTop: 2, fontWeight: "600" }}>
                   Full Yearly Breakdown (Past 365 Days)
                 </Text>
               </View>
@@ -844,8 +844,8 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
 
             {loadingCategorySales ? (
               <View style={{ padding: 40, alignItems: "center", justifyContent: "center", flex: 1 }}>
-                <ActivityIndicator size="large" color="#4F46E5" />
-                <Text style={{ fontSize: 13, fontWeight: "bold", color: "#4F46E5", marginTop: 14 }}>
+                <ActivityIndicator size="large" color="#2563EB" />
+                <Text style={{ fontSize: 13, fontWeight: "bold", color: "#2563EB", marginTop: 14 }}>
                   Analyzing category sales for the whole year...
                 </Text>
                 <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>

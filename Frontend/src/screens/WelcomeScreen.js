@@ -10,7 +10,7 @@ export default function WelcomeScreen({ onNavigate }) {
     <View
       style={{
         flex: 1,
-        backgroundColor: isWide ? "#F1F5F9" : "#FFFFFF",
+        backgroundColor: isWide ? "#F8FAFC" : "#FFFFFF",
         justifyContent: isWide ? "center" : "space-between",
         alignItems: "center",
         paddingHorizontal: 24,
