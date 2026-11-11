@@ -68,6 +68,11 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 3,
     },
+    aggregatorConfig: {
+      enabled: { type: Boolean, default: false },
+      outletId: { type: String, trim: true, default: "" },
+      webhookSecret: { type: String, trim: true, default: "" },
+    },
   },
   { timestamps: true }
 );

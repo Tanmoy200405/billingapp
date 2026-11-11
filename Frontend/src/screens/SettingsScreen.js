@@ -92,6 +92,10 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
   const [pwdLoading, setPwdLoading] = useState(false);
+
+  const [aggregatorEnabled, setAggregatorEnabled] = useState(Boolean(user?.aggregatorConfig?.enabled));
+  const [aggregatorOutletId, setAggregatorOutletId] = useState(user?.aggregatorConfig?.outletId || "");
+  const [aggregatorSecret, setAggregatorSecret] = useState(user?.aggregatorConfig?.webhookSecret || "");
   useEffect(() => {
     fetchWaStatus();
     loadBillFormatSettings();
@@ -400,6 +404,11 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       invoiceStyle,
       thermalPrinterSize: printerSize,
       vipVisitThreshold: thresholdVal,
+      aggregatorConfig: {
+        enabled: aggregatorEnabled,
+        outletId: aggregatorOutletId.trim(),
+        webhookSecret: aggregatorSecret.trim(),
+      },
     });
     setSaving(false);
     if (res.success && res.user) {
@@ -827,6 +836,62 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   <Ionicons name="key-outline" size={16} color="#334155" />
                   <Text className="text-slate-700 font-bold text-xs ml-1.5">Change Password</Text>
                 </TouchableOpacity>
+              </View>
+            </View>
+
+            <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center flex-1 pr-2">
+                  <Ionicons name="fast-food-outline" size={18} color="#EA580C" />
+                  <Text className="text-sm font-bold text-gray-900 ml-2">
+                    Swiggy / Zomato Webhook (Live Orders)
+                  </Text>
+                </View>
+                <Switch
+                  value={aggregatorEnabled}
+                  onValueChange={setAggregatorEnabled}
+                  trackColor={{ false: "#CBD5E1", true: "#FB923C" }}
+                  thumbColor={aggregatorEnabled ? "#EA580C" : "#F8FAFC"}
+                />
+              </View>
+              <Text className="text-xs text-gray-500 mb-3">
+                Receive automatic Swiggy & Zomato orders via UrbanPiper or POS Partner webhooks (orders auto-create bills & update stock).
+              </Text>
+              <View className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 mb-3">
+                <Text className="text-[10px] font-bold text-slate-500 uppercase">Your Webhook URL</Text>
+                <Text selectable className="text-[11px] font-mono text-blue-700 mt-0.5">
+                  {`${getApiBaseUrl()}/invoices/webhook/aggregator/${user?._id || "<store-id>"}`}
+                </Text>
+              </View>
+              <View className="mb-2.5">
+                <Text className="text-xs font-bold text-gray-700 mb-1">Outlet / Store ID (Optional)</Text>
+                <TextInput
+                  className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2 text-sm"
+                  placeholder="e.g. outlet_8392"
+                  value={aggregatorOutletId}
+                  onChangeText={setAggregatorOutletId}
+                  autoCapitalize="none"
+                />
+              </View>
+              <View className="mb-2">
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-xs font-bold text-gray-700">Webhook Secret (x-webhook-secret)</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const rnd = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+                      setAggregatorSecret(`whsec_${rnd}`);
+                    }}
+                  >
+                    <Text className="text-xs font-bold text-blue-600">Generate Secret</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2 text-sm font-mono"
+                  placeholder="Paste or generate secret, then Save"
+                  value={aggregatorSecret}
+                  onChangeText={setAggregatorSecret}
+                  autoCapitalize="none"
+                />
               </View>
             </View>
 

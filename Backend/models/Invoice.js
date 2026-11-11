@@ -104,9 +104,20 @@ const invoiceSchema = new mongoose.Schema(
     },
     paymentMode: {
       type: String,
-      enum: ["CASH", "UPI", "UPI/CASH", "BANK", "CHEQUE", "CREDIT"],
+      enum: ["CASH", "UPI", "UPI/CASH", "BANK", "CHEQUE", "CREDIT", "SWIGGY", "ZOMATO"],
       default: "CASH",
       index: true,
+    },
+    orderSource: {
+      type: String,
+      enum: ["COUNTER", "TAKEAWAY", "SWIGGY", "ZOMATO"],
+      default: "COUNTER",
+      index: true,
+    },
+    externalOrderId: {
+      type: String,
+      trim: true,
+      default: "",
     },
     cashAmount: {
       type: Number,
@@ -149,6 +160,7 @@ const invoiceSchema = new mongoose.Schema(
 invoiceSchema.index({ userId: 1, invoiceDate: -1 });
 invoiceSchema.index({ userId: 1, invoiceNumber: 1 });
 invoiceSchema.index({ userId: 1, paymentMode: 1 });
+invoiceSchema.index({ userId: 1, orderSource: 1, invoiceDate: -1 });
 
 const Invoice = mongoose.model("Invoice", invoiceSchema);
 export default Invoice;

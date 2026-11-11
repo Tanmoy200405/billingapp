@@ -409,9 +409,16 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
     ? `<div class="sign-box">For ${businessName}<br/><br/>Authorized Signatory</div>`
     : "";
 
+  const orderSource = (invoice?.orderSource || "COUNTER").toUpperCase();
+  const extOrderId = (invoice?.externalOrderId || "").trim();
+  const channelLabel =
+    orderSource !== "COUNTER"
+      ? `${orderSource}${extOrderId ? ` #${extOrderId}` : ""}`
+      : "";
+
   return `
     <div class="receipt">
-      <div class="center"><span class="copy-badge">${copyTitle}</span></div>
+      <div class="center"><span class="copy-badge">${copyTitle}${channelLabel ? ` • ${channelLabel}` : ""}</span></div>
       <div class="header">
         ${logoHtml}
         <div class="store-name">${businessName}</div>
@@ -421,7 +428,7 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
         ${gstinHtml}
       </div>
       <hr class="divider"/>
-      ${showTokenNumber ? `<div class="meta"><b>Bill No: ${tokenDisplay}</b></div>` : ""}
+      ${showTokenNumber ? `<div class="meta"><b>Bill No: ${tokenDisplay}</b>${channelLabel ? ` &nbsp;|&nbsp; <b>${channelLabel}</b>` : ""}</div>` : ""}
       <div class="meta">Created On: ${createdOn}</div>
       ${showBillType ? `<div class="meta">Bill To: ${saleLabel}</div>` : ""}
       ${billToCustomer}
@@ -467,9 +474,17 @@ function buildCookerReceiptCard(invoice, storeInfo = {}) {
     `;
   }).join("");
 
+  const orderSource = (invoice?.orderSource || "COUNTER").toUpperCase();
+  const extOrderId = (invoice?.externalOrderId || "").trim();
+  const channelBadge =
+    orderSource !== "COUNTER"
+      ? `<div class="center" style="font-size:14px;font-weight:900;background:#000;color:#fff;padding:3px 6px;margin:4px 0;border-radius:4px;">${orderSource}${extOrderId ? ` • #${extOrderId}` : ""}</div>`
+      : "";
+
   return `
     <div class="receipt cooker-receipt" style="border: 2px solid #000;">
       <div class="center"><span class="copy-badge" style="background:#000;color:#fff;">*** COOKER / KITCHEN KOT ***</span></div>
+      ${channelBadge}
       <div class="header" style="margin-top:4px;">
         <div style="font-size:12px;font-weight:700;text-transform:uppercase;">${businessName}</div>
       </div>

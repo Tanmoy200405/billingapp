@@ -661,6 +661,7 @@ router.put("/profile", protect, async (req, res) => {
       thermalPrinterSize,
       invoiceStyle,
       vipVisitThreshold,
+      aggregatorConfig,
     } = req.body;
 
     const currentUser = await User.findById(req.user._id).select("-password");
@@ -709,6 +710,13 @@ router.put("/profile", protect, async (req, res) => {
         ...(thermalPrinterSize && { thermalPrinterSize }),
         ...(invoiceStyle && { invoiceStyle }),
         ...(vipVisitThreshold !== undefined && { vipVisitThreshold: Number(vipVisitThreshold) || 3 }),
+        ...(aggregatorConfig && {
+          aggregatorConfig: {
+            enabled: Boolean(aggregatorConfig.enabled),
+            outletId: String(aggregatorConfig.outletId || "").trim(),
+            webhookSecret: String(aggregatorConfig.webhookSecret || "").trim(),
+          },
+        }),
       },
       { new: true, runValidators: true }
     ).select("-password");

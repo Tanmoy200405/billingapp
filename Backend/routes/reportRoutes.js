@@ -55,6 +55,9 @@ async function fetchSalesData(userId, query) {
   if (query.paymentMode) {
     filter.paymentMode = query.paymentMode.toUpperCase();
   }
+  if (query.orderSource) {
+    filter.orderSource = query.orderSource.toUpperCase();
+  }
 
   const invoices = await Invoice.find(filter)
     .sort({ invoiceDate: -1, createdAt: -1 })
@@ -65,6 +68,12 @@ async function fetchSalesData(userId, query) {
   let totalUpi = 0;
   let totalDiscount = 0;
   let totalTax = 0;
+  let totalSwiggy = 0;
+  let swiggyOrders = 0;
+  let totalZomato = 0;
+  let zomatoOrders = 0;
+  let totalCounter = 0;
+  let counterOrders = 0;
 
   for (const inv of invoices) {
     const total = Number(inv.grandTotal || 0);
@@ -80,6 +89,18 @@ async function fetchSalesData(userId, query) {
       totalCash += Number(inv.cashAmount || 0);
       totalUpi += Number(inv.upiAmount || 0);
     }
+
+    const src = (inv.orderSource || inv.paymentMode || "COUNTER").toUpperCase();
+    if (src === "SWIGGY") {
+      totalSwiggy += total;
+      swiggyOrders += 1;
+    } else if (src === "ZOMATO") {
+      totalZomato += total;
+      zomatoOrders += 1;
+    } else {
+      totalCounter += total;
+      counterOrders += 1;
+    }
   }
 
   return {
@@ -92,6 +113,12 @@ async function fetchSalesData(userId, query) {
       totalUpi,
       totalDiscount,
       totalTax,
+      totalSwiggy,
+      swiggyOrders,
+      totalZomato,
+      zomatoOrders,
+      totalCounter,
+      counterOrders,
     },
     invoices,
   };

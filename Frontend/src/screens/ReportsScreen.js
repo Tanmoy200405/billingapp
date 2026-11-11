@@ -366,6 +366,35 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                 </Text>
               </View>
             </View>
+            <View className="flex-row gap-2.5 mt-2.5">
+              <View className="flex-1 bg-slate-100 p-3 rounded-xl border border-slate-200">
+                <Text className="text-[10px] font-bold text-slate-600">Counter / Store</Text>
+                <Text className="text-sm font-black text-slate-900 mt-0.5">
+                  Rs. {Number(salesData.summary?.totalCounter || 0).toLocaleString("en-IN")}
+                </Text>
+                <Text className="text-[10px] text-slate-500">
+                  {salesData.summary?.counterOrders || 0} orders
+                </Text>
+              </View>
+              <View className="flex-1 bg-orange-50 p-3 rounded-xl border border-orange-200">
+                <Text className="text-[10px] font-bold text-orange-700">Swiggy Orders</Text>
+                <Text className="text-sm font-black text-orange-900 mt-0.5">
+                  Rs. {Number(salesData.summary?.totalSwiggy || 0).toLocaleString("en-IN")}
+                </Text>
+                <Text className="text-[10px] text-orange-700">
+                  {salesData.summary?.swiggyOrders || 0} orders
+                </Text>
+              </View>
+              <View className="flex-1 bg-red-50 p-3 rounded-xl border border-red-200">
+                <Text className="text-[10px] font-bold text-red-700">Zomato Orders</Text>
+                <Text className="text-sm font-black text-red-900 mt-0.5">
+                  Rs. {Number(salesData.summary?.totalZomato || 0).toLocaleString("en-IN")}
+                </Text>
+                <Text className="text-[10px] text-red-700">
+                  {salesData.summary?.zomatoOrders || 0} orders
+                </Text>
+              </View>
+            </View>
           </View>
         )}
         {reportType === "inventory" && (

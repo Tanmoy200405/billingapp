@@ -35,6 +35,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
   const [customerPhone, setCustomerPhone] = useState("");
   const [cart, setCart] = useState([]);
   const [paymentMode, setPaymentMode] = useState("CASH");
+  const [orderSource, setOrderSource] = useState("COUNTER");
+  const [externalOrderId, setExternalOrderId] = useState("");
   const [cashAmount, setCashAmount] = useState("");
   const [upiAmount, setUpiAmount] = useState("");
   const [partySearch, setPartySearch] = useState("");
@@ -309,6 +311,21 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     setShowPartyModal(false);
   };
 
+  const handleOrderSourceChange = (src) => {
+    setOrderSource(src);
+    if (src === "SWIGGY") {
+      setPaymentMode("SWIGGY");
+      setCashAmount("");
+      setUpiAmount("");
+    } else if (src === "ZOMATO") {
+      setPaymentMode("ZOMATO");
+      setCashAmount("");
+      setUpiAmount("");
+    } else if (paymentMode === "SWIGGY" || paymentMode === "ZOMATO") {
+      setPaymentMode("CASH");
+    }
+  };
+
   const handleGenerateInvoice = async () => {
     if (cart.length === 0) {
       Alert.alert("Empty Bill", "Please select at least one item to bill");
@@ -337,6 +354,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       partyPhone: cleanPhone || undefined,
       autoSendWhatsApp: cleanPhone.length >= 10,
       paymentMode,
+      orderSource,
+      externalOrderId: externalOrderId.trim() || undefined,
       cashAmount: paymentMode === "UPI/CASH" ? Number(cashAmount) || 0 : undefined,
       upiAmount: paymentMode === "UPI/CASH" ? Number(upiAmount) || 0 : undefined,
       customDiscountPercent: Number(customDiscount) || (activeCustomer?.customDiscountPercent || 0),
@@ -474,6 +493,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     setCustomerName("Walk-in Customer");
     setCustomerPhone("");
     setPaymentMode("CASH");
+    setOrderSource("COUNTER");
+    setExternalOrderId("");
     setCashAmount("");
     setUpiAmount("");
     setCreatedInvoice(null);
@@ -768,6 +789,50 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             keyboardDismissMode="on-drag"
             contentContainerStyle={{ paddingBottom: 120 }}
           >
+            {/* Order Source Card (Counter / Takeaway / Swiggy / Zomato) */}
+            <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
+              <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                Order Channel
+              </Text>
+              <View className="flex-row gap-2 flex-wrap">
+                {[
+                  { id: "COUNTER", label: "Counter", activeBg: "bg-blue-600 border-blue-600" },
+                  { id: "TAKEAWAY", label: "Takeaway", activeBg: "bg-indigo-600 border-indigo-600" },
+                  { id: "SWIGGY", label: "Swiggy", activeBg: "bg-orange-500 border-orange-500" },
+                  { id: "ZOMATO", label: "Zomato", activeBg: "bg-red-600 border-red-600" },
+                ].map((ch) => (
+                  <TouchableOpacity
+                    key={ch.id}
+                    onPress={() => handleOrderSourceChange(ch.id)}
+                    className={`px-3 py-2 rounded-xl border ${
+                      orderSource === ch.id ? ch.activeBg : "bg-gray-100 border-gray-200"
+                    }`}
+                  >
+                    <Text
+                      className={`text-xs font-bold ${
+                        orderSource === ch.id ? "text-white" : "text-gray-700"
+                      }`}
+                    >
+                      {ch.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {orderSource === "SWIGGY" || orderSource === "ZOMATO" ? (
+                <View className="mt-3">
+                  <Text className="text-xs font-bold text-gray-700 mb-1">
+                    {orderSource === "SWIGGY" ? "Swiggy" : "Zomato"} Order ID (Shown on KOT & Bill)
+                  </Text>
+                  <TextInput
+                    className="bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 font-semibold"
+                    placeholder={orderSource === "SWIGGY" ? "e.g. #18492031" : "e.g. #5492018"}
+                    value={externalOrderId}
+                    onChangeText={setExternalOrderId}
+                  />
+                </View>
+              ) : null}
+            </View>
+
             {/* Customer Details Card */}
             <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
               <View className="flex-row justify-between items-center mb-3">
@@ -937,7 +1002,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 Payment Mode
               </Text>
               <View className="flex-row gap-2 flex-wrap">
-                {["CASH", "UPI", "UPI/CASH", "BANK", "CHEQUE", "CREDIT"].map((mode) => (
+                {["CASH", "UPI", "UPI/CASH", "BANK", "CHEQUE", "CREDIT", "SWIGGY", "ZOMATO"].map((mode) => (
                   <TouchableOpacity
                     key={mode}
                     onPress={() => handlePaymentModeChange(mode)}

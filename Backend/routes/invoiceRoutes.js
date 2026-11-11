@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import mongoose from "mongoose";
 import Invoice from "../models/Invoice.js";
 import Item from "../models/Item.js";
@@ -17,6 +18,42 @@ function getPublicBackendBase() {
     return configured;
   }
   return "https://billingapi.duckdns.org";
+}
+
+const VALID_ORDER_SOURCES = new Set(["COUNTER", "TAKEAWAY", "SWIGGY", "ZOMATO"]);
+
+function resolveOrderSource(orderSource, paymentMode) {
+  const src = (orderSource || "").toString().trim().toUpperCase();
+  if (VALID_ORDER_SOURCES.has(src)) return src;
+  const mode = (paymentMode || "").toString().trim().toUpperCase();
+  if (mode === "SWIGGY") return "SWIGGY";
+  if (mode === "ZOMATO") return "ZOMATO";
+  return "COUNTER";
+}
+
+function safeSecretEqual(a = "", b = "") {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (!bufA.length || bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+async function getNextDailyInvoiceNumber(userId) {
+  const today = new Date();
+  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+  const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+  const todayInvoices = await Invoice.find({
+    userId,
+    createdAt: { $gte: startOfDay, $lte: endOfDay },
+  })
+    .select("invoiceNumber")
+    .lean();
+  let maxNumber = 0;
+  for (const inv of todayInvoices) {
+    const num = parseInt(inv.invoiceNumber, 10);
+    if (!isNaN(num) && num > maxNumber) maxNumber = num;
+  }
+  return (maxNumber + 1).toString();
 }
 
 router.get("/public/:id/pdf", async (req, res) => {
@@ -181,6 +218,182 @@ router.get("/public/:id", async (req, res) => {
     return res.status(500).send("Error loading bill.");
   }
 });
+
+// Public Aggregator Webhook (UrbanPiper / Swiggy / Zomato Partner integration)
+router.post("/webhook/aggregator/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid store userId" });
+    }
+    const storeUser = await User.findById(userId).select("-password").lean();
+    if (!storeUser) {
+      return res.status(404).json({ success: false, message: "Store not found" });
+    }
+    const cfg = storeUser.aggregatorConfig || {};
+    if (!cfg.enabled || !cfg.webhookSecret) {
+      return res.status(403).json({
+        success: false,
+        message: "Live aggregator webhook is not enabled for this store",
+      });
+    }
+
+    const incomingSecret =
+      req.headers["x-webhook-secret"] ||
+      req.headers["x-api-key"] ||
+      req.query?.secret ||
+      "";
+    if (!safeSecretEqual(incomingSecret, cfg.webhookSecret)) {
+      return res.status(401).json({ success: false, message: "Invalid webhook secret" });
+    }
+
+    const body = req.body || {};
+    const orderObj = body.order || body;
+    const details = orderObj.details || {};
+    const rawChannel =
+      body.source ||
+      body.orderSource ||
+      details.channel ||
+      details.platform ||
+      "";
+    const channelUpper = rawChannel.toString().toUpperCase();
+    const orderSource = channelUpper.includes("ZOMATO")
+      ? "ZOMATO"
+      : channelUpper.includes("SWIGGY")
+      ? "SWIGGY"
+      : resolveOrderSource(rawChannel, "SWIGGY");
+
+    const externalOrderId = String(
+      body.orderId ||
+        body.externalOrderId ||
+        details.ext_platforms?.[0]?.id ||
+        details.id ||
+        orderObj.id ||
+        ""
+    ).trim();
+
+    if (externalOrderId) {
+      const existingDup = await Invoice.findOne({
+        userId: storeUser._id,
+        orderSource,
+        externalOrderId,
+      }).lean();
+      if (existingDup) {
+        return res.status(200).json({
+          success: true,
+          duplicate: true,
+          message: `Order ${externalOrderId} already imported`,
+          invoice: existingDup,
+        });
+      }
+    }
+
+    const rawItems = Array.isArray(orderObj.items)
+      ? orderObj.items
+      : Array.isArray(body.items)
+      ? body.items
+      : [];
+    if (!rawItems.length) {
+      return res.status(400).json({ success: false, message: "No order items found in payload" });
+    }
+
+    const storeCatalog = await Item.find({ userId: storeUser._id }).lean();
+    const itemByName = new Map(
+      storeCatalog.map((it) => [String(it.name || "").trim().toLowerCase(), it])
+    );
+
+    let calculatedSubtotal = 0;
+    let calculatedTaxTotal = 0;
+    const processedItems = [];
+    const stockUpdates = [];
+
+    for (const rawIt of rawItems) {
+      const itemName = String(rawIt.title || rawIt.name || rawIt.itemName || "Online Item").trim();
+      const qty = Math.max(0.01, Number(rawIt.quantity ?? rawIt.qty ?? 1) || 1);
+      const unitPrice = Number(rawIt.price ?? rawIt.sellingPrice ?? rawIt.rate ?? 0);
+      const taxRate = Number(rawIt.taxRate ?? 0);
+      const lineTotal = unitPrice * qty;
+      const lineTax = (lineTotal * taxRate) / 100;
+      calculatedSubtotal += lineTotal;
+      calculatedTaxTotal += lineTax;
+
+      const matched =
+        (rawIt.itemId &&
+          mongoose.Types.ObjectId.isValid(rawIt.itemId) && { _id: rawIt.itemId }) ||
+        itemByName.get(itemName.toLowerCase());
+
+      processedItems.push({
+        itemId: matched?._id,
+        name: itemName,
+        sellingPrice: unitPrice,
+        quantity: qty,
+        unit: rawIt.unit || "PCS",
+        taxRate,
+        total: lineTotal + lineTax,
+      });
+
+      if (matched?._id) {
+        stockUpdates.push({
+          updateOne: {
+            filter: { _id: matched._id, userId: storeUser._id },
+            update: { $inc: { stock: -qty } },
+          },
+        });
+      }
+    }
+
+    const discountTotal = Number(details.discount ?? body.discountTotal ?? 0) || 0;
+    const explicitGrandTotal = Number(details.order_total ?? body.grandTotal);
+    const totalBeforeRound =
+      !isNaN(explicitGrandTotal) && explicitGrandTotal > 0
+        ? explicitGrandTotal
+        : calculatedSubtotal + calculatedTaxTotal - discountTotal;
+    const grandTotal = Math.round(totalBeforeRound);
+    const roundOff = Math.round((grandTotal - totalBeforeRound) * 100) / 100;
+
+    const cust = body.customer || orderObj.customer || {};
+    const customerName = String(cust.name || body.customerName || `${orderSource} Customer`).trim();
+    const customerPhone = normalizeWhatsAppNumber(cust.phone || body.customerPhone || "");
+    const invoiceNumber = await getNextDailyInvoiceNumber(storeUser._id);
+    const paymentMode = orderSource === "ZOMATO" ? "ZOMATO" : "SWIGGY";
+
+    const invoice = await Invoice.create({
+      userId: storeUser._id,
+      invoiceNumber,
+      invoiceDate: new Date(),
+      partyName: customerName,
+      partyPhone: customerPhone,
+      items: processedItems,
+      subtotal: calculatedSubtotal,
+      taxTotal: calculatedTaxTotal,
+      discountTotal,
+      roundOff,
+      grandTotal,
+      paymentMode,
+      orderSource,
+      externalOrderId,
+      paymentStatus: "PAID",
+      paidAmount: grandTotal,
+      dueAmount: 0,
+      notes: String(details.instructions || body.notes || `Imported from ${orderSource}`).trim(),
+    });
+
+    if (stockUpdates.length > 0) {
+      await Item.bulkWrite(stockUpdates, { ordered: false }).catch(() => {});
+    }
+    invalidateUserCache(storeUser._id);
+
+    return res.status(201).json({
+      success: true,
+      message: `${orderSource} order #${externalOrderId || invoiceNumber} imported`,
+      invoice,
+    });
+  } catch (err) {
+    console.error("[Webhook] Aggregator import error:", err.message);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.use(protect);
 const sendAutomaticWhatsAppBill = async (
   phone,
@@ -247,10 +460,13 @@ const sendAutomaticWhatsAppBill = async (
 };
 router.get("/", async (req, res) => {
   try {
-    const { startDate, endDate, paymentMode, partyId, limit = 50 } = req.query;
+    const { startDate, endDate, paymentMode, orderSource, partyId, limit = 50 } = req.query;
     const filter = { userId: req.user._id };
     if (paymentMode) {
       filter.paymentMode = paymentMode.toUpperCase();
+    }
+    if (orderSource) {
+      filter.orderSource = orderSource.toUpperCase();
     }
     if (partyId) {
       filter.partyId = partyId;
@@ -301,6 +517,8 @@ router.post("/", async (req, res) => {
       partyPhone,
       items,
       paymentMode = "CASH",
+      orderSource,
+      externalOrderId = "",
       cashAmount,
       upiAmount,
       applyRegularDiscount = true,
@@ -403,22 +621,9 @@ router.post("/", async (req, res) => {
     const totalBeforeRound = calculatedSubtotal + calculatedTaxTotal - discountAmount;
     const grandTotal = Math.round(totalBeforeRound);
     const roundOff = Math.round((grandTotal - totalBeforeRound) * 100) / 100;
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-    const todayInvoices = await Invoice.find({
-      userId: req.user._id,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
-    }).select("invoiceNumber");
-    let maxNumber = 0;
-    for (const inv of todayInvoices) {
-      const num = parseInt(inv.invoiceNumber, 10);
-      if (!isNaN(num) && num > maxNumber) {
-        maxNumber = num;
-      }
-    }
-    const invoiceNumber = (maxNumber + 1).toString();
+    const invoiceNumber = await getNextDailyInvoiceNumber(req.user._id);
     const mode = paymentMode.toUpperCase();
+    const resolvedSource = resolveOrderSource(orderSource, mode);
     const isCredit = mode === "CREDIT";
     const paidAmount = isCredit ? 0 : grandTotal;
     const dueAmount = isCredit ? grandTotal : 0;
@@ -461,6 +666,8 @@ router.post("/", async (req, res) => {
       roundOff,
       grandTotal,
       paymentMode: mode,
+      orderSource: resolvedSource,
+      externalOrderId: String(externalOrderId || "").trim(),
       cashAmount: finalCash,
       upiAmount: finalUpi,
       paymentStatus,
