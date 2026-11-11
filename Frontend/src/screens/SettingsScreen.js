@@ -77,6 +77,20 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [pairingCode, setPairingCode] = useState(null);
   const [pairingLoading, setPairingLoading] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailChangeStep, setEmailChangeStep] = useState(1);
+  const [emailChangePassword, setEmailChangePassword] = useState("");
+  const [newEmailInput, setNewEmailInput] = useState("");
+  const [emailChangeOtp, setEmailChangeOtp] = useState("");
+  const [emailChangeMsg, setEmailChangeMsg] = useState("");
+  const [emailChangeLoading, setEmailChangeLoading] = useState(false);
+
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [curPassword, setCurPassword] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [pwdLoading, setPwdLoading] = useState(false);
   useEffect(() => {
     fetchWaStatus();
     loadBillFormatSettings();
@@ -388,9 +402,98 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
     setSaving(false);
     if (res.success && res.user) {
       if (onProfileUpdated) onProfileUpdated(res.user);
-      Alert.alert("Settings Saved", "Profile & Business configurations updated successfully");
+      showWaNotice("Settings Saved", "Profile & Business configurations updated successfully");
     } else {
-      Alert.alert("Error", res.message || "Failed to update profile");
+      showWaNotice("Error", res.message || "Failed to update profile");
+    }
+  };
+
+  const openEmailChangeModal = () => {
+    setEmailChangeStep(1);
+    setEmailChangePassword("");
+    setNewEmailInput("");
+    setEmailChangeOtp("");
+    setEmailChangeMsg("");
+    setShowEmailModal(true);
+  };
+
+  const handleRequestEmailChange = async () => {
+    const trimmedEmail = newEmailInput.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      showWaNotice("Invalid Email", "Please enter a valid new email address");
+      return;
+    }
+    if (!emailChangePassword) {
+      showWaNotice("Password Required", "Enter your current password to authorize this change");
+      return;
+    }
+    setEmailChangeLoading(true);
+    const res = await api.auth.requestEmailChange({
+      currentPassword: emailChangePassword,
+      newEmail: trimmedEmail,
+    });
+    setEmailChangeLoading(false);
+    if (res.success) {
+      setEmailChangeStep(2);
+      setEmailChangeMsg(res.message || "Verification OTP sent to your new Email & registered WhatsApp.");
+    } else {
+      showWaNotice("Verification Failed", res.message || "Could not verify password or send OTP");
+    }
+  };
+
+  const handleConfirmEmailChange = async () => {
+    const trimmedEmail = newEmailInput.trim().toLowerCase();
+    if (!emailChangeOtp.trim() || emailChangeOtp.trim().length < 6) {
+      showWaNotice("OTP Required", "Enter the 6-digit verification code");
+      return;
+    }
+    setEmailChangeLoading(true);
+    const res = await api.auth.confirmEmailChange({
+      newEmail: trimmedEmail,
+      otpCode: emailChangeOtp.trim(),
+    });
+    setEmailChangeLoading(false);
+    if (res.success && res.user) {
+      setEmail(res.user.email || trimmedEmail);
+      if (onProfileUpdated) onProfileUpdated(res.user);
+      setShowEmailModal(false);
+      showWaNotice("Email Updated", res.message || "Your store email has been updated securely.");
+    } else {
+      showWaNotice("Error", res.message || "Invalid or expired OTP code");
+    }
+  };
+
+  const openPasswordModal = () => {
+    setCurPassword("");
+    setNewPwd("");
+    setConfirmPwd("");
+    setShowPasswordModal(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (!curPassword) {
+      showWaNotice("Password Required", "Please enter your current password");
+      return;
+    }
+    if (newPwd.length < 6) {
+      showWaNotice("Weak Password", "New password must be at least 6 characters long");
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      showWaNotice("Mismatch", "New password and confirm password do not match");
+      return;
+    }
+    setPwdLoading(true);
+    const res = await api.auth.changePassword({
+      currentPassword: curPassword,
+      newPassword: newPwd,
+    });
+    setPwdLoading(false);
+    if (res.success) {
+      setShowPasswordModal(false);
+      showWaNotice("Password Changed", res.message || "Your password was updated successfully.");
+    } else {
+      showWaNotice("Failed", res.message || "Could not update password");
     }
   };
   const handleCheckForUpdates = async () => {
@@ -575,17 +678,29 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 />
               </View>
               <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-700 mb-1">Store Email Address</Text>
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-xs font-bold text-gray-700">Store Email Address</Text>
+                  {user?.email ? (
+                    <TouchableOpacity onPress={openEmailChangeModal}>
+                      <Text className="text-xs font-bold text-blue-600">Reset / Change Email</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
                 <TextInput
-                  className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
+                  className={`border border-gray-300 rounded-xl px-4 py-2.5 text-sm ${
+                    user?.email ? "bg-gray-100 text-gray-500" : "bg-gray-100 text-gray-900"
+                  }`}
                   placeholder="e.g. store@example.com"
                   value={email}
                   onChangeText={setEmail}
+                  editable={!user?.email}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
                 <Text className="text-[11px] text-gray-400 mt-1">
-                  Shown on receipts and digital bills sent to customers.
+                  {user?.email
+                    ? "Verified email — changing it requires password + 6-digit OTP verification."
+                    : "Shown on receipts, digital bills, and used for password recovery."}
                 </Text>
               </View>
               <View className="mb-3">
@@ -677,6 +792,33 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 </>
               )}
             </TouchableOpacity>
+
+            <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
+              <View className="flex-row items-center mb-2">
+                <Ionicons name="shield-checkmark-outline" size={18} color="#2563EB" />
+                <Text className="text-sm font-bold text-gray-900 ml-2">Account Security</Text>
+              </View>
+              <Text className="text-xs text-gray-500 mb-3">
+                Protect your billing account with password & OTP-verified email updates.
+              </Text>
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  onPress={openEmailChangeModal}
+                  className="flex-1 bg-blue-50 border border-blue-200 py-2.5 px-3 rounded-xl flex-row items-center justify-center"
+                >
+                  <Ionicons name="mail-outline" size={16} color="#1D4ED8" />
+                  <Text className="text-blue-700 font-bold text-xs ml-1.5">Reset / Change Email</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={openPasswordModal}
+                  className="flex-1 bg-slate-100 border border-slate-300 py-2.5 px-3 rounded-xl flex-row items-center justify-center"
+                >
+                  <Ionicons name="key-outline" size={16} color="#334155" />
+                  <Text className="text-slate-700 font-bold text-xs ml-1.5">Change Password</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
               <View className="flex-row items-center justify-between mb-1">
                 <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -1338,6 +1480,162 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
               style={{ backgroundColor: "#1D4ED8", borderRadius: 12, paddingVertical: 12, alignItems: "center", marginTop: 12 }}
             >
               <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Close Preview</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEmailModal} transparent animationType="fade" onRequestClose={() => setShowEmailModal(false)}>
+        <View className="flex-1 bg-black/50 justify-center items-center px-5">
+          <View style={{ width: "100%", maxWidth: 420 }} className="bg-white rounded-2xl p-6 shadow-xl">
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <View className="w-9 h-9 rounded-full bg-blue-50 items-center justify-center mr-2.5">
+                  <Ionicons name="mail-outline" size={18} color="#2563EB" />
+                </View>
+                <Text className="text-lg font-extrabold text-gray-900">Reset / Change Email</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowEmailModal(false)} className="p-1">
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-xs text-gray-500 mb-4">
+              {emailChangeStep === 1
+                ? "Verify your current password, then enter your new email address. A 6-digit OTP will be sent to verify ownership."
+                : emailChangeMsg}
+            </Text>
+
+            <Text className="text-xs font-bold text-gray-700 mb-1">New Store Email</Text>
+            <TextInput
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 mb-3"
+              placeholder="newstore@email.com"
+              placeholderTextColor="#9CA3AF"
+              value={newEmailInput}
+              onChangeText={setNewEmailInput}
+              editable={emailChangeStep === 1}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            {emailChangeStep === 1 ? (
+              <>
+                <Text className="text-xs font-bold text-gray-700 mb-1">Current Password</Text>
+                <TextInput
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 mb-4"
+                  placeholder="Enter current password"
+                  placeholderTextColor="#9CA3AF"
+                  value={emailChangePassword}
+                  onChangeText={setEmailChangePassword}
+                  secureTextEntry
+                />
+                <TouchableOpacity
+                  onPress={handleRequestEmailChange}
+                  disabled={emailChangeLoading}
+                  className="w-full bg-blue-600 py-3.5 rounded-xl items-center"
+                >
+                  {emailChangeLoading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-white font-bold text-sm">Verify & Send OTP</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text className="text-xs font-bold text-gray-700 mb-1">6-Digit Verification OTP</Text>
+                <TextInput
+                  className="w-full bg-blue-50/60 border border-blue-200 rounded-xl px-4 py-3 text-sm text-center font-bold tracking-widest text-gray-900 mb-4"
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor="#9CA3AF"
+                  value={emailChangeOtp}
+                  onChangeText={setEmailChangeOtp}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+                <TouchableOpacity
+                  onPress={handleConfirmEmailChange}
+                  disabled={emailChangeLoading}
+                  className="w-full bg-blue-600 py-3.5 rounded-xl items-center mb-2"
+                >
+                  {emailChangeLoading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-white font-bold text-sm">Confirm Email Update</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleRequestEmailChange}
+                  disabled={emailChangeLoading}
+                  className="items-center py-2"
+                >
+                  <Text className="text-xs font-bold text-blue-600">Resend OTP</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showPasswordModal} transparent animationType="fade" onRequestClose={() => setShowPasswordModal(false)}>
+        <View className="flex-1 bg-black/50 justify-center items-center px-5">
+          <View style={{ width: "100%", maxWidth: 420 }} className="bg-white rounded-2xl p-6 shadow-xl">
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <View className="w-9 h-9 rounded-full bg-slate-100 items-center justify-center mr-2.5">
+                  <Ionicons name="key-outline" size={18} color="#334155" />
+                </View>
+                <Text className="text-lg font-extrabold text-gray-900">Change Password</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowPasswordModal(false)} className="p-1">
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-xs text-gray-500 mb-4">
+              Choose a strong password of at least 6 characters. Alerts will be sent to your WhatsApp & Email.
+            </Text>
+
+            <Text className="text-xs font-bold text-gray-700 mb-1">Current Password</Text>
+            <TextInput
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 mb-3"
+              placeholder="Enter current password"
+              placeholderTextColor="#9CA3AF"
+              value={curPassword}
+              onChangeText={setCurPassword}
+              secureTextEntry
+            />
+
+            <Text className="text-xs font-bold text-gray-700 mb-1">New Password (min 6 chars)</Text>
+            <TextInput
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 mb-3"
+              placeholder="Enter new password"
+              placeholderTextColor="#9CA3AF"
+              value={newPwd}
+              onChangeText={setNewPwd}
+              secureTextEntry
+            />
+
+            <Text className="text-xs font-bold text-gray-700 mb-1">Confirm New Password</Text>
+            <TextInput
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 mb-4"
+              placeholder="Re-enter new password"
+              placeholderTextColor="#9CA3AF"
+              value={confirmPwd}
+              onChangeText={setConfirmPwd}
+              secureTextEntry
+            />
+
+            <TouchableOpacity
+              onPress={handleChangePassword}
+              disabled={pwdLoading}
+              className="w-full bg-blue-600 py-3.5 rounded-xl items-center"
+            >
+              {pwdLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text className="text-white font-bold text-sm">Update Password</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

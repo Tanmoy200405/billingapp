@@ -350,6 +350,31 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(payload),
       }),
+    forgotPasswordSendOtp: (identifier) =>
+      request("/auth/forgot-password/send-otp", {
+        method: "POST",
+        body: JSON.stringify({ identifier }),
+      }),
+    forgotPasswordVerify: (payload) =>
+      request("/auth/forgot-password/verify", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    requestEmailChange: (payload) =>
+      request("/auth/email-change/request", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    confirmEmailChange: (payload) =>
+      request("/auth/email-change/confirm", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    changePassword: (payload) =>
+      request("/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   },
   dashboard: {
     getStats: () => request("/dashboard/stats"),

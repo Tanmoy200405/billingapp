@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
+  Modal,
 } from "react-native";
 import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { api, setAuthToken } from "../config/api";
@@ -23,6 +24,15 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotStep, setForgotStep] = useState(1);
+  const [forgotId, setForgotId] = useState("");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState("");
 
   const showNotice = (title, message) => {
     if (Platform.OS === "web") {
@@ -114,6 +124,71 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
     }
   };
 
+  const openForgotModal = () => {
+    setForgotId(identifier.trim());
+    setForgotStep(1);
+    setForgotOtp("");
+    setForgotNewPassword("");
+    setForgotConfirmPassword("");
+    setForgotMessage("");
+    setShowForgotModal(true);
+  };
+
+  const handleForgotSendOtp = async () => {
+    const raw = forgotId.trim();
+    if (!raw) {
+      showNotice("Input Required", "Enter your registered 10-digit mobile number or email");
+      return;
+    }
+    const target = raw.includes("@") ? raw.toLowerCase() : cleanPhoneNumber(raw);
+    setForgotLoading(true);
+    const res = await api.auth.forgotPasswordSendOtp(target);
+    setForgotLoading(false);
+    if (res.success) {
+      setForgotStep(2);
+      setForgotMessage(res.message || "Reset OTP sent to your registered WhatsApp & Email");
+    } else {
+      showNotice("Reset Failed", res.message || "Could not send password reset OTP");
+    }
+  };
+
+  const handleForgotReset = async () => {
+    const raw = forgotId.trim();
+    const target = raw.includes("@") ? raw.toLowerCase() : cleanPhoneNumber(raw);
+    if (!forgotOtp.trim() || forgotOtp.trim().length < 6) {
+      showNotice("OTP Required", "Enter the 6-digit reset OTP");
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      showNotice("Weak Password", "New password must be at least 6 characters long");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      showNotice("Mismatch", "New password and confirm password do not match");
+      return;
+    }
+    setForgotLoading(true);
+    const res = await api.auth.forgotPasswordVerify({
+      identifier: target,
+      otpCode: forgotOtp.trim(),
+      newPassword: forgotNewPassword,
+    });
+    setForgotLoading(false);
+    if (res.success) {
+      setShowForgotModal(false);
+      if (res.token && res.user) {
+        setAuthToken(res.token, res.user);
+        showNotice("Password Reset", "Your password has been updated and you are signed in.");
+        onLoginSuccess(res.user);
+      } else {
+        setPassword("");
+        showNotice("Password Reset", "Password updated! Please sign in with your new password.");
+      }
+    } else {
+      showNotice("Verification Failed", res.message || "Invalid or expired OTP");
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -197,7 +272,12 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
 
         {!useOtp ? (
           <View className="mb-6">
-            <Text className="text-xs font-bold text-gray-600 mb-1">Password</Text>
+            <View className="flex-row justify-between items-center mb-1">
+              <Text className="text-xs font-bold text-gray-600">Password</Text>
+              <TouchableOpacity onPress={openForgotModal}>
+                <Text className="text-xs font-bold text-blue-600">Forgot Password?</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-gray-900"
               placeholder="Enter password"
@@ -281,6 +361,108 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
         </View>
       </View>
       </ScrollView>
+
+      <Modal visible={showForgotModal} transparent animationType="fade" onRequestClose={() => setShowForgotModal(false)}>
+        <View className="flex-1 bg-black/50 justify-center items-center px-5">
+          <View style={{ width: "100%", maxWidth: 420 }} className="bg-white rounded-2xl p-6 shadow-xl">
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <View className="w-9 h-9 rounded-full bg-blue-50 items-center justify-center mr-2.5">
+                  <Ionicons name="key-outline" size={18} color="#2563EB" />
+                </View>
+                <Text className="text-lg font-extrabold text-gray-900">Reset Password</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowForgotModal(false)} className="p-1">
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-xs text-gray-500 mb-4">
+              {forgotStep === 1
+                ? "Enter your registered mobile number or email. We will send a 6-digit OTP to your verified WhatsApp & Email."
+                : forgotMessage}
+            </Text>
+
+            <Text className="text-xs font-bold text-gray-700 mb-1">Registered Phone or Email</Text>
+            <TextInput
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 mb-3"
+              placeholder="10-digit mobile or store@email.com"
+              placeholderTextColor="#9CA3AF"
+              value={forgotId}
+              onChangeText={setForgotId}
+              editable={forgotStep === 1}
+              autoCapitalize="none"
+            />
+
+            {forgotStep === 2 ? (
+              <>
+                <Text className="text-xs font-bold text-gray-700 mb-1">6-Digit Reset OTP</Text>
+                <TextInput
+                  className="w-full bg-blue-50/60 border border-blue-200 rounded-xl px-4 py-3 text-sm text-center font-bold tracking-widest text-gray-900 mb-3"
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor="#9CA3AF"
+                  value={forgotOtp}
+                  onChangeText={setForgotOtp}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+
+                <Text className="text-xs font-bold text-gray-700 mb-1">New Password (min 6 chars)</Text>
+                <TextInput
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 mb-3"
+                  placeholder="Enter new password"
+                  placeholderTextColor="#9CA3AF"
+                  value={forgotNewPassword}
+                  onChangeText={setForgotNewPassword}
+                  secureTextEntry
+                />
+
+                <Text className="text-xs font-bold text-gray-700 mb-1">Confirm New Password</Text>
+                <TextInput
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 mb-4"
+                  placeholder="Re-enter new password"
+                  placeholderTextColor="#9CA3AF"
+                  value={forgotConfirmPassword}
+                  onChangeText={setForgotConfirmPassword}
+                  secureTextEntry
+                />
+
+                <TouchableOpacity
+                  onPress={handleForgotReset}
+                  disabled={forgotLoading}
+                  className="w-full bg-blue-600 py-3.5 rounded-xl items-center mb-2"
+                >
+                  {forgotLoading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-white font-bold text-sm">Verify & Reset Password</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleForgotSendOtp}
+                  disabled={forgotLoading}
+                  className="items-center py-2"
+                >
+                  <Text className="text-xs font-bold text-blue-600">Resend Reset OTP</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                onPress={handleForgotSendOtp}
+                disabled={forgotLoading}
+                className="w-full bg-blue-600 py-3.5 rounded-xl items-center mt-1"
+              >
+                {forgotLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text className="text-white font-bold text-sm">Send Reset OTP</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
