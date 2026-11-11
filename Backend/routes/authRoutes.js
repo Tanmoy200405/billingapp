@@ -23,69 +23,174 @@ function getPhoneVariants(phone) {
   }
   return [raw];
 }
+function formatIstLoginTime() {
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
+async function dispatchLoginNotifications(user) {
+  if (!user) return;
+  const loginTime = formatIstLoginTime();
+  const targetPhone = user.whatsappNumber || user.phone;
+  const storeName = user.businessName || "My Business";
+  const ownerName = user.name || "Store Owner";
+
+  if (targetPhone) {
+    const waAlert =
+      `*Billing App Login Alert*\n\n` +
+      `Hi ${ownerName}, you logged into *${storeName}* at ${loginTime}.\n` +
+      `If this wasn't you, please change your password immediately.`;
+    enqueueJob("SEND_SYSTEM_WHATSAPP", {
+      phone: targetPhone,
+      message: waAlert,
+    }).catch(() => {});
+  }
+
+  if (user.email && isSesConfigured()) {
+    enqueueJob("SEND_EMAIL", {
+      to: user.email,
+      subject: `BillingApp Login Confirmation - ${storeName}`,
+      text: `Hi ${ownerName}, your BillingApp account (${storeName}) just logged in at ${loginTime}. If this was not you, please reset your password immediately.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px;">
+          <h2 style="color: #2563EB; margin-top: 0;">BillingApp Login Alert</h2>
+          <p style="color: #334155;">Hi <strong>${ownerName}</strong>,</p>
+          <p style="color: #334155;">Your store account <strong>${storeName}</strong> was accessed on <strong>${loginTime}</strong>.</p>
+          <p style="color: #64748B; font-size: 12px; margin-top: 20px;">If this wasn't you, please update your password immediately inside Settings.</p>
+        </div>
+      `,
+    }).catch(() => {});
+  }
+}
+
 router.post("/send-otp", async (req, res) => {
   try {
-    const { phone, channel = "whatsapp" } = req.body;
-    if (!phone) {
+    const { phone, identifier, email, channel = "whatsapp" } = req.body;
+    const rawInput = (phone || identifier || email || "").toString().trim();
+    if (!rawInput) {
       return res.status(400).json({
         success: false,
-        message: "Phone or WhatsApp number is required",
+        message: "Phone, WhatsApp number, or Email is required",
       });
     }
-    const raw = phone.toString().trim().replace(/[^0-9]/g, "");
-    const cleanPhone = raw.slice(-10);
-    if (cleanPhone.length !== 10) {
+
+    const inputIsEmail = rawInput.includes("@");
+    let matchedUser = null;
+    if (inputIsEmail) {
+      matchedUser = await User.findOne({ email: rawInput.toLowerCase() }).select("-password").lean();
+    } else {
+      const digitsOnly = rawInput.replace(/[^0-9]/g, "");
+      const p10 = digitsOnly.slice(-10);
+      if (p10.length === 10) {
+        const variants = getPhoneVariants(p10);
+        matchedUser = await User.findOne({
+          $or: [{ phone: { $in: variants } }, { whatsappNumber: { $in: variants } }],
+        })
+          .select("-password")
+          .lean();
+      }
+    }
+
+    const rawPhoneDigits = (
+      (!inputIsEmail ? rawInput : "") ||
+      matchedUser?.whatsappNumber ||
+      matchedUser?.phone ||
+      ""
+    )
+      .toString()
+      .replace(/[^0-9]/g, "");
+    const cleanPhone = rawPhoneDigits.slice(-10);
+    const targetEmail = (email || (inputIsEmail ? rawInput : "") || matchedUser?.email || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    if (cleanPhone.length !== 10 && !targetEmail) {
       return res.status(400).json({
         success: false,
-        message: "Please enter a valid 10-digit mobile number",
+        message: "Please enter a valid 10-digit mobile number or registered email address",
       });
     }
+
+    const otpKey = cleanPhone.length === 10 ? cleanPhone : targetEmail;
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    const variants = getPhoneVariants(cleanPhone);
+    const variants = cleanPhone.length === 10 ? getPhoneVariants(cleanPhone) : [targetEmail];
     await Otp.deleteMany({ phone: { $in: variants } });
     await Otp.create({
-      phone: cleanPhone,
+      phone: otpKey,
       code,
       channel,
       verified: false,
       expiresAt,
     });
+
     let sentViaWhatsApp = false;
     let sentViaSms = false;
     let sentViaEmail = false;
-    try {
-      const fullNumber = `91${cleanPhone}`;
-      const waMsg = `*Billing App Verification Code*\n\nYour 6-digit login OTP is: *${code}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
-      const waRes = await sendSystemWhatsAppMessage(fullNumber, waMsg);
-      if (waRes && waRes.success) {
-        sentViaWhatsApp = true;
+
+    if (cleanPhone.length === 10) {
+      try {
+        const fullNumber = `91${cleanPhone}`;
+        const waMsg = `*Billing App Verification Code*\n\nYour 6-digit login OTP is: *${code}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
+        const waRes = await sendSystemWhatsAppMessage(fullNumber, waMsg);
+        if (waRes && waRes.success) {
+          sentViaWhatsApp = true;
+        }
+      } catch {}
+
+      if ((!sentViaWhatsApp || channel === "sms") && isSnsSmsEnabled()) {
+        await enqueueJob("SEND_SMS", {
+          phone: cleanPhone,
+          message: `Your Billing App login OTP is ${code}. Valid for 10 minutes. Do not share.`,
+        });
+        sentViaSms = true;
       }
-    } catch {}
-    if ((!sentViaWhatsApp || channel === "sms") && isSnsSmsEnabled()) {
-      await enqueueJob("SEND_SMS", {
-        phone: cleanPhone,
-        message: `Your Billing App login OTP is ${code}. Valid for 10 minutes. Do not share.`,
-      });
-      sentViaSms = true;
     }
-    if (channel === "email" && req.body.email && isSesConfigured()) {
+
+    if (targetEmail && isSesConfigured()) {
       const emailRes = await sendEmailViaSes({
-        to: req.body.email,
-        subject: "Billing App Login OTP",
-        text: `Your 6-digit login OTP is: ${code}. Valid for 10 minutes.`,
+        to: targetEmail,
+        subject: "BillingApp Login Verification Code (OTP)",
+        text: `Your 6-digit BillingApp login OTP is: ${code}. Valid for 10 minutes. Do not share this code.`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px;">
+            <h2 style="color: #2563EB; margin-top: 0;">BillingApp Login OTP</h2>
+            <p style="color: #334155;">Use this 6-digit verification code to sign in:</p>
+            <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 14px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1E40AF;">
+              ${code}
+            </div>
+            <p style="color: #64748B; font-size: 12px; margin-top: 16px;">Valid for 10 minutes. Do not share this code with anyone.</p>
+          </div>
+        `,
       }).catch(() => null);
       if (emailRes?.sent) sentViaEmail = true;
     }
+
+    const channels = [];
+    if (sentViaWhatsApp) channels.push(`WhatsApp (+91 ${cleanPhone})`);
+    if (sentViaSms) channels.push(`SMS (+91 ${cleanPhone})`);
+    if (sentViaEmail) channels.push(`Email (${targetEmail})`);
+
     return res.status(200).json({
       success: true,
-      message: sentViaWhatsApp
-        ? `OTP code sent to your WhatsApp (+91 ${cleanPhone})`
-        : sentViaSms
-        ? `OTP code sent via SMS (+91 ${cleanPhone})`
-        : `Verification code generated for +91 ${cleanPhone}`,
+      message: channels.length
+        ? `OTP code sent to your ${channels.join(" & ")}`
+        : `Verification code generated for ${cleanPhone ? `+91 ${cleanPhone}` : targetEmail}`,
       code,
-      phone: cleanPhone,
+      phone: cleanPhone || undefined,
+      email: targetEmail || undefined,
       sentViaWhatsApp,
       sentViaSms,
       sentViaEmail,
@@ -146,6 +251,7 @@ router.post("/verify-otp", async (req, res) => {
       });
     }
     const token = generateToken(existingUser._id);
+    dispatchLoginNotifications(existingUser).catch(() => {});
     return res.status(200).json({
       success: true,
       message: "OTP verified successfully. Logged in!",
@@ -247,8 +353,11 @@ router.post("/login", async (req, res) => {
     const rawPhone = loginId.replace(/[^0-9]/g, "");
     const variants = rawPhone.length >= 10 ? getPhoneVariants(rawPhone) : [rawPhone];
     if (otpCode) {
+      const otpLookupKeys = isEmail
+        ? [loginId.toLowerCase(), ...variants].filter(Boolean)
+        : variants;
       const otpDoc = await Otp.findOne({
-        phone: { $in: variants },
+        phone: { $in: otpLookupKeys },
         code: otpCode.toString().trim(),
       });
       if (!otpDoc || new Date() > otpDoc.expiresAt) {
@@ -258,13 +367,15 @@ router.post("/login", async (req, res) => {
         });
       }
       await Otp.deleteOne({ _id: otpDoc._id });
-      let user = await User.findOne({
-        $or: [
-          { phone: { $in: variants } },
-          { whatsappNumber: { $in: variants } },
-        ],
-      });
-      if (!user) {
+      let user = isEmail
+        ? await User.findOne({ email: loginId.toLowerCase() })
+        : await User.findOne({
+            $or: [
+              { phone: { $in: variants } },
+              { whatsappNumber: { $in: variants } },
+            ],
+          });
+      if (!user && !isEmail) {
         const p10 = rawPhone.slice(-10);
         const salt = await bcrypt.genSalt(10);
         const defaultPassword = await bcrypt.hash(`wp_${p10}`, salt);
@@ -276,7 +387,14 @@ router.post("/login", async (req, res) => {
           password: defaultPassword,
         });
       }
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "No account found with this email address.",
+        });
+      }
       const token = generateToken(user._id);
+      dispatchLoginNotifications(user).catch(() => {});
       return res.status(200).json({
         success: true,
         message: "WhatsApp login successful!",
@@ -329,6 +447,7 @@ router.post("/login", async (req, res) => {
       });
     }
     const token = generateToken(user._id);
+    dispatchLoginNotifications(user).catch(() => {});
     return res.status(200).json({
       success: true,
       message: "Login successful!",

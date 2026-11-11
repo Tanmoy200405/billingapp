@@ -775,6 +775,48 @@ export const sendSystemWhatsAppMessage = async (recipientPhone, textMessage) => 
     }
   }
 
+  // 1. Prefer dedicated admin user ID if configured
+  if (process.env.ADMIN_WHATSAPP_USER_ID) {
+    const adminState = await ensureConnectedForUser(normalizeUserKey(process.env.ADMIN_WHATSAPP_USER_ID));
+    if (adminState?.sock && adminState.connectionStatus === "connected") {
+      return sendWhatsAppMessage(recipientPhone, textMessage, adminState.userId);
+    }
+  }
+
+  // 2. Match the store owner's configured WhatsApp number (DEFAULT_WHATSAPP_NUMBER / STORE_PHONE)
+  const ownerRaw = (process.env.DEFAULT_WHATSAPP_NUMBER || process.env.STORE_PHONE || "").replace(/[^0-9]/g, "");
+  const owner10 = ownerRaw.slice(-10);
+  if (owner10.length === 10) {
+    for (const [key, state] of sessions.entries()) {
+      const connected10 = (state.connectedNumber || "").replace(/[^0-9]/g, "").slice(-10);
+      if (connected10 === owner10 && state?.sock && state.connectionStatus === "connected") {
+        return sendWhatsAppMessage(recipientPhone, textMessage, key);
+      }
+    }
+
+    // Check MongoDB User owning DEFAULT_WHATSAPP_NUMBER / STORE_PHONE and wake their persisted session
+    try {
+      const variants = [owner10, `91${owner10}`, `+91${owner10}`, `0${owner10}`];
+      const ownerUser = await User.findOne({
+        $or: [
+          { whatsappLinkedNumber: { $in: variants } },
+          { whatsappNumber: { $in: variants } },
+          { phone: { $in: variants } },
+        ],
+      })
+        .select("_id")
+        .lean();
+
+      if (ownerUser?._id) {
+        const ownerState = await ensureConnectedForUser(normalizeUserKey(ownerUser._id));
+        if (ownerState?.sock && ownerState.connectionStatus === "connected") {
+          return sendWhatsAppMessage(recipientPhone, textMessage, ownerState.userId);
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Fallback to dedicated system/default keys, then any active connected session
   const preferredKeys = ["system", "default"];
   for (const key of preferredKeys) {
     const state = sessions.get(key);

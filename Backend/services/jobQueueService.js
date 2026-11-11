@@ -4,6 +4,7 @@ import { generateInvoicePdfBuffer } from "./pdfService.js";
 import {
   sendWhatsAppMessage,
   sendWhatsAppDocument,
+  sendSystemWhatsAppMessage,
   getWhatsAppStatus,
   initWhatsApp,
   waitForWhatsAppQrOrReady,
@@ -15,6 +16,8 @@ import {
   deleteSqsJob,
   sendSmsViaSns,
   isSnsSmsEnabled,
+  sendEmailViaSes,
+  isSesConfigured,
 } from "./awsMessagingService.js";
 
 const localQueue = [];
@@ -103,6 +106,22 @@ async function handleSmsJob(payload) {
   });
 }
 
+async function handleEmailJob(payload) {
+  const { to, subject, html, text } = payload || {};
+  if (!to || !subject || !isSesConfigured()) return;
+  await sendEmailViaSes({ to, subject, html, text }).catch((err) => {
+    console.warn("[Worker] SES Email error:", err.message);
+  });
+}
+
+async function handleSystemWhatsAppJob(payload) {
+  const { phone, message } = payload || {};
+  if (!phone || !message) return;
+  await sendSystemWhatsAppMessage(phone, message).catch((err) => {
+    console.warn("[Worker] System WhatsApp error:", err.message);
+  });
+}
+
 export async function processJob(job) {
   const { type, payload } = job || {};
   switch (type) {
@@ -112,6 +131,10 @@ export async function processJob(job) {
       return handleBulkWhatsAppJob(payload);
     case "SEND_SMS":
       return handleSmsJob(payload);
+    case "SEND_EMAIL":
+      return handleEmailJob(payload);
+    case "SEND_SYSTEM_WHATSAPP":
+      return handleSystemWhatsAppJob(payload);
     default:
       console.warn("[Worker] Unknown job type:", type);
   }

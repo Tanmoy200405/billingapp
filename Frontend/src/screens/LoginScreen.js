@@ -18,10 +18,19 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
   const { isWide } = useResponsive();
   const [useOtp, setUseOtp] = useState(false);
   const [identifier, setIdentifier] = useState("");
+  const [otpEmail, setOtpEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const showNotice = (title, message) => {
+    if (Platform.OS === "web") {
+      window.alert(`${title}: ${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
 
   const cleanPhoneNumber = (val) => {
     const raw = (val || "").toString().replace(/[^0-9]/g, "");
@@ -32,37 +41,39 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
   };
 
   const handleSendOtp = async (overrideTarget) => {
-    const target = cleanPhoneNumber(overrideTarget || identifier);
+    const rawInput = (overrideTarget || identifier || "").trim();
+    const isEmail = rawInput.includes("@");
+    const target = isEmail ? rawInput : cleanPhoneNumber(rawInput);
     if (!target) {
-      Alert.alert("Input Required", "Please enter your 10-digit mobile number");
+      showNotice("Input Required", "Please enter your 10-digit mobile number or registered email");
       return;
     }
     setLoading(true);
-    const res = await api.auth.sendOtp(target, "whatsapp");
+    const res = await api.auth.sendOtp(target, "whatsapp", otpEmail.trim());
     setLoading(false);
 
     if (res.success) {
       setOtpSent(true);
-      if (res.code) {
+      if (!res.sentViaWhatsApp && !res.sentViaSms && !res.sentViaEmail && res.code) {
         setOtpCode(String(res.code));
       }
-      Alert.alert(
-        res.sentViaWhatsApp ? "WhatsApp OTP Sent" : "Verification Code",
-        res.message || "OTP code has been sent to your WhatsApp"
+      showNotice(
+        res.sentViaWhatsApp || res.sentViaEmail ? "Verification Code Sent" : "Verification Code",
+        res.message || "OTP code has been sent to your WhatsApp & Email"
       );
     } else {
-      Alert.alert("Error", res.message || "Failed to send code");
+      showNotice("Error", res.message || "Failed to send code");
     }
   };
 
   const handleLogin = async () => {
     if (!identifier.trim()) {
-      Alert.alert("Input Required", "Please enter phone, WhatsApp or email");
+      showNotice("Input Required", "Please enter phone, WhatsApp or email");
       return;
     }
 
     if (!useOtp && !password) {
-      Alert.alert("Password Required", "Please enter your password");
+      showNotice("Password Required", "Please enter your password");
       return;
     }
 
@@ -71,7 +82,7 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
         handleSendOtp();
         return;
       }
-      Alert.alert("OTP Required", "Please enter the 6-digit code received on WhatsApp");
+      showNotice("OTP Required", "Please enter the 6-digit code received on WhatsApp or Email");
       return;
     }
 
@@ -89,7 +100,7 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
       setAuthToken(res.token, res.user);
       onLoginSuccess(res.user);
     } else {
-      Alert.alert("Login Failed", res.message || "Invalid credentials");
+      showNotice("Login Failed", res.message || "Invalid credentials");
     }
   };
 
@@ -99,7 +110,7 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
     if (clean && clean.length === 10) {
       handleSendOtp(clean);
     } else {
-      Alert.alert("WhatsApp Login", "Please enter your 10-digit WhatsApp phone number to receive your OTP");
+      showNotice("WhatsApp Login", "Please enter your 10-digit WhatsApp phone number to receive your OTP");
     }
   };
 
@@ -171,15 +182,15 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
 
         <View className="mb-4">
           <Text className="text-xs font-bold text-gray-600 mb-1">
-            {useOtp ? "Phone or WhatsApp Number" : "Email or Phone Number"}
+            {useOtp ? "WhatsApp / Phone or Email" : "Email or Phone Number"}
           </Text>
           <TextInput
             className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-gray-900"
-            placeholder={useOtp ? "9876543210" : "user@business.com or 9876543210"}
+            placeholder="user@business.com or 9876543210"
             placeholderTextColor="#9CA3AF"
             value={identifier}
             onChangeText={setIdentifier}
-            keyboardType={useOtp ? "phone-pad" : "email-address"}
+            keyboardType="email-address"
             autoCapitalize="none"
           />
         </View>
@@ -198,6 +209,22 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
           </View>
         ) : (
           <View className="mb-6">
+            {!identifier.includes("@") ? (
+              <View className="mb-3">
+                <Text className="text-xs font-bold text-gray-600 mb-1">
+                  Email for OTP (Optional if already saved)
+                </Text>
+                <TextInput
+                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+                  placeholder="your@email.com"
+                  placeholderTextColor="#9CA3AF"
+                  value={otpEmail}
+                  onChangeText={setOtpEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+            ) : null}
             <View className="flex-row justify-between items-center mb-1">
               <Text className="text-xs font-bold text-gray-600">Verification Code</Text>
               <TouchableOpacity onPress={() => handleSendOtp()}>

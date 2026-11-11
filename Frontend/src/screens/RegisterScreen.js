@@ -19,6 +19,7 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
   const [businessName, setBusinessName] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [gstin, setGstin] = useState("");
@@ -41,6 +42,7 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
       name: name.trim(),
       phone: phone.trim(),
       whatsappNumber: phone.trim(),
+      email: email.trim() ? email.trim().toLowerCase() : undefined,
       password,
       gstin: gstin.trim() || undefined,
     });
@@ -132,6 +134,19 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
+            />
+          </View>
+
+          <View className="mb-3">
+            <Text className="text-xs font-bold text-gray-600 mb-1">Email Address (for Login OTP & Alerts)</Text>
+            <TextInput
+              className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+              placeholder="store@business.com"
+              placeholderTextColor="#9CA3AF"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
           </View>
 
