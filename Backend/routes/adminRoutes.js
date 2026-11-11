@@ -11,6 +11,7 @@ import {
 } from "../services/whatsappService.js";
 import {
   getAwsMessagingStatus,
+  getEmailProviderDetails,
   isSesConfigured,
   sendEmailViaSes,
 } from "../services/awsMessagingService.js";
@@ -145,7 +146,7 @@ router.get("/", (req, res) => {
       <div class="card">
         <div class="row" style="justify-content:space-between">
           <div>
-            <h3 style="margin:0">2. Company Email Address (AWS SES)</h3>
+            <h3 style="margin:0">2. Company Email Address (Gmail SMTP / AWS SES)</h3>
             <p id="emailInfo" style="font-size:12px;color:#64748B;margin:4px 0 0">Loading email configuration...</p>
           </div>
           <span id="emailBadge" class="badge warn">Not Configured</span>
@@ -227,13 +228,23 @@ router.get("/", (req, res) => {
       const emailBadge = document.getElementById('emailBadge');
       const emailInfo = document.getElementById('emailInfo');
       if (data.email?.configured) {
-        emailBadge.className = 'badge ok';
-        emailBadge.innerText = 'Configured';
-        emailInfo.innerText = 'Sender: ' + data.email.fromEmail + ' (Region: ' + data.email.region + ')';
+        if (data.email.provider === 'gmail_smtp') {
+          emailBadge.className = 'badge ok';
+          emailBadge.innerText = 'Gmail SMTP Ready';
+          emailInfo.innerText = 'Sender: ' + data.email.fromEmail + ' (via Gmail / SMTP)';
+        } else if (data.email.hasAwsKeys) {
+          emailBadge.className = 'badge ok';
+          emailBadge.innerText = 'AWS SES Ready';
+          emailInfo.innerText = 'Sender: ' + data.email.fromEmail + ' (Region: ' + data.email.region + ')';
+        } else {
+          emailBadge.className = 'badge warn';
+          emailBadge.innerText = 'Needs Password / IAM Keys';
+          emailInfo.innerText = 'Sender: ' + data.email.fromEmail + ' — Add GMAIL_APP_PASSWORD or AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY (or EC2 IAM role) in Backend/.env.';
+        }
       } else {
         emailBadge.className = 'badge warn';
         emailBadge.innerText = 'Not Configured';
-        emailInfo.innerText = 'Set AWS_SES_FROM_EMAIL in Backend/.env (verify email in AWS SES Console).';
+        emailInfo.innerText = 'Set GMAIL_USER + GMAIL_APP_PASSWORD or AWS_SES_FROM_EMAIL in Backend/.env.';
       }
     }
 
@@ -281,7 +292,9 @@ router.get("/", (req, res) => {
     async function sendTestEmail() {
       const to = document.getElementById('testEmailInput').value.trim();
       const data = await apiCall('/email/test', 'POST', { to });
-      document.getElementById('emailMsg').innerText = data.sent ? 'Test Email sent via AWS SES!' : (data.reason || data.message || 'Failed');
+      document.getElementById('emailMsg').innerText = data.sent
+        ? 'Test Email sent via ' + (data.provider === 'gmail_smtp' ? 'Gmail SMTP' : 'AWS SES') + '!'
+        : (data.reason || data.message || 'Failed');
     }
 
     if (adminKey) unlockAdmin();
@@ -295,14 +308,11 @@ router.use(requireAdminKey);
 router.get("/status", (req, res) => {
   const wa = getWhatsAppStatus(SYSTEM_SESSION_ID);
   const aws = getAwsMessagingStatus();
+  const emailDetails = getEmailProviderDetails();
   return res.status(200).json({
     success: true,
     whatsapp: wa,
-    email: {
-      configured: isSesConfigured(),
-      fromEmail: process.env.AWS_SES_FROM_EMAIL || "",
-      region: aws.region,
-    },
+    email: emailDetails,
     awsMessaging: aws,
   });
 });

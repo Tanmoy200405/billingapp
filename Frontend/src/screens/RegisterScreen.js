@@ -16,13 +16,9 @@ import { useResponsive } from "../utils/responsive";
 
 export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
   const { isWide } = useResponsive();
-  const [businessName, setBusinessName] = useState("");
-  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [gstin, setGstin] = useState("");
   const [otpStep, setOtpStep] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpInfoMsg, setOtpInfoMsg] = useState("");
@@ -37,14 +33,14 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
   };
 
   const handleRequestRegisterOtp = async () => {
-    if (!businessName.trim() || !name.trim() || !phone.trim() || !password) {
-      showNotice("Required Fields", "Please fill in Business Name, Owner Name, Phone, and Password");
+    const cleanPhone = phone.replace(/[^0-9]/g, "").slice(-10);
+    if (cleanPhone.length !== 10) {
+      showNotice("Invalid WhatsApp Number", "Please enter a valid 10-digit WhatsApp number");
       return;
     }
 
-    const cleanPhone = phone.replace(/[^0-9]/g, "").slice(-10);
-    if (cleanPhone.length !== 10) {
-      showNotice("Invalid Phone", "Please enter a valid 10-digit WhatsApp / mobile number");
+    if (!password || password.length < 6) {
+      showNotice("Weak Password", "Password must be at least 6 characters long");
       return;
     }
 
@@ -54,18 +50,18 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
     }
 
     setLoading(true);
-    const res = await api.auth.sendOtp(cleanPhone, "whatsapp", email.trim(), "register");
+    const res = await api.auth.sendOtp(cleanPhone, "whatsapp", "", "register");
     setLoading(false);
 
     if (res?.success) {
       setOtpStep(true);
-      setOtpInfoMsg(res.message || "Enter the 6-digit verification code.");
+      setOtpInfoMsg(res.message || "Enter the 6-digit verification code sent to your WhatsApp.");
       if (!res.sentViaWhatsApp && !res.sentViaSms && !res.sentViaEmail && res.code) {
         setOtpCode(String(res.code));
       }
       showNotice(
         "Verification Code Sent",
-        res.message || "OTP sent to your WhatsApp & Email."
+        res.message || "OTP sent to your WhatsApp number."
       );
     } else {
       showNotice("Notice", res?.message || "Could not start registration verification");
@@ -74,20 +70,17 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
 
   const handleRegister = async () => {
     if (!otpCode.trim()) {
-      showNotice("OTP Required", "Please enter the 6-digit verification code");
+      showNotice("OTP Required", "Please enter the 6-digit WhatsApp verification code");
       return;
     }
 
+    const cleanPhone = phone.replace(/[^0-9]/g, "").slice(-10);
     setLoading(true);
     const res = await api.auth.register({
-      businessName: businessName.trim(),
-      name: name.trim(),
-      phone: phone.trim(),
-      whatsappNumber: phone.trim(),
-      email: email.trim() ? email.trim().toLowerCase() : undefined,
+      phone: cleanPhone,
+      whatsappNumber: cleanPhone,
       password,
       otpCode: otpCode.trim(),
-      gstin: gstin.trim() || undefined,
     });
     setLoading(false);
 
@@ -140,79 +133,33 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
           </TouchableOpacity>
 
           <Text className="text-3xl font-extrabold text-blue-900 text-center">
-            {otpStep ? "Verify Account" : "Create Account"}
+            {otpStep ? "Verify WhatsApp" : "Create Account"}
           </Text>
           <Text className="text-xs text-gray-500 text-center mt-1 mb-6 px-4">
             {otpStep
-              ? otpInfoMsg || "Enter the 6-digit code sent to your WhatsApp & Email."
-              : "Create your store account to manage billing, inventory, and regular customers."}
+              ? otpInfoMsg || "Enter the 6-digit code sent to your WhatsApp number."
+              : "Register quickly with your WhatsApp number. You can add your Store Name, Email, GSTIN, and Logo anytime inside Settings."}
           </Text>
 
           {!otpStep ? (
             <>
               <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-600 mb-1">Business / Store Name</Text>
+                <Text className="text-xs font-bold text-gray-600 mb-1">WhatsApp Mobile Number</Text>
                 <TextInput
-                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-                  placeholder="e.g. Sri Krishna Super Mart"
-                  placeholderTextColor="#9CA3AF"
-                  value={businessName}
-                  onChangeText={setBusinessName}
-                />
-              </View>
-
-              <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-600 mb-1">Owner Name</Text>
-                <TextInput
-                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-                  placeholder="e.g. Ramesh Kumar"
-                  placeholderTextColor="#9CA3AF"
-                  value={name}
-                  onChangeText={setName}
-                />
-              </View>
-
-              <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-600 mb-1">Phone / WhatsApp Number</Text>
-                <TextInput
-                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-                  placeholder="10-digit mobile number"
+                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-gray-900"
+                  placeholder="10-digit WhatsApp number"
                   placeholderTextColor="#9CA3AF"
                   value={phone}
                   onChangeText={setPhone}
                   keyboardType="phone-pad"
+                  maxLength={13}
                 />
               </View>
 
               <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-600 mb-1">Email Address (for OTP & Login Alerts)</Text>
+                <Text className="text-xs font-bold text-gray-600 mb-1">Password (min 6 characters)</Text>
                 <TextInput
-                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-                  placeholder="store@business.com"
-                  placeholderTextColor="#9CA3AF"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-600 mb-1">GSTIN (Optional)</Text>
-                <TextInput
-                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-                  placeholder="e.g. 19AAACB1234F1Z5"
-                  placeholderTextColor="#9CA3AF"
-                  value={gstin}
-                  onChangeText={setGstin}
-                  autoCapitalize="characters"
-                />
-              </View>
-
-              <View className="mb-3">
-                <Text className="text-xs font-bold text-gray-600 mb-1">Password</Text>
-                <TextInput
-                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-gray-900"
                   placeholder="Enter password"
                   placeholderTextColor="#9CA3AF"
                   value={password}
@@ -224,7 +171,7 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
               <View className="mb-6">
                 <Text className="text-xs font-bold text-gray-600 mb-1">Confirm Password</Text>
                 <TextInput
-                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+                  className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-gray-900"
                   placeholder="Confirm password"
                   placeholderTextColor="#9CA3AF"
                   value={confirmPassword}
@@ -242,7 +189,7 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text className="text-white font-bold text-base">Verify & Continue</Text>
+                  <Text className="text-white font-bold text-base">Get WhatsApp OTP</Text>
                 )}
               </TouchableOpacity>
             </>
@@ -283,7 +230,7 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
                 onPress={() => setOtpStep(false)}
                 className="items-center mt-4"
               >
-                <Text className="text-xs font-semibold text-blue-600">Edit phone or email</Text>
+                <Text className="text-xs font-semibold text-blue-600">Edit WhatsApp number</Text>
               </TouchableOpacity>
             </>
           )}

@@ -411,14 +411,16 @@ router.post("/register", async (req, res) => {
       address,
       upiId,
     } = req.body;
-    if (!name || !businessName || !phone || !password) {
+    const rawPhone = (phone || whatsappNumber || "").toString().trim().replace(/[^0-9]/g, "");
+    const cleanPhone = rawPhone.length >= 10 ? rawPhone.slice(-10) : rawPhone;
+    if (!cleanPhone || cleanPhone.length !== 10 || !password) {
       return res.status(400).json({
         success: false,
-        message: "Name, Business Name, Phone, and Password are required",
+        message: "10-digit WhatsApp number and Password are required",
       });
     }
-    const rawPhone = phone.toString().trim().replace(/[^0-9]/g, "");
-    const cleanPhone = rawPhone.length >= 10 ? rawPhone.slice(-10) : rawPhone;
+    const finalName = (name || "").toString().trim() || "Store Owner";
+    const finalBusinessName = (businessName || "").toString().trim() || "My Business";
     const variants = getPhoneVariants(cleanPhone);
     const cleanEmail = email ? email.trim().toLowerCase() : "";
 
@@ -451,8 +453,8 @@ router.post("/register", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const user = await User.create({
-      name: name.trim(),
-      businessName: businessName.trim(),
+      name: finalName,
+      businessName: finalBusinessName,
       phone: cleanPhone,
       whatsappNumber: cleanWa,
       email: cleanEmail || undefined,

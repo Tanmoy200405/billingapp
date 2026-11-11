@@ -6,10 +6,13 @@ import {
 } from "@aws-sdk/client-sqs";
 import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import nodemailer from "nodemailer";
 
 let sqsClient = null;
 let snsClient = null;
 let sesClient = null;
+let smtpTransporter = null;
+let smtpCacheKey = "";
 
 function getAwsRegion() {
   return process.env.AWS_REGION || "ap-south-1";
@@ -38,8 +41,69 @@ export function isSnsTopicConfigured() {
   return Boolean(process.env.AWS_SNS_TOPIC_ARN);
 }
 
+export function isSmtpConfigured() {
+  const hasGmail = Boolean(
+    (process.env.GMAIL_USER || process.env.AWS_SES_FROM_EMAIL) &&
+      (process.env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, "")
+  );
+  const hasCustomSmtp = Boolean(
+    process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
+  );
+  return hasGmail || hasCustomSmtp;
+}
+
+export function getEmailFromAddress() {
+  return (
+    process.env.SMTP_FROM_EMAIL ||
+    process.env.GMAIL_USER ||
+    process.env.SMTP_USER ||
+    process.env.AWS_SES_FROM_EMAIL ||
+    ""
+  ).trim();
+}
+
 export function isSesConfigured() {
-  return Boolean(process.env.AWS_SES_FROM_EMAIL);
+  return Boolean(isSmtpConfigured() || process.env.AWS_SES_FROM_EMAIL);
+}
+
+export function getEmailProviderDetails() {
+  const smtpReady = isSmtpConfigured();
+  const hasAwsKeys = Boolean(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+  const hasSesEmail = Boolean(process.env.AWS_SES_FROM_EMAIL);
+  return {
+    configured: isSesConfigured(),
+    provider: smtpReady ? "gmail_smtp" : hasSesEmail ? "aws_ses" : "none",
+    fromEmail: getEmailFromAddress(),
+    hasAwsKeys,
+    region: getAwsRegion(),
+  };
+}
+
+function getSmtpTransporter() {
+  const smtpHost = (process.env.SMTP_HOST || "").trim();
+  const smtpUser = (process.env.SMTP_USER || process.env.GMAIL_USER || process.env.AWS_SES_FROM_EMAIL || "").trim();
+  const rawPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || "";
+  const smtpPass = rawPass.replace(/\s+/g, "");
+  const smtpPort = Number(process.env.SMTP_PORT || 465);
+  const cacheKey = `${smtpHost}:${smtpPort}:${smtpUser}:${smtpPass.length}`;
+
+  if (!smtpTransporter || smtpCacheKey !== cacheKey) {
+    smtpCacheKey = cacheKey;
+    if (smtpHost) {
+      smtpTransporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    } else {
+      smtpTransporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    }
+  }
+  return smtpTransporter;
 }
 
 function getSqsClient() {
@@ -158,10 +222,24 @@ export async function publishSnsEvent(subject, message) {
 
 export async function sendEmailViaSes({ to, subject, html, text }) {
   if (!isSesConfigured()) {
-    return { sent: false, reason: "AWS_SES_FROM_EMAIL not configured" };
+    return { sent: false, reason: "No email provider configured (set GMAIL_APP_PASSWORD or AWS_SES_FROM_EMAIL)" };
   }
   if (!to) {
     return { sent: false, reason: "Recipient email is missing" };
+  }
+
+  const fromEmail = getEmailFromAddress();
+
+  if (isSmtpConfigured()) {
+    const transporter = getSmtpTransporter();
+    const info = await transporter.sendMail({
+      from: `"BillingApp" <${fromEmail}>`,
+      to: Array.isArray(to) ? to.join(", ") : to,
+      subject,
+      ...(text ? { text } : {}),
+      ...(html ? { html } : {}),
+    });
+    return { sent: true, provider: "gmail_smtp", messageId: info.messageId };
   }
 
   const command = new SendEmailCommand({
@@ -178,8 +256,18 @@ export async function sendEmailViaSes({ to, subject, html, text }) {
     },
   });
 
-  const res = await getSesClient().send(command);
-  return { sent: true, messageId: res.MessageId };
+  try {
+    const res = await getSesClient().send(command);
+    return { sent: true, provider: "aws_ses", messageId: res.MessageId };
+  } catch (err) {
+    const msg = err?.message || "AWS SES send failed";
+    if (msg.includes("Could not load credentials from any providers")) {
+      throw new Error(
+        "AWS credentials missing. For Gmail, set GMAIL_USER and GMAIL_APP_PASSWORD (16-char Google App Password) in Backend/.env; OR set AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY (or attach an EC2 IAM Role with SES permissions)."
+      );
+    }
+    throw err;
+  }
 }
 
 export function getAwsMessagingStatus() {
@@ -189,6 +277,7 @@ export function getAwsMessagingStatus() {
     snsSmsEnabled: isSnsSmsEnabled(),
     snsTopicEnabled: isSnsTopicConfigured(),
     sesEmailEnabled: isSesConfigured(),
+    emailProvider: getEmailProviderDetails().provider,
   };
 }
 

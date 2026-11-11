@@ -46,6 +46,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       setActiveTab(initialTab);
     }
   }, [initialTab]);
+  const [ownerName, setOwnerName] = useState(user?.name || "");
   const [businessName, setBusinessName] = useState(user?.businessName || "");
   const [email, setEmail] = useState(user?.email || "");
   const [gstin, setGstin] = useState(user?.gstin || "");
@@ -389,6 +390,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
     setVipInputText(String(thresholdVal));
     AsyncStorage.setItem("party_vip_threshold", String(thresholdVal)).catch(() => {});
     const res = await api.auth.updateProfile({
+      name: ownerName.trim() || undefined,
       businessName: businessName.trim(),
       email: email.trim() || undefined,
       gstin: gstin.trim() || undefined,
@@ -659,6 +661,15 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                     <Text className="text-[10px] text-blue-600 font-bold mt-1">Add Logo</Text>
                   </TouchableOpacity>
                 )}
+              </View>
+              <View className="mb-3">
+                <Text className="text-xs font-bold text-gray-700 mb-1">Owner Name</Text>
+                <TextInput
+                  className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-semibold"
+                  value={ownerName}
+                  onChangeText={setOwnerName}
+                  placeholder="e.g. Ramesh Kumar"
+                />
               </View>
               <View className="mb-3">
                 <Text className="text-xs font-bold text-gray-700 mb-1">Store / Business Name</Text>
