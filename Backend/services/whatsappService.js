@@ -230,7 +230,8 @@ function stopKeepAlive(state) {
 function startServerSelfPing() {
   if (selfPingStarted || process.env.VERCEL) return;
   selfPingStarted = true;
-  const backendUrl = process.env.BACKEND_PUBLIC_URL || "https://billingapi.duckdns.org";
+  const envUrl = (process.env.BACKEND_PUBLIC_URL || "").trim().replace(/\/+$/, "");
+  const backendUrl = envUrl && !envUrl.includes("onrender.com") ? envUrl : "https://billingapi.duckdns.org";
   setInterval(async () => {
     try {
       await fetch(`${backendUrl}/api/health`);

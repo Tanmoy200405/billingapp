@@ -10,6 +10,15 @@ import { generateInvoicePdfBuffer } from "../services/pdfService.js";
 import { enqueueJob } from "../services/jobQueueService.js";
 import { invalidateUserCache } from "../services/cacheService.js";
 const router = express.Router();
+
+function getPublicBackendBase() {
+  const configured = (process.env.BACKEND_PUBLIC_URL || "").trim().replace(/\/+$/, "");
+  if (configured && !configured.includes("onrender.com")) {
+    return configured;
+  }
+  return "https://billingapi.duckdns.org";
+}
+
 router.get("/public/:id/pdf", async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
@@ -477,7 +486,7 @@ router.post("/", async (req, res) => {
       await customer.save();
     }
     const business = req.user;
-    const backendBase = process.env.BACKEND_PUBLIC_URL || "https://billingapi.duckdns.org";
+    const backendBase = getPublicBackendBase();
     const publicPdfUrl = `${backendBase}/api/invoices/public/${invoice._id}/pdf`;
     const itemsSummary = processedItems
       .map((it, idx) => `• ${it.name} x ${it.quantity} = Rs.${it.total}`)
@@ -576,7 +585,7 @@ router.post("/:id/send-whatsapp", async (req, res) => {
       });
     }
     const business = req.user;
-    const backendBase = process.env.BACKEND_PUBLIC_URL || "https://billingapi.duckdns.org";
+    const backendBase = getPublicBackendBase();
     const publicPdfUrl = `${backendBase}/api/invoices/public/${invoice._id}/pdf`;
     const itemsSummary = (invoice.items || [])
       .map((it) => `• ${it.name} x ${it.quantity} = Rs.${it.total}`)
