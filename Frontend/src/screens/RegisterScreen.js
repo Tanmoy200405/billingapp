@@ -72,133 +72,133 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-      <View
-        style={{
-          width: "100%",
-          maxWidth: 480,
-          backgroundColor: "#FFFFFF",
-          borderRadius: isWide ? 24 : 0,
-          padding: isWide ? 32 : 0,
-          borderWidth: isWide ? 1 : 0,
-          borderColor: "#E2E8F0",
-          shadowColor: isWide ? "#0F172A" : "transparent",
-          shadowOpacity: isWide ? 0.08 : 0,
-          shadowRadius: isWide ? 24 : 0,
-          elevation: isWide ? 4 : 0,
-        }}
-      >
-        <TouchableOpacity
-          onPress={() => onNavigate("welcome")}
-          className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center mb-4"
+        <View
+          style={{
+            width: "100%",
+            maxWidth: 480,
+            backgroundColor: "#FFFFFF",
+            borderRadius: isWide ? 24 : 0,
+            padding: isWide ? 32 : 0,
+            borderWidth: isWide ? 1 : 0,
+            borderColor: "#E2E8F0",
+            shadowColor: isWide ? "#0F172A" : "transparent",
+            shadowOpacity: isWide ? 0.08 : 0,
+            shadowRadius: isWide ? 24 : 0,
+            elevation: isWide ? 4 : 0,
+          }}
         >
-          <Ionicons name="arrow-back" size={20} color="#374151" />
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onNavigate("welcome")}
+            className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center mb-4"
+          >
+            <Ionicons name="arrow-back" size={20} color="#374151" />
+          </TouchableOpacity>
 
-        <Text className="text-3xl font-extrabold text-blue-900 text-center">
-          Create Account
-        </Text>
-        <Text className="text-xs text-gray-500 text-center mt-1 mb-6 px-4">
-          Create an account so you can manage your billing, inventory, and regular customers.
-        </Text>
-
-        <View className="mb-3">
-          <Text className="text-xs font-bold text-gray-600 mb-1">Business / Store Name</Text>
-          <TextInput
-            className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-            placeholder="e.g. Sri Krishna Super Mart"
-            placeholderTextColor="#9CA3AF"
-            value={businessName}
-            onChangeText={setBusinessName}
-          />
-        </View>
-
-        <View className="mb-3">
-          <Text className="text-xs font-bold text-gray-600 mb-1">Owner Name</Text>
-          <TextInput
-            className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-            placeholder="e.g. Ramesh Kumar"
-            placeholderTextColor="#9CA3AF"
-            value={name}
-            onChangeText={setName}
-          />
-        </View>
-
-        <View className="mb-3">
-          <Text className="text-xs font-bold text-gray-600 mb-1">Phone / WhatsApp Number</Text>
-          <TextInput
-            className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-            placeholder="10-digit mobile number"
-            placeholderTextColor="#9CA3AF"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
-        </View>
-
-        <View className="mb-3">
-          <Text className="text-xs font-bold text-gray-600 mb-1">GSTIN (Optional)</Text>
-          <TextInput
-            className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-            placeholder="e.g. 19AAACB1234F1Z5"
-            placeholderTextColor="#9CA3AF"
-            value={gstin}
-            onChangeText={setGstin}
-            autoCapitalize="characters"
-          />
-        </View>
-
-        <View className="mb-3">
-          <Text className="text-xs font-bold text-gray-600 mb-1">Password</Text>
-          <TextInput
-            className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-            placeholder="Enter password"
-            placeholderTextColor="#9CA3AF"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
-
-        <View className="mb-6">
-          <Text className="text-xs font-bold text-gray-600 mb-1">Confirm Password</Text>
-          <TextInput
-            className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
-            placeholder="Confirm password"
-            placeholderTextColor="#9CA3AF"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-          />
-        </View>
-
-        <TouchableOpacity
-          onPress={handleRegister}
-          disabled={loading}
-          activeOpacity={0.8}
-          className="w-full bg-blue-600 py-4 rounded-xl items-center shadow-md shadow-blue-500/30"
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text className="text-white font-bold text-base">Sign up</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => onNavigate("login")}
-          className="items-center mt-5"
-        >
-          <Text className="text-xs font-semibold text-gray-600">
-            Already have an account
+          <Text className="text-3xl font-extrabold text-blue-900 text-center">
+            Create Account
           </Text>
-        </TouchableOpacity>
-
-        <View className="items-center mt-5 pb-2">
-          <Text className="text-[11px] text-gray-400 text-center">
-            Your store profile, GST details, and receipts are securely synced to the cloud.
+          <Text className="text-xs text-gray-500 text-center mt-1 mb-6 px-4">
+            Create an account so you can manage your billing, inventory, and regular customers.
           </Text>
+
+          <View className="mb-3">
+            <Text className="text-xs font-bold text-gray-600 mb-1">Business / Store Name</Text>
+            <TextInput
+              className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+              placeholder="e.g. Sri Krishna Super Mart"
+              placeholderTextColor="#9CA3AF"
+              value={businessName}
+              onChangeText={setBusinessName}
+            />
+          </View>
+
+          <View className="mb-3">
+            <Text className="text-xs font-bold text-gray-600 mb-1">Owner Name</Text>
+            <TextInput
+              className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+              placeholder="e.g. Ramesh Kumar"
+              placeholderTextColor="#9CA3AF"
+              value={name}
+              onChangeText={setName}
+            />
+          </View>
+
+          <View className="mb-3">
+            <Text className="text-xs font-bold text-gray-600 mb-1">Phone / WhatsApp Number</Text>
+            <TextInput
+              className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+              placeholder="10-digit mobile number"
+              placeholderTextColor="#9CA3AF"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <View className="mb-3">
+            <Text className="text-xs font-bold text-gray-600 mb-1">GSTIN (Optional)</Text>
+            <TextInput
+              className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+              placeholder="e.g. 19AAACB1234F1Z5"
+              placeholderTextColor="#9CA3AF"
+              value={gstin}
+              onChangeText={setGstin}
+              autoCapitalize="characters"
+            />
+          </View>
+
+          <View className="mb-3">
+            <Text className="text-xs font-bold text-gray-600 mb-1">Password</Text>
+            <TextInput
+              className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+              placeholder="Enter password"
+              placeholderTextColor="#9CA3AF"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
+
+          <View className="mb-6">
+            <Text className="text-xs font-bold text-gray-600 mb-1">Confirm Password</Text>
+            <TextInput
+              className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-gray-900"
+              placeholder="Confirm password"
+              placeholderTextColor="#9CA3AF"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+          </View>
+
+          <TouchableOpacity
+            onPress={handleRegister}
+            disabled={loading}
+            activeOpacity={0.8}
+            className="w-full bg-blue-600 py-4 rounded-xl items-center shadow-md shadow-blue-500/30"
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text className="text-white font-bold text-base">Sign up</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => onNavigate("login")}
+            className="items-center mt-5"
+          >
+            <Text className="text-xs font-semibold text-gray-600">
+              Already have an account
+            </Text>
+          </TouchableOpacity>
+
+          <View className="items-center mt-5 pb-2">
+            <Text className="text-[11px] text-gray-400 text-center">
+              Your store profile, GST details, and receipts are securely synced to the cloud.
+            </Text>
+          </View>
         </View>
-      </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -130,7 +130,14 @@ router.post("/broadcast-offer", async (req, res) => {
     });
 
     // Check if server-side WhatsApp socket is connected for this store user
-    const waStatus = getWhatsAppStatus(req.user._id);
+    let waStatus = getWhatsAppStatus(req.user._id);
+    if (waStatus.status !== "connected" && process.env.MICROSERVICES_MODE === "true") {
+      try {
+        const messagingUrl = process.env.MESSAGING_SERVICE_URL || "http://127.0.0.1:5004";
+        const r = await fetch(`${messagingUrl}/internal/whatsapp/status/${req.user._id}`);
+        if (r.ok) waStatus = await r.json();
+      } catch {}
+    }
     const canServerSend = waStatus.status === "connected";
 
     if (autoSendViaServer && canServerSend) {

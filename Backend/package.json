@@ -6,6 +6,11 @@
   "scripts": {
     "start": "nodemon app.js",
     "dev": "nodemon app.js",
+    "gateway": "node gateway.js",
+    "ms:core": "node microservices/coreService.js",
+    "ms:billing": "node microservices/billingService.js",
+    "ms:reports": "node microservices/reportsService.js",
+    "ms:messaging": "node microservices/messagingService.js",
     "worker": "node worker.js"
   },
   "keywords": [],

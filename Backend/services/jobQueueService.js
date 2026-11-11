@@ -127,17 +127,34 @@ async function drainLocalQueue() {
 
 /**
  * Enqueue an async background job.
- * Uses AWS SQS when configured, with automatic fallback to local non-blocking queue.
+ * Uses AWS SQS when configured, forwards to ms-messaging in microservice mode,
+ * or falls back to local non-blocking queue in single-process mode.
  */
-export async function enqueueJob(type, payload) {
-  if (isSqsConfigured()) {
+export async function enqueueJob(type, payload, options = {}) {
+  if (!options.forceLocal && isSqsConfigured()) {
     try {
       const sqsRes = await sendSqsJob(type, payload);
       if (sqsRes.queued) {
         return { mode: "sqs", messageId: sqsRes.messageId };
       }
     } catch (err) {
-      console.warn("[Queue] SQS send failed, using local fallback:", err.message);
+      console.warn("[Queue] SQS send failed, using fallback:", err.message);
+    }
+  }
+
+  if (!options.forceLocal && process.env.MICROSERVICES_MODE === "true") {
+    const messagingUrl = process.env.MESSAGING_SERVICE_URL || "http://127.0.0.1:5004";
+    try {
+      const resp = await fetch(`${messagingUrl}/internal/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, payload }),
+      });
+      if (resp.ok) {
+        return { mode: "microservice-bridge" };
+      }
+    } catch (err) {
+      console.warn("[Queue] Messaging bridge fallback to local queue:", err.message);
     }
   }
 
