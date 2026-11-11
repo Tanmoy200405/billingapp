@@ -178,7 +178,8 @@ const sendAutomaticWhatsAppBill = async (
   message,
   pdfBuffer = null,
   invoiceNumber = "1",
-  storeName = "THE A POP JAKO BITES"
+  storeName = "THE A POP JAKO BITES",
+  userId = null
 ) => {
   if (pdfBuffer) {
     try {
@@ -186,7 +187,8 @@ const sendAutomaticWhatsAppBill = async (
         phone,
         pdfBuffer,
         `Invoice_${invoiceNumber}.pdf`,
-        message
+        message,
+        userId
       );
       if (docResult && docResult.success) {
         console.log(`[WhatsApp] Invoice #${invoiceNumber} PDF delivered successfully to +${phone}`);
@@ -197,7 +199,7 @@ const sendAutomaticWhatsAppBill = async (
     }
   }
   try {
-    const directResult = await sendWhatsAppMessage(phone, message);
+    const directResult = await sendWhatsAppMessage(phone, message, userId);
     if (directResult && directResult.success) {
       console.log(`[WhatsApp] Invoice #${invoiceNumber} text copy delivered to +${phone}`);
       return true;
@@ -633,7 +635,8 @@ router.post("/:id/send-whatsapp", async (req, res) => {
       whatsappText,
       pdfBuffer,
       invoice.invoiceNumber,
-      business.businessName || "THE A POP JAKO BITES"
+      business.businessName || "THE A POP JAKO BITES",
+      req.user._id
     );
     if (sent) {
       invoice.whatsappSent = true;

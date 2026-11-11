@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Otp from "../models/Otp.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { sendWhatsAppMessage } from "../services/whatsappService.js";
+import { sendSystemWhatsAppMessage } from "../services/whatsappService.js";
 import { enqueueJob } from "../services/jobQueueService.js";
 import {
   isSnsSmsEnabled,
@@ -57,7 +57,7 @@ router.post("/send-otp", async (req, res) => {
     try {
       const fullNumber = `91${cleanPhone}`;
       const waMsg = `*Billing App Verification Code*\n\nYour 6-digit login OTP is: *${code}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
-      const waRes = await sendWhatsAppMessage(fullNumber, waMsg);
+      const waRes = await sendSystemWhatsAppMessage(fullNumber, waMsg);
       if (waRes && waRes.success) {
         sentViaWhatsApp = true;
       }

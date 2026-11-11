@@ -129,12 +129,13 @@ router.post("/broadcast-offer", async (req, res) => {
       };
     });
 
-    // Check if server-side WhatsApp socket is connected
-    const waStatus = getWhatsAppStatus();
+    // Check if server-side WhatsApp socket is connected for this store user
+    const waStatus = getWhatsAppStatus(req.user._id);
     const canServerSend = waStatus.status === "connected";
 
     if (autoSendViaServer && canServerSend) {
       await enqueueJob("BULK_WHATSAPP_BROADCAST", {
+        userId: req.user._id.toString(),
         recipients: formattedResults,
       });
       return res.status(200).json({
@@ -235,7 +236,7 @@ router.post("/send-bulk-vip-offer", async (req, res) => {
       const whatsappUrl = `https://wa.me/91${phone}?text=${encodeURIComponent(message)}`;
       let sentDirectly = false;
       try {
-        const direct = await sendWhatsAppMessage(phone, message);
+        const direct = await sendWhatsAppMessage(phone, message, req.user._id);
         if (direct.success) sentDirectly = true;
       } catch { }
       results.push({ name: party.name, phone, whatsappUrl, message, sentDirectly });

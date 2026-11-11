@@ -36,7 +36,7 @@ async function handleInvoiceWhatsAppJob(payload) {
     console.warn("[Worker] PDF render warning:", err.message);
   }
 
-  const waStatus = getWhatsAppStatus();
+  const waStatus = getWhatsAppStatus(userId);
   let sent = false;
 
   if (waStatus.status === "connected") {
@@ -46,12 +46,13 @@ async function handleInvoiceWhatsAppJob(payload) {
           destinationPhone,
           pdfBuffer,
           `Bill_${invoice.invoiceNumber || invoice._id}_${(business?.businessName || "Store").replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
-          whatsappText
+          whatsappText,
+          userId
         );
         if (docRes?.success) sent = true;
       }
       if (!sent) {
-        const textRes = await sendWhatsAppMessage(destinationPhone, whatsappText);
+        const textRes = await sendWhatsAppMessage(destinationPhone, whatsappText, userId);
         if (textRes?.success) sent = true;
       }
     } catch (waErr) {
@@ -73,13 +74,13 @@ async function handleInvoiceWhatsAppJob(payload) {
 }
 
 async function handleBulkWhatsAppJob(payload) {
-  const { recipients = [] } = payload || {};
-  if (!Array.isArray(recipients) || !recipients.length) return;
+  const { userId, recipients = [] } = payload || {};
+  if (!userId || !Array.isArray(recipients) || !recipients.length) return;
 
   for (const rec of recipients) {
     if (!rec?.phone || !rec?.messageText) continue;
     try {
-      await sendWhatsAppMessage(rec.phone, rec.messageText);
+      await sendWhatsAppMessage(rec.phone, rec.messageText, userId);
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 1200));
   }

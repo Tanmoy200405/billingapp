@@ -7,6 +7,7 @@ import {
   initWhatsApp,
   disconnectWhatsApp,
   sendWhatsAppMessage,
+  requestPairingCodeForNumber,
 } from "../services/whatsappService.js";
 
 const router = express.Router();
@@ -14,56 +15,51 @@ const router = express.Router();
 router.use(protect);
 
 router.get("/status", async (req, res) => {
-  const globalStatus = getWhatsAppStatus();
+  const userId = req.user?._id?.toString();
   const user = req.user;
+  const waStatus = getWhatsAppStatus(userId);
 
-  let userStatus = "disconnected";
-  let userPhone = user?.whatsappLinkedNumber || null;
+  if (waStatus.status === "disconnected" && userId && (user?.whatsappLinked || waStatus.sessionPersisted)) {
+    initWhatsApp(false, userId).catch(() => {});
+  }
 
-  if (globalStatus.status === "connected") {
-    if (user?.whatsappLinked || !user?.whatsappLinkedNumber) {
-      userStatus = "connected";
-      userPhone = globalStatus.phoneNumber || user?.whatsappLinkedNumber;
-      if (user && !user.whatsappLinked) {
-        user.whatsappLinked = true;
-        user.whatsappLinkedNumber = userPhone;
-        if (user._id) {
-          await User.findByIdAndUpdate(user._id, {
-            whatsappLinked: true,
-            whatsappLinkedNumber: userPhone,
-          }).catch(() => {});
-        }
-      }
+  let userPhone = waStatus.phoneNumber || user?.whatsappLinkedNumber || null;
+
+  if (waStatus.status === "connected" && user?._id) {
+    if (!user.whatsappLinked || (waStatus.phoneNumber && user.whatsappLinkedNumber !== waStatus.phoneNumber)) {
+      await User.findByIdAndUpdate(user._id, {
+        whatsappLinked: true,
+        whatsappLinkedNumber: userPhone || "",
+      }).catch(() => {});
     }
-  } else if (globalStatus.status === "scan_qr") {
-    userStatus = "scan_qr";
   }
 
   return res.status(200).json({
     success: true,
-    status: userStatus,
-    qrCode: globalStatus.qrCode,
+    status: waStatus.status,
+    qrCode: waStatus.qrCode,
     phoneNumber: userPhone,
-    isLinkedForUser: userStatus === "connected",
+    isLinkedForUser: waStatus.status === "connected",
   });
 });
 
 router.post("/init", async (req, res) => {
+  const userId = req.user?._id?.toString();
   const force = req.body?.force === true;
-  await initWhatsApp(force);
-  const status = await waitForWhatsAppQrOrReady(12000);
+  await initWhatsApp(force, userId);
+  const status = await waitForWhatsAppQrOrReady(12000, userId);
   return res.status(200).json({ success: true, ...status });
 });
 
 router.post("/pairing-code", async (req, res) => {
+  const userId = req.user?._id?.toString();
   const { phone } = req.body;
   if (!phone) {
     return res.status(400).json({ success: false, message: "Phone number is required" });
   }
   try {
-    const { requestPairingCodeForNumber } = await import("../services/whatsappService.js");
-    const code = await requestPairingCodeForNumber(phone);
-    if (req.user && req.user._id) {
+    const code = await requestPairingCodeForNumber(phone, userId);
+    if (req.user?._id) {
       req.user.whatsappLinkedNumber = phone;
       await User.findByIdAndUpdate(req.user._id, {
         whatsappLinkedNumber: phone,
@@ -76,7 +72,8 @@ router.post("/pairing-code", async (req, res) => {
 });
 
 router.post("/disconnect", async (req, res) => {
-  if (req.user && req.user._id) {
+  const userId = req.user?._id?.toString();
+  if (req.user?._id) {
     req.user.whatsappLinked = false;
     req.user.whatsappLinkedNumber = "";
     await User.findByIdAndUpdate(req.user._id, {
@@ -84,16 +81,17 @@ router.post("/disconnect", async (req, res) => {
       whatsappLinkedNumber: "",
     }).catch(() => {});
   }
-  const result = await disconnectWhatsApp();
+  await disconnectWhatsApp(false, userId);
   return res.status(200).json({ success: true, status: "disconnected" });
 });
 
 router.post("/test", async (req, res) => {
+  const userId = req.user?._id?.toString();
   const { phone, message } = req.body;
   if (!phone || !message) {
     return res.status(400).json({ success: false, message: "Phone and message required" });
   }
-  const result = await sendWhatsAppMessage(phone, message);
+  const result = await sendWhatsAppMessage(phone, message, userId);
   return res.status(result.success ? 200 : 400).json(result);
 });
 

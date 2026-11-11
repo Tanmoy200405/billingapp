@@ -17,7 +17,7 @@ import invoiceRoutes from "./routes/invoiceRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import whatsappRoutes from "./routes/whatsappRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
-import { initWhatsApp } from "./services/whatsappService.js";
+import { initAllWhatsAppSessions } from "./services/whatsappService.js";
 import { startQueueWorker } from "./services/jobQueueService.js";
 import { getAwsMessagingStatus } from "./services/awsMessagingService.js";
 
@@ -26,7 +26,7 @@ connectDB().catch((err) =>
 );
 
 if (!process.env.VERCEL) {
-  initWhatsApp().catch((err) =>
+  initAllWhatsAppSessions().catch((err) =>
     console.warn("WhatsApp initialization notice:", err.message)
   );
   startQueueWorker();
