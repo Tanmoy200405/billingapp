@@ -20,7 +20,8 @@ import { api } from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { shareBillAsPdf, shareBackendPdf, printBill } from "../utils/receiptPdfGenerator";
 import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/localCache";
-import { queueOfflineInvoice, isNetworkErrorMessage, applyOfflineItemOpsToList } from "../utils/offlineQueue";
+import { queueOfflineInvoice, isNetworkErrorMessage, applyOfflineItemOpsToList, queueOfflineItemCreate } from "../utils/offlineQueue";
+import { CURRENT_APP_VERSION } from "../services/updateService";
 import { useResponsive } from "../utils/responsive";
 
 export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInvoice }) {
@@ -58,6 +59,27 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
   const [kotSent, setKotSent] = useState(false);
   const [printingBill, setPrintingBill] = useState(false);
 
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  const [showItemImages, setShowItemImages] = useState(true);
+  const [heldBills, setHeldBills] = useState([]);
+  const [showHoldModal, setShowHoldModal] = useState(false);
+  const [holdNote, setHoldNote] = useState("");
+  const [defaultAllParcel, setDefaultAllParcel] = useState(false);
+  const [showParcelModal, setShowParcelModal] = useState(false);
+  const [showQuickItemModal, setShowQuickItemModal] = useState(false);
+  const [quickItemName, setQuickItemName] = useState("");
+  const [quickItemPrice, setQuickItemPrice] = useState("");
+  const [quickItemCategory, setQuickItemCategory] = useState("General");
+  const [savingQuickItem, setSavingQuickItem] = useState(false);
+
+  const showPosNotice = (title, message) => {
+    if (Platform.OS === "web") {
+      window.alert(`${title}: ${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const formatISTDate = (dateVal) => {
     try {
       const d = new Date(dateVal || Date.now());
@@ -85,6 +107,14 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
   useEffect(() => {
     loadPartiesAndItems();
     loadBillFormat();
+    AsyncStorage.getItem("pos_held_bills")
+      .then((raw) => {
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setHeldBills(parsed);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -97,6 +127,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             barcode: it.barcode || "",
             sellingPrice: Number(it.sellingPrice ?? it.price ?? it.rate ?? 0),
             quantity: Number(it.quantity || it.qty || 1),
+            parcelQuantity: Number(it.parcelQuantity || 0),
             unit: it.unit || "PCS",
             taxRate: Number(it.taxRate) || 0,
           }))
@@ -174,7 +205,15 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     if (existing) {
       setCart(
         cart.map((c) =>
-          c._id === item._id ? { ...c, quantity: c.quantity + 1 } : c
+          c._id === item._id
+            ? {
+                ...c,
+                quantity: c.quantity + 1,
+                parcelQuantity: defaultAllParcel
+                  ? Math.min(c.quantity + 1, (c.parcelQuantity || 0) + 1)
+                  : c.parcelQuantity || 0,
+              }
+            : c
         )
       );
     } else {
@@ -188,6 +227,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
           unit: item.unit || "PCS",
           taxRate: item.taxRate || 0,
           quantity: 1,
+          parcelQuantity: defaultAllParcel ? 1 : 0,
         },
       ]);
     }
@@ -196,9 +236,16 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
   const removeItemFromCart = (itemId) => {
     const existing = cart.find((c) => c._id === itemId);
     if (existing && existing.quantity > 1) {
+      const nextQty = existing.quantity - 1;
       setCart(
         cart.map((c) =>
-          c._id === itemId ? { ...c, quantity: c.quantity - 1 } : c
+          c._id === itemId
+            ? {
+                ...c,
+                quantity: nextQty,
+                parcelQuantity: Math.min(c.parcelQuantity || 0, nextQty),
+              }
+            : c
         )
       );
     } else {
@@ -206,12 +253,19 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     }
   };
 
+  const clearItemFromCart = (itemId) => {
+    setCart((prev) => prev.filter((c) => c._id !== itemId));
+  };
+
+  const getCartItem = (itemId) => cart.find((c) => c._id === itemId);
+
   const getCartItemQty = (itemId) => {
     const found = cart.find((c) => c._id === itemId);
     return found ? found.quantity : 0;
   };
 
   const cartTotalItems = cart.reduce((sum, c) => sum + c.quantity, 0);
+  const cartTotalParcelItems = cart.reduce((sum, c) => sum + (c.parcelQuantity || 0), 0);
 
   const updateQuantity = (itemId, change) => {
     setCart((prev) =>
@@ -219,12 +273,133 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
         .map((c) => {
           if (c._id === itemId) {
             const nextQty = c.quantity + change;
-            return nextQty > 0 ? { ...c, quantity: nextQty } : null;
+            if (nextQty <= 0) return null;
+            return {
+              ...c,
+              quantity: nextQty,
+              parcelQuantity:
+                defaultAllParcel && change > 0
+                  ? Math.min(nextQty, (c.parcelQuantity || 0) + change)
+                  : Math.min(c.parcelQuantity || 0, nextQty),
+            };
           }
           return c;
         })
         .filter(Boolean)
     );
+  };
+
+  const setItemParcelQty = (itemId, targetParcelQty) => {
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c._id !== itemId) return c;
+        const clamped = Math.max(0, Math.min(c.quantity, Number(targetParcelQty) || 0));
+        return { ...c, parcelQuantity: clamped };
+      })
+    );
+  };
+
+  const toggleParcelAll = (makeAll) => {
+    setDefaultAllParcel(makeAll);
+    setCart((prev) =>
+      prev.map((c) => ({
+        ...c,
+        parcelQuantity: makeAll ? c.quantity : 0,
+      }))
+    );
+  };
+
+  const persistHeldBills = async (nextList) => {
+    setHeldBills(nextList);
+    try {
+      await AsyncStorage.setItem("pos_held_bills", JSON.stringify(nextList));
+    } catch {}
+  };
+
+  const handleHoldCurrentBill = async (customLabel = "") => {
+    if (cart.length === 0) return;
+    const entry = {
+      id: `hold_${Date.now()}`,
+      label:
+        customLabel.trim() ||
+        (customerName && customerName !== "Walk-in Customer" ? customerName.trim() : `Hold #${heldBills.length + 1}`),
+      heldAt: new Date().toISOString(),
+      cart,
+      customerName,
+      customerPhone,
+      paymentMode,
+      orderSource,
+      externalOrderId,
+      customDiscount,
+      customFreebie,
+      defaultAllParcel,
+    };
+    await persistHeldBills([entry, ...heldBills]);
+    setHoldNote("");
+    setShowHoldModal(false);
+    handleResetForNextBill();
+    showPosNotice("Bill Held", `"${entry.label}" saved on Hold. Tap HOLD to resume anytime.`);
+  };
+
+  const handleHoldButtonPress = () => {
+    if (cart.length > 0 && heldBills.length === 0) {
+      handleHoldCurrentBill();
+    } else {
+      setShowHoldModal(true);
+    }
+  };
+
+  const handleResumeHeldBill = async (entry) => {
+    setCart(Array.isArray(entry.cart) ? entry.cart : []);
+    setCustomerName(entry.customerName || "Walk-in Customer");
+    setCustomerPhone(entry.customerPhone || "");
+    setPaymentMode(entry.paymentMode || "CASH");
+    setOrderSource(entry.orderSource || "COUNTER");
+    setExternalOrderId(entry.externalOrderId || "");
+    setCustomDiscount(entry.customDiscount || "");
+    setCustomFreebie(entry.customFreebie || "");
+    setDefaultAllParcel(Boolean(entry.defaultAllParcel));
+    await persistHeldBills(heldBills.filter((h) => h.id !== entry.id));
+    setShowHoldModal(false);
+  };
+
+  const handleDeleteHeldBill = async (holdId) => {
+    await persistHeldBills(heldBills.filter((h) => h.id !== holdId));
+  };
+
+  const handleSaveQuickItem = async () => {
+    const name = quickItemName.trim();
+    const price = Number(quickItemPrice);
+    if (!name || isNaN(price) || price < 0) {
+      showPosNotice("Required", "Enter item name and valid price");
+      return;
+    }
+    setSavingQuickItem(true);
+    const payload = {
+      name,
+      category: quickItemCategory.trim() || (selectedCategory !== "All" ? selectedCategory : "General"),
+      sellingPrice: price,
+      stock: 100,
+      unit: "PCS",
+      taxRate: 0,
+    };
+    try {
+      let res = await api.items.create(payload).catch((e) => ({ success: false, message: e.message }));
+      if (!res || (!res.success && isNetworkErrorMessage(res.message))) {
+        res = await queueOfflineItemCreate(payload);
+      }
+      if (res && res.success && res.item) {
+        setItems((prev) => [res.item, ...prev]);
+        addItemToCart(res.item);
+        setQuickItemName("");
+        setQuickItemPrice("");
+        setShowQuickItemModal(false);
+      } else {
+        showPosNotice("Error", res?.message || "Could not add item");
+      }
+    } finally {
+      setSavingQuickItem(false);
+    }
   };
 
   const subtotal = cart.reduce(
@@ -326,9 +501,9 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     }
   };
 
-  const handleGenerateInvoice = async () => {
+  const handleGenerateInvoice = async (overridePrintTarget = null) => {
     if (cart.length === 0) {
-      Alert.alert("Empty Bill", "Please select at least one item to bill");
+      showPosNotice("Empty Bill", "Please tap at least one food item to bill");
       setCurrentStep("items");
       return;
     }
@@ -337,7 +512,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       const cash = Number(cashAmount) || 0;
       const upi = Number(upiAmount) || 0;
       if (cash + upi !== grandTotal) {
-        Alert.alert(
+        showPosNotice(
           "Payment Mismatch",
           `Cash (Rs. ${cash}) + UPI (Rs. ${upi}) must equal Grand Total (Rs. ${grandTotal})`
         );
@@ -366,6 +541,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
         barcode: c.barcode,
         sellingPrice: c.sellingPrice,
         quantity: c.quantity,
+        parcelQuantity: c.parcelQuantity || 0,
         unit: c.unit,
         taxRate: c.taxRate,
       })),
@@ -408,8 +584,9 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
         }
       }
 
-      // Automatic printing only if printTarget is not 'none'
-      if (printTarget !== "none") {
+      // Automatic printing only if target is not 'none'
+      const activePrintTarget = overridePrintTarget || printTarget;
+      if (activePrintTarget !== "none") {
         try {
           const storeData = {
             businessName: user?.businessName || "My Store",
@@ -418,7 +595,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             email: user?.email || "",
             gstin: user?.gstin || "",
           };
-          await printBill(finalRes.invoice, storeData, billFormatOptions, printTarget);
+          await printBill(finalRes.invoice, storeData, billFormatOptions, activePrintTarget);
           setKotSent(true);
         } catch (printErr) {
           console.warn("Thermal print notice (printer offline or skipped):", printErr.message);
@@ -495,8 +672,11 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     setPaymentMode("CASH");
     setOrderSource("COUNTER");
     setExternalOrderId("");
+    setDefaultAllParcel(false);
     setCashAmount("");
     setUpiAmount("");
+    setCustomDiscount("");
+    setCustomFreebie("");
     setCreatedInvoice(null);
     setShowReceiptModal(false);
     setCurrentStep("items");
@@ -532,14 +712,31 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
   const showItemsPane = isWide || currentStep === "items";
   const showInvoicePane = isWide || currentStep === "invoice";
 
+  const gridColumns = isDesktop ? 4 : isWide ? 3 : 2;
+
+  const getCategorySelectedCount = (cat) => {
+    if (cat === "All") return cartTotalItems;
+    return cart.reduce((sum, c) => {
+      const matched = items.find((i) => i._id === c._id);
+      return (matched?.category || "General") === cat ? sum + c.quantity : sum;
+    }, 0);
+  };
+
+  const parcelSummaryLabel =
+    cartTotalParcelItems <= 0
+      ? "Parcel"
+      : cartTotalParcelItems >= cartTotalItems
+      ? `All Parcel (${cartTotalParcelItems})`
+      : `Parcel ${cartTotalParcelItems}/${cartTotalItems}`;
+
   return (
-    <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
-      {/* ────────────────── HEADER ────────────────── */}
+    <View style={{ flex: 1 }} className="flex-1 bg-slate-100">
+      {/* ────────────────── HEADER (Screenshot Style) ────────────────── */}
       <View
-        style={{ paddingTop: headerTopPadding }}
-        className="bg-blue-600 px-4 pb-4 flex-row items-center justify-between"
+        style={{ paddingTop: headerTopPadding, backgroundColor: "#5B5CE2" }}
+        className="px-3 pb-3 flex-row items-center justify-between"
       >
-        <View className="flex-row items-center">
+        <View className="flex-row items-center flex-1 pr-2">
           <TouchableOpacity
             onPress={() => {
               if (!isWide && currentStep === "invoice") {
@@ -548,222 +745,483 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 onBack();
               }
             }}
-            className="mr-3"
+            className="mr-2.5 p-1"
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Ionicons name="arrow-back" size={23} color="#FFFFFF" />
           </TouchableOpacity>
-          <View>
-            <Text className="text-white text-lg font-bold">
+          <View className="flex-1">
+            <Text className="text-white text-lg font-extrabold" numberOfLines={1}>
               {editingInvoice
                 ? `Edit Bill #${editingInvoice.invoiceNumber}`
                 : isWide
-                  ? "POS Billing Workspace"
-                  : currentStep === "items"
-                    ? "1. Select Items"
-                    : "2. Finalize Invoice"}
+                ? "Select Items & Checkout"
+                : currentStep === "items"
+                ? "Select Items"
+                : "Finalize Invoice"}
             </Text>
-            <Text className="text-blue-100 text-[11px]">
-              {isWide || currentStep === "items"
-                ? `${cartTotalItems} item(s) in cart · Subtotal Rs. ${subtotal}`
-                : "Customer Details & Payment"}
+            <Text className="text-indigo-100 text-[10px] font-medium" numberOfLines={1}>
+              {`v${CURRENT_APP_VERSION}${user?.phone ? ` | ${user.phone}` : ""}${
+                user?.businessName ? ` | ${user.businessName}` : ""
+              }`}
             </Text>
           </View>
         </View>
 
-        {isWide ? (
-          <View className="flex-row items-center bg-white/20 px-3 py-1 rounded-full">
-            <Ionicons name="desktop-outline" size={14} color="#FFFFFF" />
-            <Text className="text-white text-xs font-bold ml-1.5">
-              Grand Total: Rs. {grandTotal}
-            </Text>
-          </View>
-        ) : currentStep === "invoice" ? (
-          <TouchableOpacity
-            onPress={() => setCurrentStep("items")}
-            className="bg-white/20 px-3 py-1.5 rounded-lg flex-row items-center"
-          >
-            <Ionicons name="cart" size={16} color="#FFFFFF" />
-            <Text className="text-white text-xs font-bold ml-1.5">Edit Items</Text>
-          </TouchableOpacity>
-        ) : (
-          <View className="flex-row items-center bg-white/20 px-2.5 py-1 rounded-full">
-            <Ionicons name="receipt-outline" size={15} color="#FFFFFF" />
-            <Text className="text-white text-xs font-bold ml-1">Step 1 of 2</Text>
-          </View>
-        )}
+        <View className="flex-row items-center gap-2">
+          {!isWide && currentStep === "invoice" ? (
+            <TouchableOpacity
+              onPress={() => setCurrentStep("items")}
+              className="bg-white/20 px-3 py-1.5 rounded-lg flex-row items-center"
+            >
+              <Ionicons name="grid-outline" size={15} color="#FFFFFF" />
+              <Text className="text-white text-xs font-bold ml-1">Items</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={() => setShowSearchBar((prev) => !prev)}
+                className={`p-2 rounded-lg ${showSearchBar ? "bg-white/25" : ""}`}
+              >
+                <Ionicons name="search" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowQuickItemModal(true)}
+                className="p-2 rounded-lg"
+              >
+                <Ionicons name="add-circle-outline" size={21} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleHoldButtonPress()}
+                className="p-2 rounded-lg"
+              >
+                <Ionicons name="calculator-outline" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
 
       <View style={{ flex: 1, flexDirection: isWide ? "row" : "column" }}>
-      {/* ────────────────── STEP 1 / LEFT PANE: ITEM SELECTION CATALOG ────────────────── */}
+      {/* ────────────────── STEP 1 / LEFT PANE: SPLIT CATEGORY + 2-COL GRID ────────────────── */}
       {showItemsPane && (
-        <View style={{ flex: isWide ? 1.35 : 1 }}>
-          {/* Search Bar */}
-          <View className="bg-white px-4 pt-3 pb-2 border-b border-gray-200">
-            <View className="flex-row bg-gray-100 rounded-xl px-3 py-2 items-center">
-              <Ionicons name="search" size={18} color="#9CA3AF" />
-              <TextInput
-                className="flex-1 ml-2 text-sm text-gray-800"
-                placeholder="Search items by name or scan barcode..."
-                value={itemSearch}
-                onChangeText={setItemSearch}
+        <View style={{ flex: isWide ? 1.4 : 1, backgroundColor: "#F1F5F9" }}>
+          {/* Top Action Bar (+ Item | HOLD | Parcel | Toggle Images) */}
+          <View className="bg-white px-2.5 py-2 border-b border-gray-200 flex-row items-center gap-1.5">
+            <TouchableOpacity
+              onPress={() => setShowQuickItemModal(true)}
+              className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white items-center justify-center"
+            >
+              <Text className="text-xs font-bold text-gray-800">+ Item</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleHoldButtonPress}
+              className={`flex-1 py-1.5 px-2 rounded-lg border items-center justify-center flex-row ${
+                heldBills.length > 0
+                  ? "bg-amber-50 border-amber-400"
+                  : cart.length > 0
+                  ? "bg-white border-gray-300"
+                  : "bg-gray-50 border-gray-200"
+              }`}
+            >
+              <Text
+                className={`text-xs font-extrabold ${
+                  heldBills.length > 0 ? "text-amber-800" : "text-gray-700"
+                }`}
+              >
+                {heldBills.length > 0 ? `HOLD (${heldBills.length})` : "HOLD"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowParcelModal(true)}
+              className={`flex-1 py-1.5 px-2 rounded-lg border items-center justify-center flex-row ${
+                cartTotalParcelItems > 0 || defaultAllParcel
+                  ? "bg-orange-50 border-orange-400"
+                  : "bg-white border-gray-300"
+              }`}
+            >
+              <Ionicons
+                name="bag-handle-outline"
+                size={13}
+                color={cartTotalParcelItems > 0 || defaultAllParcel ? "#C2410C" : "#374151"}
               />
-              {itemSearch ? (
-                <TouchableOpacity onPress={() => setItemSearch("")}>
-                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              <Text
+                className={`text-xs font-extrabold ml-1 ${
+                  cartTotalParcelItems > 0 || defaultAllParcel ? "text-orange-700" : "text-gray-700"
+                }`}
+                numberOfLines={1}
+              >
+                {parcelSummaryLabel}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowItemImages((prev) => !prev)}
+              className={`p-1.5 rounded-lg border ${
+                showItemImages ? "bg-white border-gray-300" : "bg-indigo-50 border-indigo-400"
+              }`}
+            >
+              <Ionicons
+                name={showItemImages ? "images-outline" : "eye-off-outline"}
+                size={17}
+                color={showItemImages ? "#475569" : "#4338CA"}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Optional Search Input */}
+          {showSearchBar ? (
+            <View className="bg-white px-3 py-2 border-b border-gray-200">
+              <View className="flex-row bg-gray-100 rounded-lg px-3 py-1.5 items-center">
+                <Ionicons name="search" size={16} color="#9CA3AF" />
+                <TextInput
+                  className="flex-1 ml-2 text-xs text-gray-900"
+                  placeholder="Search food item or barcode..."
+                  value={itemSearch}
+                  onChangeText={setItemSearch}
+                  autoFocus
+                />
+                {itemSearch ? (
+                  <TouchableOpacity onPress={() => setItemSearch("")}>
+                    <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+
+          {/* 2-Column Split Body: Left Category Sidebar + Right Item Tiles Grid */}
+          <View style={{ flex: 1, flexDirection: "row" }}>
+            {/* Left Vertical Categories Sidebar */}
+            <View style={{ width: isWide ? 128 : 92, backgroundColor: "#F8FAFC", borderRightWidth: 1, borderRightColor: "#E2E8F0" }}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ padding: 5, paddingBottom: 140 }}
+              >
+                {categories.map((cat) => {
+                  const selectedCount = getCategorySelectedCount(cat);
+                  const isActiveCat = selectedCategory === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => setSelectedCategory(cat)}
+                      className={`px-2 py-2.5 mb-1.5 rounded-lg border ${
+                        isActiveCat
+                          ? "bg-emerald-200 border-emerald-500"
+                          : selectedCount > 0
+                          ? "bg-emerald-50 border-emerald-300"
+                          : "bg-white border-gray-200"
+                      }`}
+                    >
+                      <Text
+                        className={`text-[11px] font-bold leading-4 ${
+                          isActiveCat ? "text-gray-900" : "text-gray-700"
+                        }`}
+                      >
+                        {cat} ({selectedCount})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Right Multi-Column Food Tile Grid */}
+            <View style={{ flex: 1 }}>
+              <FlatList
+                key={`pos-grid-${gridColumns}-${showItemImages}`}
+                numColumns={gridColumns}
+                columnWrapperStyle={{ gap: 6 }}
+                data={filteredItems}
+                keyExtractor={(i) => i._id}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                contentContainerStyle={{ padding: 6, paddingBottom: isWide ? 110 : 145 }}
+                ListEmptyComponent={
+                  <View className="items-center justify-center py-16 px-4">
+                    <FontAwesome5 name="box-open" size={36} color="#CBD5E1" />
+                    <Text className="text-gray-500 font-bold text-xs mt-3 text-center">
+                      No food items match "{itemSearch || selectedCategory}"
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowQuickItemModal(true)}
+                      className="mt-3 bg-indigo-600 px-3 py-1.5 rounded-lg"
+                    >
+                      <Text className="text-white text-xs font-bold">+ Add Food Item</Text>
+                    </TouchableOpacity>
+                  </View>
+                }
+                renderItem={({ item }) => {
+                  const cartEntry = getCartItem(item._id);
+                  const qtyInCart = cartEntry ? cartEntry.quantity : 0;
+                  const parcelInCart = cartEntry ? cartEntry.parcelQuantity || 0 : 0;
+
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.75}
+                      onPress={() => addItemToCart(item)}
+                      style={{
+                        flex: 1,
+                        maxWidth: `${100 / gridColumns - 1}%`,
+                        backgroundColor: qtyInCart > 0 ? "#BBF7D0" : "#FFFFFF",
+                        borderColor: qtyInCart > 0 ? "#4ADE80" : "#E2E8F0",
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        padding: 6,
+                        marginBottom: 6,
+                        justifyContent: "space-between",
+                        minHeight: showItemImages ? 132 : 76,
+                      }}
+                    >
+                      {/* Red X Remove Badge on Top-Right when Selected */}
+                      {qtyInCart > 0 ? (
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            e.stopPropagation && e.stopPropagation();
+                            clearItemFromCart(item._id);
+                          }}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          style={{
+                            position: "absolute",
+                            top: 4,
+                            right: 4,
+                            zIndex: 10,
+                            backgroundColor: "#DC2626",
+                            width: 18,
+                            height: 18,
+                            borderRadius: 4,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Ionicons name="close" size={12} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      ) : null}
+
+                      {/* Item Image Thumbnail */}
+                      {showItemImages ? (
+                        <View className="items-center justify-center mb-1.5 mt-0.5">
+                          {item.imageUrl ? (
+                            <Image
+                              source={{ uri: item.imageUrl }}
+                              style={{ width: "100%", height: 54, borderRadius: 6, backgroundColor: "#F1F5F9" }}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View className="w-full h-12 rounded-md bg-gray-100 items-center justify-center border border-gray-200">
+                              <Ionicons name="image-outline" size={22} color="#94A3B8" />
+                            </View>
+                          )}
+                        </View>
+                      ) : null}
+
+                      {/* Item Title */}
+                      <Text
+                        className="text-xs font-extrabold text-gray-900 text-center leading-4 mb-2"
+                        numberOfLines={2}
+                      >
+                        {item.name}
+                      </Text>
+
+                      {/* Bottom Row: [Qty / Parcel] on Left, [Dashed Price] on Right */}
+                      <View className="flex-row items-center justify-between mt-auto">
+                        <View className="flex-row items-center gap-1">
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation && e.stopPropagation();
+                              if (qtyInCart > 0) removeItemFromCart(item._id);
+                            }}
+                            style={{
+                              minWidth: 28,
+                              paddingHorizontal: 5,
+                              paddingVertical: 2,
+                              borderRadius: 5,
+                              borderWidth: 1,
+                              borderColor: qtyInCart > 0 ? "#16A34A" : "#94A3B8",
+                              backgroundColor: qtyInCart > 0 ? "#DCFCE7" : "#FFFFFF",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Text className="text-[11px] font-extrabold text-gray-900">
+                              {qtyInCart}
+                            </Text>
+                          </TouchableOpacity>
+
+                          {qtyInCart > 0 ? (
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e.stopPropagation && e.stopPropagation();
+                                setShowParcelModal(true);
+                              }}
+                              style={{
+                                paddingHorizontal: 4,
+                                paddingVertical: 2,
+                                borderRadius: 5,
+                                borderWidth: 1,
+                                borderColor: parcelInCart > 0 ? "#EA580C" : "#94A3B8",
+                                backgroundColor: parcelInCart > 0 ? "#FFEDD5" : "#FFFFFF",
+                              }}
+                            >
+                              <Text
+                                className="text-[9px] font-extrabold"
+                                style={{ color: parcelInCart > 0 ? "#C2410C" : "#475569" }}
+                              >
+                                {parcelInCart > 0
+                                  ? parcelInCart >= qtyInCart
+                                    ? "P"
+                                    : `${parcelInCart}P`
+                                  : "D"}
+                              </Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+
+                        <View
+                          style={{
+                            borderWidth: 1,
+                            borderStyle: "dashed",
+                            borderColor: "#6366F1",
+                            borderRadius: 5,
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            backgroundColor: "#FFFFFF",
+                          }}
+                        >
+                          <Text className="text-[11px] font-extrabold text-gray-900">
+                            {item.sellingPrice}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            </View>
+          </View>
+
+          {/* Sticky Bottom Checkout Strip (Exact 3-Tap POS Footer) */}
+          <View className="bg-white border-t border-gray-300 px-3 pt-2 pb-2.5 shadow-lg">
+            {/* Total + Paid Checkbox + Order Source/Payment Quick Chips */}
+            <View className="flex-row items-center justify-between mb-1.5">
+              <View className="flex-row items-center">
+                <Text className="text-xs font-extrabold text-gray-900">
+                  Total:{Number(grandTotal).toFixed(1)}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => handlePaymentModeChange(paymentMode === "CREDIT" ? "CASH" : "CREDIT")}
+                  className="flex-row items-center ml-2.5"
+                >
+                  <Ionicons
+                    name={paymentMode === "CREDIT" ? "square-outline" : "checkbox"}
+                    size={18}
+                    color="#5B5CE2"
+                  />
+                  <Text className="text-xs font-bold text-gray-800 ml-1">
+                    {paymentMode === "CREDIT" ? "Credit (Unpaid)" : `Received:${Number(grandTotal).toFixed(1)}`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {cartTotalParcelItems > 0 ? (
+                <TouchableOpacity
+                  onPress={() => setShowParcelModal(true)}
+                  className="bg-orange-100 border border-orange-300 px-2 py-0.5 rounded-full"
+                >
+                  <Text className="text-[10px] font-extrabold text-orange-800">
+                    {cartTotalParcelItems === cartTotalItems
+                      ? "ALL PARCEL"
+                      : `${cartTotalParcelItems}P / ${cartTotalItems - cartTotalParcelItems}D`}
+                  </Text>
                 </TouchableOpacity>
               ) : null}
             </View>
 
-            {/* Category Filter Chips */}
-            {categories.length > 2 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2.5 py-1">
-                {categories.map((cat) => (
+            {/* Quick Payment & Aggregator Pills */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
+              {[
+                { label: "Cash", mode: "CASH", src: "COUNTER" },
+                { label: "UPI", mode: "UPI", src: "COUNTER" },
+                { label: "UPI/Cash", mode: "UPI/CASH", src: "COUNTER" },
+                { label: "Swiggy", mode: "SWIGGY", src: "SWIGGY" },
+                { label: "Zomato", mode: "ZOMATO", src: "ZOMATO" },
+                { label: "Bank", mode: "BANK", src: "COUNTER" },
+                { label: "Credit", mode: "CREDIT", src: "COUNTER" },
+              ].map((pill) => {
+                const isSelected = paymentMode === pill.mode;
+                return (
                   <TouchableOpacity
-                    key={cat}
-                    onPress={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-full mr-2 border ${selectedCategory === cat
-                        ? "bg-blue-600 border-blue-600"
-                        : "bg-gray-100 border-gray-200"
-                      }`}
+                    key={pill.mode}
+                    onPress={() => {
+                      handlePaymentModeChange(pill.mode);
+                      if (pill.src === "SWIGGY" || pill.src === "ZOMATO") {
+                        setOrderSource(pill.src);
+                      } else if (orderSource === "SWIGGY" || orderSource === "ZOMATO") {
+                        setOrderSource("COUNTER");
+                      }
+                    }}
+                    style={{
+                      backgroundColor: isSelected ? "#5B5CE2" : "#FFFFFF",
+                      borderColor: "#5B5CE2",
+                      borderWidth: 1,
+                    }}
+                    className="px-3 py-1 rounded-full mr-1.5"
                   >
                     <Text
-                      className={`text-xs font-bold ${selectedCategory === cat ? "text-white" : "text-gray-700"
-                        }`}
+                      className={`text-[11px] font-bold ${
+                        isSelected ? "text-white" : "text-gray-800"
+                      }`}
                     >
-                      {cat}
+                      {pill.label}
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : null}
-          </View>
+                );
+              })}
+            </ScrollView>
 
-          {/* Items Catalog List */}
-          <FlatList
-            key={`pos-cols-${posColumns}`}
-            numColumns={posColumns}
-            columnWrapperStyle={posColumns > 1 ? { gap: 10, paddingHorizontal: 4 } : undefined}
-            data={filteredItems}
-            keyExtractor={(i) => i._id}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            contentContainerStyle={{ padding: 12, paddingBottom: isWide ? 24 : 110 }}
-            ListEmptyComponent={
-              <View className="items-center justify-center py-16">
-                <FontAwesome5 name="box-open" size={40} color="#D1D5DB" />
-                <Text className="text-gray-500 font-bold text-sm mt-3">
-                  No items match "{itemSearch}"
-                </Text>
-                <Text className="text-gray-400 text-xs mt-1">
-                  Add items in the Items screen or clear filters
-                </Text>
-              </View>
-            }
-            renderItem={({ item }) => {
-              const qtyInCart = getCartItemQty(item._id);
-              return (
-                <View
-                  style={posColumns > 1 ? { flex: 1, maxWidth: `${100 / posColumns - 1}%` } : undefined}
-                  className={`flex-row items-center justify-between p-3.5 mb-2.5 rounded-xl border bg-white ${qtyInCart > 0
-                      ? "border-blue-400 bg-blue-50/40 shadow-sm"
-                      : "border-gray-200 shadow-xs"
-                    }`}
-                >
-                  <View className="flex-row items-center flex-1 pr-2">
-                    {item.imageUrl ? (
-                      <Image
-                        source={{ uri: item.imageUrl }}
-                        style={{ width: 44, height: 44, borderRadius: 10, marginRight: 12 }}
-                      />
-                    ) : (
-                      <View className="w-11 h-11 rounded-10 bg-gray-100 items-center justify-center mr-3 border border-gray-200">
-                        <Ionicons name="cube-outline" size={22} color="#6B7280" />
-                      </View>
-                    )}
-                    <View className="flex-1">
-                      <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <View className="flex-row items-center mt-0.5">
-                        <Text className="text-xs font-extrabold text-blue-700 mr-2">
-                          Rs. {item.sellingPrice}
-                          <Text className="text-gray-500 font-normal"> / {item.unit || "PCS"}</Text>
-                        </Text>
-                        {item.stock !== undefined ? (
-                          <Text
-                            className={`text-[10px] font-semibold ${item.stock > 5 ? "text-emerald-700" : "text-amber-700"
-                              }`}
-                          >
-                            Stock: {item.stock}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </View>
-                  </View>
+            {/* 3 Bottom Action Buttons: DETAILS | KOT | NEXT (₹ Amount) */}
+            <View className="flex-row gap-2">
+              <TouchableOpacity
+                onPress={() => setCurrentStep("invoice")}
+                className="flex-1 py-2.5 rounded-lg border border-gray-300 bg-white items-center justify-center"
+              >
+                <Text className="text-xs font-extrabold text-gray-700">DETAILS</Text>
+              </TouchableOpacity>
 
-                  {/* Quantity Controls */}
-                  {qtyInCart > 0 ? (
-                    <View className="flex-row items-center bg-blue-100/80 rounded-xl p-1">
-                      <TouchableOpacity
-                        onPress={() => removeItemFromCart(item._id)}
-                        className="w-8 h-8 rounded-lg bg-white items-center justify-center shadow-xs"
-                      >
-                        <Ionicons name="remove" size={18} color="#DC2626" />
-                      </TouchableOpacity>
-                      <Text className="text-sm font-extrabold text-blue-900 w-8 text-center">
-                        {qtyInCart}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => addItemToCart(item)}
-                        className="w-8 h-8 rounded-lg bg-blue-600 items-center justify-center shadow-xs"
-                      >
-                        <Ionicons name="add" size={18} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      onPress={() => addItemToCart(item)}
-                      className="bg-blue-600 px-3.5 py-2 rounded-xl flex-row items-center shadow-xs"
-                    >
-                      <Ionicons name="add" size={16} color="#FFFFFF" />
-                      <Text className="text-white font-bold text-xs ml-1">ADD</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-            }}
-          />
+              <TouchableOpacity
+                onPress={() => handleGenerateInvoice("cooker")}
+                disabled={loading || cart.length === 0}
+                className="flex-1 py-2.5 rounded-lg border border-gray-300 bg-white items-center justify-center"
+              >
+                <Text className="text-xs font-extrabold text-gray-700">KOT</Text>
+              </TouchableOpacity>
 
-          {/* Sticky Bottom Bar (Phone Only): Cart Summary & "Proceed to Invoice" */}
-          {!isWide && (
-          <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg flex-row items-center justify-between">
-            <View>
-              <Text className="text-xs text-gray-500 font-medium">Selected Items</Text>
-              <Text className="text-base font-black text-gray-900">
-                {cartTotalItems} item{cartTotalItems > 1 ? "s" : ""} ·{" "}
-                <Text className="text-blue-600">Rs. {subtotal}</Text>
-              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (cart.length === 0) {
+                    showPosNotice("Select Items", "Tap at least 1 food item to continue");
+                    return;
+                  }
+                  if (isWide) {
+                    handleGenerateInvoice();
+                  } else {
+                    setCurrentStep("invoice");
+                  }
+                }}
+                disabled={loading}
+                style={{ backgroundColor: cart.length > 0 ? "#5B5CE2" : "#94A3B8" }}
+                className="flex-1.5 px-4 py-2.5 rounded-lg items-center justify-center"
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text className="text-xs font-extrabold text-white">
+                    {isWide ? `BILL (₹ ${grandTotal})` : `NEXT (₹ ${grandTotal})`}
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              onPress={() => {
-                if (cart.length === 0) {
-                  Alert.alert("Select Items First", "Please add at least 1 item to proceed to invoice");
-                  return;
-                }
-                setCurrentStep("invoice");
-              }}
-              disabled={cart.length === 0}
-              className={`px-5 py-3 rounded-xl flex-row items-center shadow ${cart.length > 0 ? "bg-emerald-600" : "bg-gray-300"
-                }`}
-            >
-              <Text className="text-white font-bold text-sm mr-2">
-                Proceed to Invoice
-              </Text>
-              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
           </View>
-          )}
         </View>
       )}
 
@@ -952,9 +1410,16 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                   Billed Items ({cart.length})
                 </Text>
-                <TouchableOpacity onPress={() => setCurrentStep("items")}>
-                  <Text className="text-xs font-bold text-blue-600">+ Add / Change Items</Text>
-                </TouchableOpacity>
+                <View className="flex-row items-center gap-3">
+                  <TouchableOpacity onPress={() => setShowParcelModal(true)}>
+                    <Text className="text-xs font-bold text-orange-600">
+                      {cartTotalParcelItems > 0 ? `Parcel (${cartTotalParcelItems}/${cartTotalItems})` : "Parcel / Dine-in"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setCurrentStep("items")}>
+                    <Text className="text-xs font-bold text-blue-600">+ Add / Change</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {cart.map((c, index) => (
@@ -966,9 +1431,23 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                     <Text className="text-sm font-bold text-gray-900">
                       {index + 1}. {c.name}
                     </Text>
-                    <Text className="text-xs text-gray-500 mt-0.5">
-                      Rs. {c.sellingPrice} / {c.unit}
-                    </Text>
+                    <View className="flex-row items-center gap-2 mt-0.5 flex-wrap">
+                      <Text className="text-xs text-gray-500">
+                        Rs. {c.sellingPrice} / {c.unit}
+                      </Text>
+                      {(c.parcelQuantity || 0) > 0 ? (
+                        <TouchableOpacity
+                          onPress={() => setShowParcelModal(true)}
+                          className="bg-orange-100 px-1.5 py-0.5 rounded"
+                        >
+                          <Text className="text-[10px] font-extrabold text-orange-800">
+                            {c.parcelQuantity >= c.quantity
+                              ? "PARCEL"
+                              : `${c.parcelQuantity} Parcel · ${c.quantity - c.parcelQuantity} Dine-in`}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
                   </View>
 
                   <View className="flex-row items-center mr-3">
@@ -1440,6 +1919,244 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 <Text className="text-gray-800 font-bold text-xs">Done & Close</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ────────────────── PARCEL SETUP MODAL (All Parcel or Mixed Parcel + Eat Here) ────────────────── */}
+      <Modal visible={showParcelModal} transparent animationType="slide" onRequestClose={() => setShowParcelModal(false)}>
+        <View className="flex-1 bg-black/50 justify-end sm:justify-center items-center">
+          <View style={{ width: "100%", maxWidth: 460 }} className="bg-white rounded-t-3xl sm:rounded-2xl p-5 max-h-[85%]">
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <View className="w-9 h-9 rounded-full bg-orange-100 items-center justify-center mr-2.5">
+                  <Ionicons name="bag-handle-outline" size={18} color="#EA580C" />
+                </View>
+                <View>
+                  <Text className="text-base font-extrabold text-gray-900">Parcel & Dine-In Split</Text>
+                  <Text className="text-[11px] text-gray-500">
+                    Mark all items Parcel, or split per item (some Parcel, some Eat Here)
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowParcelModal(false)} className="p-1">
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="flex-row gap-2 mb-4">
+              <TouchableOpacity
+                onPress={() => toggleParcelAll(true)}
+                className={`flex-1 py-2.5 px-3 rounded-xl border items-center ${
+                  defaultAllParcel || (cart.length > 0 && cartTotalParcelItems === cartTotalItems)
+                    ? "bg-orange-600 border-orange-600"
+                    : "bg-orange-50 border-orange-300"
+                }`}
+              >
+                <Text
+                  className={`text-xs font-extrabold ${
+                    defaultAllParcel || (cart.length > 0 && cartTotalParcelItems === cartTotalItems)
+                      ? "text-white"
+                      : "text-orange-800"
+                  }`}
+                >
+                  Parcel All Items
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => toggleParcelAll(false)}
+                className={`flex-1 py-2.5 px-3 rounded-xl border items-center ${
+                  !defaultAllParcel && cartTotalParcelItems === 0
+                    ? "bg-emerald-600 border-emerald-600"
+                    : "bg-gray-100 border-gray-300"
+                }`}
+              >
+                <Text
+                  className={`text-xs font-extrabold ${
+                    !defaultAllParcel && cartTotalParcelItems === 0 ? "text-white" : "text-gray-700"
+                  }`}
+                >
+                  Eat Here All (Dine-In)
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {cart.length === 0 ? (
+              <View className="py-6 items-center">
+                <Text className="text-xs text-gray-500 text-center">
+                  Tap items on the menu first, or choose "Parcel All Items" above so every item you tap is marked Parcel.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
+                {cart.map((c) => {
+                  const pQty = c.parcelQuantity || 0;
+                  const dineQty = Math.max(0, c.quantity - pQty);
+                  return (
+                    <View
+                      key={c._id}
+                      className="flex-row items-center justify-between py-2.5 px-3 mb-2 bg-slate-50 rounded-xl border border-slate-200"
+                    >
+                      <View className="flex-1 pr-2">
+                        <Text className="text-xs font-extrabold text-gray-900" numberOfLines={1}>
+                          {c.name} (x{c.quantity})
+                        </Text>
+                        <Text className="text-[11px] font-semibold text-orange-700 mt-0.5">
+                          {pQty} Parcel · {dineQty} Eat Here
+                        </Text>
+                      </View>
+                      <View className="flex-row items-center gap-1.5">
+                        <TouchableOpacity
+                          onPress={() => setItemParcelQty(c._id, pQty - 1)}
+                          className="w-7 h-7 rounded-lg bg-white border border-gray-300 items-center justify-center"
+                        >
+                          <Ionicons name="remove" size={15} color="#374151" />
+                        </TouchableOpacity>
+                        <Text className="text-xs font-extrabold text-gray-900 w-8 text-center">
+                          {pQty}P
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setItemParcelQty(c._id, pQty + 1)}
+                          className="w-7 h-7 rounded-lg bg-orange-600 items-center justify-center"
+                        >
+                          <Ionicons name="add" size={15} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            <TouchableOpacity
+              onPress={() => setShowParcelModal(false)}
+              style={{ backgroundColor: "#5B5CE2" }}
+              className="w-full py-3 rounded-xl items-center mt-3"
+            >
+              <Text className="text-white font-bold text-sm">Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ────────────────── HOLD / RESUME BILLS MODAL ────────────────── */}
+      <Modal visible={showHoldModal} transparent animationType="fade" onRequestClose={() => setShowHoldModal(false)}>
+        <View className="flex-1 bg-black/50 justify-center items-center px-5">
+          <View style={{ width: "100%", maxWidth: 440 }} className="bg-white rounded-2xl p-5 max-h-[82%]">
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-base font-extrabold text-gray-900">Hold & Resume Bills</Text>
+              <TouchableOpacity onPress={() => setShowHoldModal(false)} className="p-1">
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {cart.length > 0 ? (
+              <View className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+                <Text className="text-xs font-extrabold text-amber-900 mb-2">
+                  Park Current Cart ({cartTotalItems} items · Rs. {grandTotal})
+                </Text>
+                <TextInput
+                  className="bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs text-gray-900 mb-2"
+                  placeholder="Optional Table / Customer note (e.g. Table 4)"
+                  value={holdNote}
+                  onChangeText={setHoldNote}
+                />
+                <TouchableOpacity
+                  onPress={() => handleHoldCurrentBill(holdNote)}
+                  className="bg-amber-600 py-2.5 rounded-lg items-center"
+                >
+                  <Text className="text-white font-bold text-xs">Put Current Bill on Hold</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            <Text className="text-xs font-bold text-gray-500 uppercase mb-2">
+              Held Bills ({heldBills.length})
+            </Text>
+            {heldBills.length === 0 ? (
+              <Text className="text-xs text-gray-400 text-center py-6">
+                No bills on hold right now.
+              </Text>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280 }}>
+                {heldBills.map((h) => {
+                  const total = (h.cart || []).reduce(
+                    (s, it) => s + Number(it.sellingPrice || 0) * Number(it.quantity || 1),
+                    0
+                  );
+                  return (
+                    <View
+                      key={h.id}
+                      className="flex-row items-center justify-between p-3 mb-2 bg-slate-50 border border-slate-200 rounded-xl"
+                    >
+                      <View className="flex-1 pr-2">
+                        <Text className="text-xs font-extrabold text-gray-900">{h.label}</Text>
+                        <Text className="text-[11px] text-gray-500 mt-0.5">
+                          {(h.cart || []).reduce((s, c) => s + (c.quantity || 1), 0)} items · Rs. {total}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleResumeHeldBill(h)}
+                        className="bg-blue-600 px-3 py-1.5 rounded-lg mr-2"
+                      >
+                        <Text className="text-white text-xs font-bold">Resume</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteHeldBill(h.id)} className="p-1.5">
+                        <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ────────────────── QUICK + ITEM MODAL ────────────────── */}
+      <Modal visible={showQuickItemModal} transparent animationType="fade" onRequestClose={() => setShowQuickItemModal(false)}>
+        <View className="flex-1 bg-black/50 justify-center items-center px-5">
+          <View style={{ width: "100%", maxWidth: 400 }} className="bg-white rounded-2xl p-5">
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-base font-extrabold text-gray-900">Quick Add Food Item</Text>
+              <TouchableOpacity onPress={() => setShowQuickItemModal(false)} className="p-1">
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <Text className="text-xs font-bold text-gray-700 mb-1">Item Name</Text>
+            <TextInput
+              className="bg-gray-50 border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 mb-3"
+              placeholder="e.g. Classic CornDog"
+              value={quickItemName}
+              onChangeText={setQuickItemName}
+            />
+            <Text className="text-xs font-bold text-gray-700 mb-1">Selling Price (Rs.)</Text>
+            <TextInput
+              className="bg-gray-50 border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 mb-3"
+              placeholder="e.g. 159"
+              keyboardType="numeric"
+              value={quickItemPrice}
+              onChangeText={setQuickItemPrice}
+            />
+            <Text className="text-xs font-bold text-gray-700 mb-1">Category</Text>
+            <TextInput
+              className="bg-gray-50 border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 mb-4"
+              placeholder="e.g. Korean"
+              value={quickItemCategory}
+              onChangeText={setQuickItemCategory}
+            />
+            <TouchableOpacity
+              onPress={handleSaveQuickItem}
+              disabled={savingQuickItem}
+              style={{ backgroundColor: "#5B5CE2" }}
+              className="w-full py-3 rounded-xl items-center"
+            >
+              {savingQuickItem ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text className="text-white font-bold text-sm">Add Item & Select</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

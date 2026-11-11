@@ -19,6 +19,11 @@ const invoiceItemSchema = new mongoose.Schema({
     required: true,
     min: 0.01,
   },
+  parcelQuantity: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
   unit: {
     type: String,
     default: "PCS",
@@ -118,6 +123,11 @@ const invoiceSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
+    },
+    parcelMode: {
+      type: String,
+      enum: ["DINE_IN", "PARCEL", "MIXED"],
+      default: "DINE_IN",
     },
     cashAmount: {
       type: Number,

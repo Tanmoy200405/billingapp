@@ -256,8 +256,15 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
 
       for (const it of items) {
         const rowY = doc.y;
-        const name = (it.name || "Item").toString();
+        const pQty = Number(it.parcelQuantity || 0);
         const qty = Number(it.quantity || 1);
+        const parcelLabel =
+          pQty > 0
+            ? pQty >= qty
+              ? " [PARCEL]"
+              : ` [${pQty}P/${qty - pQty}D]`
+            : "";
+        const name = `${(it.name || "Item").toString()}${parcelLabel}`;
         const rateVal = Number(it.sellingPrice ?? it.price ?? it.rate ?? 0);
         const totalVal = Number(it.total ?? rateVal * qty);
 

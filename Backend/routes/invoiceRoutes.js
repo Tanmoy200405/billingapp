@@ -38,6 +38,20 @@ function safeSecretEqual(a = "", b = "") {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+function resolveParcelMode(processedItems = []) {
+  let totalQty = 0;
+  let totalParcel = 0;
+  for (const it of processedItems) {
+    const q = Number(it.quantity || 0);
+    const p = Number(it.parcelQuantity || 0);
+    totalQty += q;
+    totalParcel += p;
+  }
+  if (totalParcel <= 0) return "DINE_IN";
+  if (totalParcel >= totalQty) return "PARCEL";
+  return "MIXED";
+}
+
 async function getNextDailyInvoiceNumber(userId) {
   const today = new Date();
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
@@ -595,12 +609,14 @@ router.post("/", async (req, res) => {
           ? new mongoose.Types.ObjectId(it._id)
           : undefined;
 
+      const pQty = Math.min(qty, Math.max(0, Number(it.parcelQuantity ?? (it.isParcel ? qty : 0)) || 0));
       processedItems.push({
         itemId: validItemId,
         name: it.name || it.itemName || "Item",
         barcode: it.barcode,
         sellingPrice: price,
         quantity: qty,
+        parcelQuantity: pQty,
         unit: it.unit || "PCS",
         taxRate,
         discountPercent: it.discountPercent || 0,
@@ -668,6 +684,7 @@ router.post("/", async (req, res) => {
       paymentMode: mode,
       orderSource: resolvedSource,
       externalOrderId: String(externalOrderId || "").trim(),
+      parcelMode: resolveParcelMode(processedItems),
       cashAmount: finalCash,
       upiAmount: finalUpi,
       paymentStatus,
@@ -976,12 +993,14 @@ router.put("/:id", async (req, res) => {
           ? new mongoose.Types.ObjectId(it._id)
           : undefined;
 
+      const pQty = Math.min(qty, Math.max(0, Number(it.parcelQuantity ?? (it.isParcel ? qty : 0)) || 0));
       processedItems.push({
         itemId: validItemId,
         name: it.name || it.itemName || "Item",
         barcode: it.barcode,
         sellingPrice: price,
         quantity: qty,
+        parcelQuantity: pQty,
         unit: it.unit || "PCS",
         taxRate,
         discountPercent: it.discountPercent || 0,

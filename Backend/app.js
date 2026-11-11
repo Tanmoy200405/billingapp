@@ -85,12 +85,12 @@ app.get("/api/app-version", (req, res) => {
   const defaultApkUrl = "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
   res.status(200).json({
     success: true,
-    latestVersion: process.env.APP_LATEST_VERSION || "1.1.0",
+    latestVersion: process.env.APP_LATEST_VERSION || "1.2.0",
     minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
     apkUrl: process.env.APP_APK_URL || defaultApkUrl,
     releaseNotes:
       process.env.APP_RELEASE_NOTES ||
-      "Version 1.1.0: WhatsApp-only quick register, Forgot Password & secure OTP Email Reset, offline billing queue sync, Gmail SMTP/SES email, and <20 MB APK.",
+      "Version 1.2.0: Redesigned 3-Tap POS Sale Invoice UI with Hold Bills, Mixed/Full Parcel & Dine-in KOT tags, and Swiggy/Zomato channel tracking.",
     forceUpdate: false,
     timestamp: new Date().toISOString(),
   });

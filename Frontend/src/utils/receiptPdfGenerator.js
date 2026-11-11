@@ -353,11 +353,18 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
   const itemRows = (invoice?.items || []).map((it) => {
     const name = it.name || "";
     const qty = it.quantity || 0;
+    const pQty = Number(it.parcelQuantity || 0);
+    const parcelTag =
+      pQty > 0
+        ? `<div style="font-size:9px;color:#C2410C;font-weight:800;">${
+            pQty >= qty ? "[PARCEL]" : `[${pQty} PARCEL, ${qty - pQty} DINE-IN]`
+          }</div>`
+        : "";
     const rate = it.sellingPrice || it.rate || 0;
     const total = it.total || qty * rate;
     const hsnText = invoiceStyle === "gst_detailed" && it.hsnCode ? `<div style="font-size:9px;color:#64748B;">HSN: ${it.hsnCode}</div>` : "";
     return `<tr>
-      <td style="padding:3px 0;word-break:break-word;max-width:${isNarrow ? "110px" : "220px"}">${name}${hsnText}</td>
+      <td style="padding:3px 0;word-break:break-word;max-width:${isNarrow ? "110px" : "220px"}">${name}${parcelTag}${hsnText}</td>
       <td style="padding:3px 4px;text-align:center">${qty}</td>
       <td style="padding:3px 4px;text-align:right">${rate}</td>
       <td style="padding:3px 0;text-align:right;font-weight:700">${total}</td>
@@ -463,12 +470,21 @@ function buildCookerReceiptCard(invoice, storeInfo = {}) {
   const createdOn = formatReceiptDate(invoice?.createdAt || invoice?.invoiceDate);
 
   let totalItemsQty = 0;
+  let totalParcelQty = 0;
   const cookerRows = (invoice?.items || []).map((it, idx) => {
-    const qty = it.quantity || 1;
-    totalItemsQty += Number(qty) || 0;
+    const qty = Number(it.quantity || 1);
+    const pQty = Number(it.parcelQuantity || 0);
+    totalItemsQty += qty;
+    totalParcelQty += pQty;
+    const parcelNote =
+      pQty > 0
+        ? `<div style="font-size:11px;font-weight:900;color:#B45309;">${
+            pQty >= qty ? ">> PARCEL PACK <<" : `>> ${pQty} PARCEL / ${qty - pQty} EAT HERE <<`
+          }</div>`
+        : `<div style="font-size:10px;color:#475569;">[EAT HERE]</div>`;
     return `
       <tr>
-        <td style="padding:4px 0;font-size:13px;font-weight:700;word-break:break-word">${idx + 1}. ${it.name}</td>
+        <td style="padding:4px 0;font-size:13px;font-weight:700;word-break:break-word">${idx + 1}. ${it.name}${parcelNote}</td>
         <td style="padding:4px 0;text-align:right;font-size:16px;font-weight:900">x ${qty}</td>
       </tr>
     `;
@@ -476,10 +492,21 @@ function buildCookerReceiptCard(invoice, storeInfo = {}) {
 
   const orderSource = (invoice?.orderSource || "COUNTER").toUpperCase();
   const extOrderId = (invoice?.externalOrderId || "").trim();
-  const channelBadge =
-    orderSource !== "COUNTER"
-      ? `<div class="center" style="font-size:14px;font-weight:900;background:#000;color:#fff;padding:3px 6px;margin:4px 0;border-radius:4px;">${orderSource}${extOrderId ? ` • #${extOrderId}` : ""}</div>`
+  const parcelHeaderText =
+    totalParcelQty > 0
+      ? totalParcelQty >= totalItemsQty
+        ? "FULL PARCEL"
+        : `MIXED (${totalParcelQty}P / ${totalItemsQty - totalParcelQty}D)`
       : "";
+  const channelBadgeText = [
+    orderSource !== "COUNTER" ? `${orderSource}${extOrderId ? ` • #${extOrderId}` : ""}` : "",
+    parcelHeaderText,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+  const channelBadge = channelBadgeText
+    ? `<div class="center" style="font-size:13px;font-weight:900;background:#000;color:#fff;padding:3px 6px;margin:4px 0;border-radius:4px;">${channelBadgeText}</div>`
+    : "";
 
   return `
     <div class="receipt cooker-receipt" style="border: 2px solid #000;">
