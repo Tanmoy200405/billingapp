@@ -25,6 +25,23 @@ const MAX_RECONNECT_DELAY = 15000;
 const sessions = new Map();
 let selfPingStarted = false;
 
+let cachedWaVersion = [2, 3000, 1054053575];
+let cachedWaVersionAt = 0;
+
+async function getCachedWaVersion() {
+  if (Date.now() - cachedWaVersionAt < 60 * 60 * 1000 && cachedWaVersionAt > 0) {
+    return cachedWaVersion;
+  }
+  try {
+    const v = await fetchLatestWaWebVersion();
+    if (v?.version) {
+      cachedWaVersion = v.version;
+      cachedWaVersionAt = Date.now();
+    }
+  } catch {}
+  return cachedWaVersion;
+}
+
 function normalizeUserKey(userId) {
   if (!userId) return null;
   const raw = userId.toString().trim();
@@ -43,9 +60,13 @@ function getOrCreateSession(userId) {
       sessionDir: path.join(BASE_SESSION_DIR, userKey),
       sock: null,
       qrCodeData: null,
+      qrReadyForPairing: false,
+      pairingPending: false,
       connectionStatus: "disconnected",
       connectedNumber: null,
       isInitializing: false,
+      generation: 0,
+      lastError: null,
       reconnectAttempts: 0,
       keepAliveInterval: null,
       syncDebounceTimer: null,
@@ -78,6 +99,29 @@ function clearTimers(state) {
   }
 }
 
+function isLocalRegistered(state) {
+  try {
+    const credsPath = path.join(state.sessionDir, "creds.json");
+    if (!fs.existsSync(credsPath)) return false;
+    const data = JSON.parse(fs.readFileSync(credsPath, "utf-8"));
+    return Boolean(data?.registered || data?.me?.id);
+  } catch {
+    return false;
+  }
+}
+
+async function clearSessionFilesAndDb(state) {
+  clearTimers(state);
+  try {
+    if (fs.existsSync(state.sessionDir)) {
+      fs.rmSync(state.sessionDir, { recursive: true, force: true });
+    }
+  } catch {}
+  try {
+    await WhatsAppSession.deleteMany({ userId: state.userId });
+  } catch {}
+}
+
 async function updateUserLinkStatus(userKey, linked, phoneNumber = "") {
   if (!mongoose.Types.ObjectId.isValid(userKey)) return;
   await User.findByIdAndUpdate(userKey, {
@@ -88,19 +132,19 @@ async function updateUserLinkStatus(userKey, linked, phoneNumber = "") {
 
 async function restoreSessionFromMongo(state) {
   try {
+    const localCredsPath = path.join(state.sessionDir, "creds.json");
+    if (fs.existsSync(localCredsPath)) {
+      // Preserve fresh local disk creds (critical during 515 restartRequired pairing flow!)
+      return;
+    }
+
     const records = await WhatsAppSession.find({ userId: state.userId }).lean();
     const credsDoc = records.find(
       (r) => (r.fileName || r.key) === "creds.json" || r.key === `${state.userId}:creds.json`
     );
 
     if (!credsDoc || !credsDoc.data || !credsDoc.data.registered) {
-      if (fs.existsSync(state.sessionDir)) {
-        const localCredsPath = path.join(state.sessionDir, "creds.json");
-        if (!fs.existsSync(localCredsPath)) {
-          fs.rmSync(state.sessionDir, { recursive: true, force: true });
-          fs.mkdirSync(state.sessionDir, { recursive: true });
-        }
-      } else {
+      if (!fs.existsSync(state.sessionDir)) {
         fs.mkdirSync(state.sessionDir, { recursive: true });
       }
       if (records.length > 0 && !credsDoc?.data?.registered) {
@@ -213,10 +257,6 @@ function safelyCloseSocket(state) {
   }
 }
 
-/**
- * Migrate any legacy single-tenant WhatsApp session files/documents
- * into the owning user's scoped session namespace on startup.
- */
 async function migrateLegacySingleSessionIfNeeded() {
   try {
     const legacyDocs = await WhatsAppSession.find({
@@ -272,9 +312,6 @@ async function migrateLegacySingleSessionIfNeeded() {
   }
 }
 
-/**
- * Restore and connect all saved per-user WhatsApp sessions at server boot.
- */
 export const initAllWhatsAppSessions = async () => {
   startServerSelfPing();
   await migrateLegacySingleSessionIfNeeded();
@@ -295,7 +332,7 @@ export const initAllWhatsAppSessions = async () => {
     if (fs.existsSync(BASE_SESSION_DIR)) {
       const dirs = fs.readdirSync(BASE_SESSION_DIR, { withFileTypes: true });
       for (const entry of dirs) {
-        if (entry.isDirectory()) {
+        if (entry.isDirectory() && !entry.name.startsWith("_")) {
           const credsFile = path.join(BASE_SESSION_DIR, entry.name, "creds.json");
           if (fs.existsSync(credsFile)) {
             userIds.add(entry.name);
@@ -326,6 +363,8 @@ export const getWhatsAppStatus = (userId = null) => {
       status: "disconnected",
       qrCode: null,
       phoneNumber: null,
+      isInitializing: false,
+      lastError: null,
       isShared: false,
       sessionPersisted: false,
     };
@@ -337,12 +376,14 @@ export const getWhatsAppStatus = (userId = null) => {
     status: state?.connectionStatus || "disconnected",
     qrCode: state?.qrCodeData || null,
     phoneNumber: state?.connectedNumber || null,
+    isInitializing: Boolean(state?.isInitializing),
+    lastError: state?.lastError || null,
     isShared: false,
     sessionPersisted: fs.existsSync(path.join(sessionDir, "creds.json")),
   };
 };
 
-export const waitForWhatsAppQrOrReady = async (timeoutMs = 12000, userId = null) => {
+export const waitForWhatsAppQrOrReady = async (timeoutMs = 18000, userId = null) => {
   const current = getWhatsAppStatus(userId);
   if (current.status === "connected" || (current.status === "scan_qr" && current.qrCode)) {
     return current;
@@ -353,12 +394,12 @@ export const waitForWhatsAppQrOrReady = async (timeoutMs = 12000, userId = null)
     if (nextStatus.status === "connected" || (nextStatus.status === "scan_qr" && nextStatus.qrCode)) {
       return nextStatus;
     }
-    await new Promise((r) => setTimeout(r, 350));
+    await new Promise((r) => setTimeout(r, 300));
   }
   return getWhatsAppStatus(userId);
 };
 
-export const initWhatsApp = async (forceRestart = false, userId = null) => {
+export const initWhatsApp = async (forceRestart = false, userId = null, options = {}) => {
   const state = getOrCreateSession(userId);
   if (!state) return;
 
@@ -379,7 +420,9 @@ export const initWhatsApp = async (forceRestart = false, userId = null) => {
     state.reconnectTimer = null;
   }
 
+  const gen = ++state.generation;
   state.isInitializing = true;
+  state.lastError = null;
   startServerSelfPing();
 
   try {
@@ -387,11 +430,21 @@ export const initWhatsApp = async (forceRestart = false, userId = null) => {
       stopKeepAlive(state);
       safelyCloseSocket(state);
       state.qrCodeData = null;
+      state.qrReadyForPairing = false;
       state.connectionStatus = "disconnected";
       state.connectedNumber = null;
+
+      // If user explicitly requests a fresh link/QR/pairing while not actively registered, wipe stale keys
+      if (options.cleanUnregistered !== false && !isLocalRegistered(state)) {
+        await clearSessionFilesAndDb(state);
+      }
+      if (options.resetAll) {
+        await clearSessionFilesAndDb(state);
+      }
     }
 
     await restoreSessionFromMongo(state);
+    if (state.generation !== gen) return;
 
     if (!fs.existsSync(state.sessionDir)) {
       fs.mkdirSync(state.sessionDir, { recursive: true });
@@ -408,12 +461,10 @@ export const initWhatsApp = async (forceRestart = false, userId = null) => {
     }
 
     const { state: authState, saveCreds } = await useMultiFileAuthState(state.sessionDir);
+    if (state.generation !== gen) return;
 
-    let waVersion = [2, 3000, 1015901307];
-    try {
-      const v = await fetchLatestWaWebVersion();
-      if (v?.version) waVersion = v.version;
-    } catch {}
+    const waVersion = await getCachedWaVersion();
+    if (state.generation !== gen) return;
 
     const logger = pino({ level: "silent" });
 
@@ -439,15 +490,19 @@ export const initWhatsApp = async (forceRestart = false, userId = null) => {
     state.sock = sock;
 
     sock.ev.on("creds.update", async () => {
-      if (state.sock !== sock) return;
+      if (state.sock !== sock || state.generation !== gen) return;
       try {
         await saveCreds();
-        triggerSessionSync(state);
+        if (authState.creds?.registered) {
+          await syncSessionToMongo(state);
+        } else {
+          triggerSessionSync(state);
+        }
       } catch {}
     });
 
     sock.ev.on("messages.upsert", async ({ messages }) => {
-      if (state.sock !== sock) return;
+      if (state.sock !== sock || state.generation !== gen) return;
       try {
         if (!messages || !messages.length) return;
         for (const msg of messages) {
@@ -469,23 +524,28 @@ export const initWhatsApp = async (forceRestart = false, userId = null) => {
     });
 
     sock.ev.on("connection.update", async (update) => {
-      if (state.sock !== sock) return;
+      if (state.sock !== sock || state.generation !== gen) return;
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
+        state.qrReadyForPairing = true;
         try {
           state.qrCodeData = await QRCode.toDataURL(qr, { margin: 2, scale: 6 });
           state.connectionStatus = "scan_qr";
           state.isInitializing = false;
         } catch {
           state.qrCodeData = null;
+          state.isInitializing = false;
         }
       }
 
       if (connection === "open") {
         state.connectionStatus = "connected";
         state.qrCodeData = null;
+        state.qrReadyForPairing = false;
+        state.pairingPending = false;
         state.reconnectAttempts = 0;
+        state.lastError = null;
         state.connectedNumber = sock.user?.id
           ? sock.user.id.split(":")[0].replace(/[^0-9]/g, "")
           : null;
@@ -493,42 +553,51 @@ export const initWhatsApp = async (forceRestart = false, userId = null) => {
         startKeepAlive(state);
         await syncSessionToMongo(state);
         await updateUserLinkStatus(state.userId, true, state.connectedNumber);
+        console.log(`[WhatsApp] Connected user ${state.userId} (+${state.connectedNumber})`);
       }
 
       if (connection === "close") {
         stopKeepAlive(state);
         const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const errMsg = lastDisconnect?.error?.message || "";
         state.connectionStatus = "disconnected";
         state.connectedNumber = null;
         state.isInitializing = false;
+        state.qrReadyForPairing = false;
 
         if (statusCode === DisconnectReason.loggedOut) {
-          clearTimers(state);
+          state.pairingPending = false;
           safelyCloseSocket(state);
           state.qrCodeData = null;
-          try {
-            fs.rmSync(state.sessionDir, { recursive: true, force: true });
-            await WhatsAppSession.deleteMany({ userId: state.userId });
-          } catch {}
+          await clearSessionFilesAndDb(state);
           await updateUserLinkStatus(state.userId, false, "");
+          console.log(`[WhatsApp] User ${state.userId} logged out.`);
         } else if (statusCode === DisconnectReason.restartRequired) {
+          console.log(`[WhatsApp] Restart required (515) for user ${state.userId}, reconnecting with paired creds...`);
           state.reconnectAttempts = 0;
           initWhatsApp(false, state.userId).catch(() => {});
-        } else {
+        } else if (statusCode === 401 || statusCode === 405) {
+          state.lastError = errMsg || "Session expired. Please link again.";
+          await clearSessionFilesAndDb(state);
+          await updateUserLinkStatus(state.userId, false, "");
+        } else if (isLocalRegistered(state) || state.pairingPending) {
           const delay = getReconnectDelay(state);
           state.reconnectTimer = setTimeout(() => {
             initWhatsApp(false, state.userId).catch(() => {});
           }, delay);
+        } else {
+          // Expired unlinked QR timeout
+          state.qrCodeData = null;
+          state.lastError = errMsg || "QR session timed out. Tap Link WhatsApp to retry.";
         }
       }
     });
-  } catch {
+  } catch (err) {
+    if (state.generation !== gen) return;
     state.connectionStatus = "disconnected";
     state.isInitializing = false;
-    const delay = getReconnectDelay(state);
-    state.reconnectTimer = setTimeout(() => {
-      initWhatsApp(false, state.userId).catch(() => {});
-    }, delay);
+    state.lastError = err.message;
+    console.warn(`[WhatsApp] Init error for user ${state.userId}:`, err.message);
   }
 };
 
@@ -557,22 +626,28 @@ export const requestPairingCodeForNumber = async (phoneNumber, userId = null) =>
   }
 
   await disconnectWhatsApp(false, state.userId);
-  await new Promise((r) => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 400));
 
-  await initWhatsApp(true, state.userId);
+  state.pairingPending = true;
+  await initWhatsApp(true, state.userId, { resetAll: true });
 
+  // Wait until Noise handshake & QR readiness (not just object creation) before requesting pairing code
   let waitedMs = 0;
-  while ((!state.sock || !state.sock.requestPairingCode) && waitedMs < 16000) {
-    await new Promise((r) => setTimeout(r, 350));
-    waitedMs += 350;
+  while (
+    (!state.sock || !state.sock.requestPairingCode || !state.qrReadyForPairing) &&
+    waitedMs < 18000
+  ) {
+    if (state.connectionStatus === "connected") break;
+    await new Promise((r) => setTimeout(r, 300));
+    waitedMs += 300;
   }
 
-  if (!state.sock || !state.sock.requestPairingCode) {
-    throw new Error("WhatsApp connection timeout. Please try again or use QR code scan.");
+  if (!state.sock || !state.sock.requestPairingCode || !state.qrReadyForPairing) {
+    state.pairingPending = false;
+    throw new Error("WhatsApp handshake timed out. Please try again or scan the QR code.");
   }
 
-  await new Promise((r) => setTimeout(r, 1200));
-
+  await new Promise((r) => setTimeout(r, 300));
   const rawCode = await state.sock.requestPairingCode(fullNumber);
 
   const formattedCode =
@@ -587,24 +662,23 @@ export const disconnectWhatsApp = async (autoRestart = false, userId = null) => 
   const state = getOrCreateSession(userId);
   if (!state) return { success: false };
 
+  state.generation += 1;
+  state.pairingPending = false;
   clearTimers(state);
   try {
     if (state.sock) await state.sock.logout();
   } catch {}
   safelyCloseSocket(state);
 
-  try {
-    fs.rmSync(state.sessionDir, { recursive: true, force: true });
-  } catch {}
-  try {
-    await WhatsAppSession.deleteMany({ userId: state.userId });
-  } catch {}
+  await clearSessionFilesAndDb(state);
 
   state.qrCodeData = null;
+  state.qrReadyForPairing = false;
   state.connectionStatus = "disconnected";
   state.connectedNumber = null;
   state.isInitializing = false;
   state.reconnectAttempts = 0;
+  state.lastError = null;
 
   await updateUserLinkStatus(state.userId, false, "");
 
@@ -687,10 +761,6 @@ export const sendWhatsAppMessage = async (recipientPhone, textMessage, userId = 
   }
 };
 
-/**
- * Send platform-level WhatsApp messages (e.g. pre-login OTP) without attributing to a specific customer store
- * unless a system/default session is connected.
- */
 export const sendSystemWhatsAppMessage = async (recipientPhone, textMessage) => {
   if (shouldForwardToMessagingService()) {
     try {

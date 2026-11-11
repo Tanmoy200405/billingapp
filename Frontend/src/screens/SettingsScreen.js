@@ -71,6 +71,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [waQr, setWaQr] = useState(null);
   const [waPhone, setWaPhone] = useState(null);
   const [waLoading, setWaLoading] = useState(false);
+  const [waError, setWaError] = useState("");
   const [showPairingInput, setShowPairingInput] = useState(false);
   const [pairingPhone, setPairingPhone] = useState(user?.whatsappNumber || user?.phone || "");
   const [pairingCode, setPairingCode] = useState(null);
@@ -163,13 +164,32 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       setTestingPrinter(false);
     }
   };
+  const showWaNotice = (title, message) => {
+    if (Platform.OS === "web") {
+      window.alert(`${title}: ${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const fetchWaStatus = async () => {
     try {
       const res = await api.whatsapp.getStatus();
       if (res && res.success) {
         setWaStatus(res.status);
-        setWaQr(res.qrCode);
-        setWaPhone(res.phoneNumber);
+        setWaQr(res.qrCode || null);
+        setWaPhone(res.phoneNumber || null);
+        if (res.lastError && res.status === "disconnected") {
+          setWaError(res.lastError);
+        } else if (res.status === "connected" || res.qrCode) {
+          setWaError("");
+        }
+        if (res.status === "connected" && onProfileUpdated && user && !user.whatsappLinked) {
+          const meRes = await api.auth.getMe().catch(() => null);
+          if (meRes?.success && meRes?.user) {
+            onProfileUpdated(meRes.user);
+          }
+        }
       }
     } catch {}
   };
@@ -190,7 +210,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   };
   useEffect(() => {
     let interval = null;
-    if (waStatus === "scan_qr" || waLoading || pairingCode) {
+    if (waStatus === "scan_qr" || waLoading || pairingCode || showPairingInput) {
       interval = setInterval(() => {
         fetchWaStatus();
       }, 3000);
@@ -198,27 +218,31 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [waStatus, waLoading, pairingCode]);
+  }, [waStatus, waLoading, pairingCode, showPairingInput]);
   const handleStartWaLink = async (force = false) => {
     setWaLoading(true);
+    setWaError("");
     setPairingCode(null);
     try {
       const res = await api.whatsapp.init(force);
       if (res && res.success) {
-        setWaStatus(res.status);
+        setWaStatus(res.status || "scan_qr");
         setWaQr(res.qrCode || null);
         setWaPhone(res.phoneNumber || null);
-        if (!res.qrCode && res.status !== "connected") {
+        if (res.lastError && !res.qrCode && res.status !== "connected") {
+          setWaError(res.lastError);
+        } else if (!res.qrCode && res.status !== "connected") {
           setWaStatus("scan_qr");
         }
       } else {
-        Alert.alert(
-          "WhatsApp Notice",
-          res?.message || "Could not connect to WhatsApp backend server. Please verify backend connectivity."
-        );
+        const msg = res?.message || "Could not connect to WhatsApp backend server. Please verify backend connectivity.";
+        setWaError(msg);
+        showWaNotice("WhatsApp Notice", msg);
       }
     } catch (err) {
-      Alert.alert("Error", err.message || "Could not start WhatsApp linking");
+      const msg = err.message || "Could not start WhatsApp linking";
+      setWaError(msg);
+      showWaNotice("Error", msg);
     } finally {
       setWaLoading(false);
     }
@@ -235,13 +259,18 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
           setWaPhone(res.phoneNumber);
           setPairingCode(null);
           setShowPairingInput(false);
-          Alert.alert(
+          setWaError("");
+          if (onProfileUpdated) {
+            const meRes = await api.auth.getMe().catch(() => null);
+            if (meRes?.success && meRes?.user) onProfileUpdated(meRes.user);
+          }
+          showWaNotice(
             "WhatsApp 24/7 Linked!",
-            `Successfully connected WhatsApp (+${res.phoneNumber || "linked"}). Baileys multi-day persistent sync is active!`
+            `Successfully connected WhatsApp (+${res.phoneNumber || "linked"}). Automatic bills & broadcasts are active!`
           );
         }
       } catch {}
-      if (attempts >= 30) {
+      if (attempts >= 40) {
         clearInterval(interval);
       }
     }, 2500);
@@ -249,7 +278,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const handleGetPairingCode = async () => {
     let raw = (pairingPhone || user?.whatsappNumber || user?.phone || "").replace(/[^0-9]/g, "");
     if (!raw) {
-      Alert.alert("Phone Required", "Please enter your 10-digit WhatsApp phone number");
+      showWaNotice("Phone Required", "Please enter your 10-digit WhatsApp phone number");
       return;
     }
     raw = raw.replace(/^0+/, "");
@@ -257,27 +286,57 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       raw = raw.slice(2);
     }
     if (raw.length !== 10) {
-      Alert.alert("Invalid Phone", "Please enter a valid 10-digit mobile number (e.g. 9876543210)");
+      showWaNotice("Invalid Phone", "Please enter a valid 10-digit mobile number (e.g. 9876543210)");
       return;
     }
     const fullNumber = `91${raw}`;
     setPairingLoading(true);
+    setWaError("");
     setPairingCode(null);
     try {
       const res = await api.whatsapp.getPairingCode(fullNumber);
       if (res && res.success && res.code) {
         setPairingCode(res.code);
+        setWaStatus("scan_qr");
         startPairingPolling();
       } else {
-        Alert.alert("Notice", res?.message || "Could not generate pairing code. You can scan the QR code.");
+        const msg = res?.message || "Could not generate pairing code. Please try QR code scan.";
+        setWaError(msg);
+        showWaNotice("Notice", msg);
       }
     } catch (err) {
-      Alert.alert("Notice", err.message || "Failed to generate pairing code. Please try QR code scan.");
+      const msg = err.message || "Failed to generate pairing code. Please try QR code scan.";
+      setWaError(msg);
+      showWaNotice("Notice", msg);
     } finally {
       setPairingLoading(false);
     }
   };
+  const performDisconnectWa = async () => {
+    setWaLoading(true);
+    setWaError("");
+    try {
+      await api.whatsapp.disconnect();
+      setWaStatus("disconnected");
+      setWaQr(null);
+      setWaPhone(null);
+      setPairingCode(null);
+      if (onProfileUpdated && user) {
+        onProfileUpdated({ ...user, whatsappLinked: false, whatsappLinkedNumber: "" });
+      }
+    } catch {
+      showWaNotice("Error", "Could not unlink WhatsApp");
+    } finally {
+      setWaLoading(false);
+    }
+  };
   const handleDisconnectWa = async () => {
+    if (Platform.OS === "web") {
+      if (window.confirm("Are you sure you want to unlink WhatsApp from this account?")) {
+        performDisconnectWa();
+      }
+      return;
+    }
     Alert.alert(
       "Unlink WhatsApp",
       "Are you sure you want to unlink WhatsApp from this device? Multi-day sync will be stopped.",
@@ -286,19 +345,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         {
           text: "Unlink",
           style: "destructive",
-          onPress: async () => {
-            setWaLoading(true);
-            try {
-              await api.whatsapp.disconnect();
-              setWaStatus("disconnected");
-              setWaQr(null);
-              setWaPhone(null);
-            } catch {
-              Alert.alert("Error", "Could not unlink WhatsApp");
-            } finally {
-              setWaLoading(false);
-            }
-          },
+          onPress: performDisconnectWa,
         },
       ]
     );
@@ -1063,22 +1110,68 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   )}
                 </View>
               ) : (
-                <TouchableOpacity
-                  onPress={() => handleStartWaLink(true)}
-                  disabled={waLoading}
-                  className="bg-emerald-600 py-3 rounded-xl flex-row items-center justify-center shadow-sm"
-                >
-                  {waLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <FontAwesome name="whatsapp" size={18} color="#FFFFFF" />
-                      <Text className="text-white font-bold text-xs ml-2">
-                        Link WhatsApp (Start Multi-Day Sync)
+                <View>
+                  {waError ? (
+                    <View className="bg-red-50 border border-red-200 rounded-xl p-2.5 mb-2.5 flex-row items-center">
+                      <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                      <Text className="text-red-700 text-[11px] font-semibold ml-1.5 flex-1">
+                        {waError}
                       </Text>
-                    </>
+                    </View>
+                  ) : null}
+                  <TouchableOpacity
+                    onPress={() => handleStartWaLink(true)}
+                    disabled={waLoading}
+                    className="bg-emerald-600 py-3 rounded-xl flex-row items-center justify-center shadow-sm"
+                  >
+                    {waLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <FontAwesome name="whatsapp" size={18} color="#FFFFFF" />
+                        <Text className="text-white font-bold text-xs ml-2">
+                          Link WhatsApp (QR Code Scan)
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowPairingInput(!showPairingInput)}
+                    className="mt-2 bg-blue-50 border border-blue-200 py-2.5 rounded-xl flex-row items-center justify-center"
+                  >
+                    <Ionicons name="keypad-outline" size={15} color="#2563EB" />
+                    <Text className="text-blue-700 font-bold text-xs ml-1.5">
+                      {showPairingInput ? "Hide Phone Number Linking" : "Or Link with 10-Digit Phone Number"}
+                    </Text>
+                  </TouchableOpacity>
+                  {showPairingInput && (
+                    <View className="mt-3 w-full bg-gray-50 p-3 rounded-xl border border-gray-200">
+                      <Text className="text-xs font-bold text-gray-800 mb-1">Link with Phone Number:</Text>
+                      <Text className="text-[11px] text-gray-500 mb-2">Enter 10-digit WhatsApp number to get an 8-digit pairing code:</Text>
+                      <View className="flex-row items-center">
+                        <TextInput
+                          className="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-900"
+                          placeholder="e.g. 9876543210"
+                          placeholderTextColor="#9CA3AF"
+                          value={pairingPhone}
+                          onChangeText={setPairingPhone}
+                          keyboardType="phone-pad"
+                        />
+                        <TouchableOpacity
+                          onPress={handleGetPairingCode}
+                          disabled={pairingLoading}
+                          className="ml-2 bg-emerald-600 px-3 py-2 rounded-lg"
+                        >
+                          {pairingLoading ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text className="text-white text-xs font-bold">Get Code</Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   )}
-                </TouchableOpacity>
+                </View>
               )}
             </View>
           </View>

@@ -19,7 +19,12 @@ router.get("/status", async (req, res) => {
   const user = req.user;
   const waStatus = getWhatsAppStatus(userId);
 
-  if (waStatus.status === "disconnected" && userId && (user?.whatsappLinked || waStatus.sessionPersisted)) {
+  if (
+    waStatus.status === "disconnected" &&
+    !waStatus.isInitializing &&
+    userId &&
+    (user?.whatsappLinked || waStatus.sessionPersisted)
+  ) {
     initWhatsApp(false, userId).catch(() => {});
   }
 
@@ -39,6 +44,8 @@ router.get("/status", async (req, res) => {
     status: waStatus.status,
     qrCode: waStatus.qrCode,
     phoneNumber: userPhone,
+    isInitializing: waStatus.isInitializing,
+    lastError: waStatus.lastError,
     isLinkedForUser: waStatus.status === "connected",
   });
 });
@@ -46,8 +53,8 @@ router.get("/status", async (req, res) => {
 router.post("/init", async (req, res) => {
   const userId = req.user?._id?.toString();
   const force = req.body?.force === true;
-  await initWhatsApp(force, userId);
-  const status = await waitForWhatsAppQrOrReady(12000, userId);
+  await initWhatsApp(force, userId, { cleanUnregistered: force });
+  const status = await waitForWhatsAppQrOrReady(18000, userId);
   return res.status(200).json({ success: true, ...status });
 });
 
