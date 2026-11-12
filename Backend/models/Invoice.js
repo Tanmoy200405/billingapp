@@ -159,6 +159,11 @@ const invoiceSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    googleMapLocation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     notes: {
       type: String,
       trim: true,

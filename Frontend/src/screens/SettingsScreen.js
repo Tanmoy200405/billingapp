@@ -148,10 +148,14 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         footerNote: billFooter,
       };
       await AsyncStorage.setItem("billFormatOptions", JSON.stringify(opts));
-      await api.auth.updateProfile({
+      const updateRes = await api.auth.updateProfile({
         invoiceStyle,
         thermalPrinterSize: printerSize,
+        ...(googleMapLocation.trim() ? { googleMapLocation: googleMapLocation.trim() } : {}),
       });
+      if (updateRes?.success && updateRes?.user && onProfileUpdated) {
+        onProfileUpdated(updateRes.user);
+      }
       Alert.alert(
         "Saved",
         `Printer & Invoice settings updated! Active style: ${

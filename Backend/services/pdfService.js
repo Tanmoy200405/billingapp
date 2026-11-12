@@ -24,6 +24,7 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
       const storeEmail = (storeInfo.email || "").toString().trim();
       const storeGstin = (storeInfo.gstin || "").toString().trim();
       const storeLogo = (storeInfo.logo || "").toString().trim();
+      const storeMapLocation = (storeInfo.googleMapLocation || invoice.googleMapLocation || "").toString().trim();
 
       const pageWidth = 240; // ~80mm crisp POS receipt width
       const leftX = 14;
@@ -60,6 +61,7 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
       if (storePhone) estimatedHeight += 12;
       if (storeEmail) estimatedHeight += 12;
       if (storeGstin) estimatedHeight += 12;
+      if (storeMapLocation) estimatedHeight += 24;
 
       for (const it of items) {
         const nm = (it.name || "Item").toString();
@@ -180,6 +182,22 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
           .text(`GSTIN: ${storeGstin}`, leftX, doc.y + 1, {
             width: contentWidth,
             align: "center",
+          });
+      }
+
+      if (storeMapLocation) {
+        const cleanMapUrl = storeMapLocation.startsWith("http")
+          ? storeMapLocation
+          : `https://${storeMapLocation}`;
+        doc
+          .fontSize(8)
+          .font("Helvetica-Bold")
+          .fillColor("#2563EB")
+          .text("📍 View on Google Maps", leftX, doc.y + 1, {
+            width: contentWidth,
+            align: "center",
+            link: cleanMapUrl,
+            underline: true,
           });
       }
 
@@ -368,6 +386,23 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
           width: contentWidth,
           align: "center",
         });
+
+      if (storeMapLocation) {
+        const cleanMapUrl = storeMapLocation.startsWith("http")
+          ? storeMapLocation
+          : `https://${storeMapLocation}`;
+        doc.y += 4;
+        doc
+          .fontSize(7.5)
+          .font("Helvetica-Bold")
+          .fillColor("#2563EB")
+          .text("📍 Locate Us on Google Maps", leftX, doc.y, {
+            width: contentWidth,
+            align: "center",
+            link: cleanMapUrl,
+            underline: true,
+          });
+      }
 
       doc.end();
     } catch (err) {

@@ -550,6 +550,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       upiAmount: paymentMode === "UPI/CASH" ? Number(upiAmount) || 0 : undefined,
       customDiscountPercent: Number(customDiscount) || (activeCustomer?.customDiscountPercent || 0),
       customFreebieItem: customFreebie.trim() || (activeCustomer?.assignedFreebie || ""),
+      googleMapLocation: user?.googleMapLocation || billFormatOptions?.googleMapLocation || "",
       items: cart.map((c) => ({
         itemId: c._id,
         name: c.name,
