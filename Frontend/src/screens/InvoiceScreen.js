@@ -623,6 +623,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             email: user?.email || "",
             gstin: user?.gstin || "",
             logo: user?.logo || "",
+            googleMapLocation: user?.googleMapLocation || "",
           };
           await printBill(finalRes.invoice, storeData, billFormatOptions, activePrintTarget);
           setKotSent(true);
@@ -679,6 +680,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
         email: user?.email || "",
         gstin: user?.gstin || "",
         logo: user?.logo || "",
+        googleMapLocation: user?.googleMapLocation || "",
       };
       const target = printTarget === "none" ? "both" : printTarget;
       const opts = { paperWidth: "2inch", invoiceStyle: user?.invoiceStyle || billFormatOptions?.invoiceStyle || "modern_zudio", ...billFormatOptions };

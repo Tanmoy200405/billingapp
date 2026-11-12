@@ -738,6 +738,9 @@ router.post("/", async (req, res) => {
     const freebieLine = invoice.freebieItemGiven
       ? `🎁 Complimentary Gift: ${invoice.freebieItemGiven}\n`
       : "";
+    const mapLocationLine = business.googleMapLocation
+      ? `📍 *Find Us on Google Maps:*\n${business.googleMapLocation}\n\n`
+      : "";
     const whatsappText =
       `Dear Customer,\n\n` +
       `Thank you for your order at *${storeTitle}*!\n\n` +
@@ -752,6 +755,7 @@ router.post("/", async (req, res) => {
       freebieLine +
       `💰 *Grand Total:* *Rs.${amountVal}*\n\n` +
       `🔗 *View Full Bill Online:*\n${publicPdfUrl}\n\n` +
+      mapLocationLine +
       `How was your experience with *${storeTitle}* today?\n` +
       `_Tap to reply automatically in 1 click:_\n` +
       `🌟 *Loved it!* ➔ ${lovedUrl}\n` +
@@ -837,6 +841,9 @@ router.post("/:id/send-whatsapp", async (req, res) => {
     const freebieLine = invoice.freebieItemGiven
       ? `🎁 Complimentary Gift: ${invoice.freebieItemGiven}\n`
       : "";
+    const mapLocationLine = business.googleMapLocation
+      ? `📍 *Find Us on Google Maps:*\n${business.googleMapLocation}\n\n`
+      : "";
     const whatsappText =
       `Dear Customer,\n\n` +
       `Thank you for your order at *${storeTitle}*!\n\n` +
@@ -851,6 +858,7 @@ router.post("/:id/send-whatsapp", async (req, res) => {
       freebieLine +
       `💰 *Grand Total:* *Rs.${amountVal}*\n\n` +
       `🔗 *View Full Bill Online:*\n${publicPdfUrl}\n\n` +
+      mapLocationLine +
       `How was your experience with *${storeTitle}* today?\n` +
       `_Tap to reply automatically in 1 click:_\n` +
       `🌟 *Loved it!* ➔ ${lovedUrl}\n` +

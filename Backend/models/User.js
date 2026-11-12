@@ -52,6 +52,11 @@ const userSchema = new mongoose.Schema(
       enum: ["restaurant", "salon", "retail", "general"],
       default: "restaurant",
     },
+    googleMapLocation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     thermalPrinterSize: {
       type: String,
       enum: ["2inch", "3inch", "A4", "A5"],

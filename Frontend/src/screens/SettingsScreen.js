@@ -54,6 +54,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [upiId, setUpiId] = useState(user?.upiId || "");
   const [logo, setLogo] = useState(user?.logo || "");
   const [businessType, setBusinessType] = useState(user?.businessType || "restaurant");
+  const [googleMapLocation, setGoogleMapLocation] = useState(user?.googleMapLocation || "");
   const [invoiceStyle, setInvoiceStyle] = useState(user?.invoiceStyle || "modern_zudio");
   const [saving, setSaving] = useState(false);
   const [printerSize, setPrinterSize] = useState(user?.thermalPrinterSize || "2inch");
@@ -66,6 +67,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [billShowEmail, setBillShowEmail] = useState(true);
   const [billShowGstin, setBillShowGstin] = useState(true);
   const [billShowType, setBillShowType] = useState(true);
+  const [billShowMapLocation, setBillShowMapLocation] = useState(true);
   const [billFooter, setBillFooter] = useState("Thank you! Visit again.");
   const [showPreview, setShowPreview] = useState(false);
   const [previewTab, setPreviewTab] = useState("both");
@@ -120,6 +122,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         if (opts.showEmail !== undefined) setBillShowEmail(opts.showEmail);
         if (opts.showGstin !== undefined) setBillShowGstin(opts.showGstin);
         if (opts.showBillType !== undefined) setBillShowType(opts.showBillType);
+        if (opts.showGoogleMapLocation !== undefined) setBillShowMapLocation(Boolean(opts.showGoogleMapLocation));
         if (opts.autoPrintBill !== undefined) setAutoPrintBill(Boolean(opts.autoPrintBill));
         if (opts.showReceiptModalOnSave !== undefined) setShowReceiptModalOnSave(Boolean(opts.showReceiptModalOnSave));
         if (opts.footerNote) setBillFooter(opts.footerNote);
@@ -141,6 +144,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         showEmail: billShowEmail,
         showGstin: billShowGstin,
         showBillType: billShowType,
+        showGoogleMapLocation: billShowMapLocation,
         footerNote: billFooter,
       };
       await AsyncStorage.setItem("billFormatOptions", JSON.stringify(opts));
@@ -183,6 +187,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         showEmail: billShowEmail,
         showGstin: billShowGstin,
         showBillType: billShowType,
+        showGoogleMapLocation: billShowMapLocation,
         footerNote: billFooter,
       };
       await printTestSlip(storeData, opts, printTarget);
@@ -409,6 +414,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       email: email.trim() || undefined,
       gstin: gstin.trim() || undefined,
       address: address.trim() || undefined,
+      googleMapLocation: googleMapLocation.trim() || "",
       upiId: upiId.trim() || undefined,
       logo: logo || "",
       invoiceStyle,
@@ -797,7 +803,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   onChangeText={setUpiId}
                 />
               </View>
-              <View className="mb-2">
+              <View className="mb-3">
                 <Text className="text-xs font-bold text-gray-700 mb-1">Store Address</Text>
                 <TextInput
                   className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
@@ -805,6 +811,32 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   value={address}
                   onChangeText={setAddress}
                 />
+              </View>
+              <View className="mb-3">
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-xs font-bold text-gray-700">Google Maps Location Link / URL</Text>
+                  {googleMapLocation ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        const url = googleMapLocation.startsWith("http") ? googleMapLocation : `https://${googleMapLocation}`;
+                        Linking.openURL(url).catch(() => Alert.alert("Error", "Could not open map URL"));
+                      }}
+                    >
+                      <Text className="text-xs font-bold text-blue-600">Test / Open Map ↗</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+                <TextInput
+                  className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm"
+                  placeholder="e.g. https://maps.app.goo.gl/xyz or Google Maps share link"
+                  value={googleMapLocation}
+                  onChangeText={setGoogleMapLocation}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Text className="text-[11px] text-gray-400 mt-1">
+                  Shown on WhatsApp invoice messages and printed bills so customers can find and review your store.
+                </Text>
               </View>
               <View className="mb-3 pt-2 border-t border-gray-100">
                 <View className="flex-row items-center justify-between mb-1.5">
@@ -1165,6 +1197,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 { label: "Show Store Email in Header", state: billShowEmail, set: setBillShowEmail },
                 { label: "Show GSTIN in Header", state: billShowGstin, set: setBillShowGstin },
                 { label: "Show Bill Type (Cash Sale / Credit)", state: billShowType, set: setBillShowType },
+                { label: "Show Google Maps Location on Bill & WhatsApp", state: billShowMapLocation, set: setBillShowMapLocation },
               ].map(({ label, state, set }) => (
                 <View key={label} className="flex-row items-center justify-between py-2 border-b border-gray-100">
                   <Text className="text-xs text-gray-800 font-medium flex-1 pr-2">{label}</Text>
@@ -1537,6 +1570,11 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                     {user?.phone ? <Text style={{ fontSize: 10.5, color: "#334155", textAlign: "center" }}>Phone: {user.phone}</Text> : null}
                     {billShowEmail && (email || user?.email) ? <Text style={{ fontSize: 10, color: "#475569", textAlign: "center" }}>@: {email || user.email}</Text> : null}
                     {billShowGstin && (gstin || user?.gstin) ? <Text style={{ fontSize: 10, fontWeight: "700", color: "#0F172A", textAlign: "center" }}>GSTIN: {gstin || user.gstin}</Text> : null}
+                    {billShowMapLocation && (googleMapLocation || user?.googleMapLocation) ? (
+                      <Text style={{ fontSize: 9.5, color: "#2563EB", fontWeight: "700", textAlign: "center", marginTop: 2 }}>
+                        📍 Google Maps Location
+                      </Text>
+                    ) : null}
                   </View>
                   <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#94A3B8", marginVertical: 6 }} />
                   {billShowToken ? <Text style={{ fontSize: 11, fontWeight: "800", color: "#0F172A" }}>Bill No: 21</Text> : null}

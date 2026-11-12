@@ -332,6 +332,7 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
     email = "",
     logo = "",
     gstin = "",
+    googleMapLocation = "",
   } = storeInfo;
 
   const {
@@ -341,6 +342,7 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
     showCustomerPhone = true,
     showEmail = true,
     showGstin = true,
+    showGoogleMapLocation = true,
     footerNote = "Thank you! Visit again.",
     showBillType = true,
     invoiceStyle = "modern_zudio",
@@ -435,6 +437,11 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
       ? `${orderSource}${extOrderId ? ` #${extOrderId}` : ""}`
       : "";
 
+  const mapUrl = (googleMapLocation || storeInfo?.googleMapLocation || options?.googleMapLocation || "").trim();
+  const mapHtml = showGoogleMapLocation && mapUrl
+    ? `<div style="margin-top:2px;font-size:10px;"><a href="${mapUrl}" style="color:#2563EB;text-decoration:none;font-weight:700;">📍 Google Maps Location</a></div>`
+    : "";
+
   return `
     <div class="receipt">
       <div class="center"><span class="copy-badge">${copyTitle}${channelLabel ? ` • ${channelLabel}` : ""}</span></div>
@@ -445,6 +452,7 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
         ${phone ? `<div>Phone: ${phone}</div>` : ""}
         ${emailHtml}
         ${gstinHtml}
+        ${mapHtml}
       </div>
       <hr class="divider"/>
       ${showTokenNumber ? `<div class="meta"><b>Bill No: ${tokenDisplay}</b>${channelLabel ? ` &nbsp;|&nbsp; <b>${channelLabel}</b>` : ""}</div>` : ""}
@@ -470,7 +478,10 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
       ${savingsHtml}
       ${signHtml}
       <hr class="divider"/>
-      <div class="footer">${footerNote}</div>
+      <div class="footer">
+        ${footerNote}
+        ${showGoogleMapLocation && mapUrl ? `<div style="margin-top:3px;font-size:9.5px;color:#2563EB;">📍 Find Us: <a href="${mapUrl}" style="color:#2563EB;text-decoration:underline;font-weight:700;">Google Maps Location</a></div>` : ""}
+      </div>
     </div>
   `;
 }
