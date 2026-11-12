@@ -2,6 +2,7 @@ import express from "express";
 import { createRequire } from "module";
 import Item from "../models/Item.js";
 import Category from "../models/Category.js";
+import Invoice from "../models/Invoice.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { getCache, setCache, invalidateUserCache } from "../services/cacheService.js";
 
@@ -175,6 +176,137 @@ router.get("/barcode/:barcode", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Error scanning barcode",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/sales-summary", async (req, res) => {
+  try {
+    const summary = await Invoice.aggregate([
+      { $match: { userId: req.user._id } },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: {
+            $ifNull: ["$items.itemId", "$items.name"],
+          },
+          itemId: { $first: "$items.itemId" },
+          name: { $first: "$items.name" },
+          totalSoldQuantity: { $sum: "$items.quantity" },
+          totalRevenue: { $sum: "$items.total" },
+          totalParcelQuantity: { $sum: { $ifNull: ["$items.parcelQuantity", 0] } },
+          invoiceIds: { $addToSet: "$_id" },
+          lastSoldAt: { $max: "$createdAt" },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          itemId: 1,
+          name: 1,
+          totalSoldQuantity: 1,
+          totalRevenue: 1,
+          totalParcelQuantity: 1,
+          invoiceCount: { $size: "$invoiceIds" },
+          lastSoldAt: 1,
+        },
+      },
+    ]);
+
+    const byItemId = {};
+    const byName = {};
+    for (const row of summary) {
+      if (row.itemId) {
+        byItemId[String(row.itemId)] = row;
+      }
+      if (row.name) {
+        byName[String(row.name).trim().toLowerCase()] = row;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      summary,
+      byItemId,
+      byName,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate sales summary",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/:id/sales-stats", async (req, res) => {
+  try {
+    const item = await Item.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+    }).lean();
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found in inventory",
+      });
+    }
+
+    const escapedName = item.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const nameRegex = new RegExp(`^${escapedName}$`, "i");
+
+    const agg = await Invoice.aggregate([
+      { $match: { userId: req.user._id } },
+      { $unwind: "$items" },
+      {
+        $match: {
+          $or: [
+            { "items.itemId": item._id },
+            { "items.name": { $regex: nameRegex } },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalSoldQuantity: { $sum: "$items.quantity" },
+          totalRevenue: { $sum: "$items.total" },
+          totalParcelQuantity: { $sum: { $ifNull: ["$items.parcelQuantity", 0] } },
+          invoiceIds: { $addToSet: "$_id" },
+          lastSoldAt: { $max: "$createdAt" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalSoldQuantity: 1,
+          totalRevenue: 1,
+          totalParcelQuantity: 1,
+          invoiceCount: { $size: "$invoiceIds" },
+          lastSoldAt: 1,
+        },
+      },
+    ]);
+
+    const stats = agg[0] || {
+      totalSoldQuantity: 0,
+      totalRevenue: 0,
+      totalParcelQuantity: 0,
+      invoiceCount: 0,
+      lastSoldAt: null,
+    };
+
+    return res.status(200).json({
+      success: true,
+      item,
+      stats,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch sales statistics for item",
       error: error.message,
     });
   }

@@ -55,9 +55,15 @@ function SafeProductImage({ uri }) {
   );
 }
 
-export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack }) {
+export default function InventoryScreen({ user, isActive = true, onOpenDrawer, onBack }) {
   const { isWide, gridColumns, headerTopPadding } = useResponsive();
+  const businessType = user?.businessType || "restaurant";
   const [items, setItems] = useState(() => getMemoryCachedData("items_all") || []);
+  const [salesSummary, setSalesSummary] = useState({ byItemId: {}, byName: {} });
+  const [selectedStatsItem, setSelectedStatsItem] = useState(null);
+  const [statsModalVisible, setStatsModalVisible] = useState(false);
+  const [itemStatsData, setItemStatsData] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterLowStock, setFilterLowStock] = useState(false);
@@ -171,6 +177,19 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
       } else if (!hasCached) {
         setItems([]);
       }
+
+      // Fetch live sales summary in background for instant sales badges & analytics
+      api.items
+        .getSalesSummary()
+        .then((sRes) => {
+          if (sRes && sRes.success) {
+            setSalesSummary({
+              byItemId: sRes.byItemId || {},
+              byName: sRes.byName || {},
+            });
+          }
+        })
+        .catch(() => {});
     } catch {
       const cached = await getCachedData("items_all");
       if (Array.isArray(cached)) {
@@ -182,6 +201,39 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
       setLoading(false);
     }
   }, [search, filterLowStock, selectedCategory]);
+
+  const handleOpenItemStats = async (item) => {
+    if (!item) return;
+    setSelectedStatsItem(item);
+    setStatsModalVisible(true);
+    setStatsLoading(true);
+
+    const quick =
+      salesSummary.byItemId?.[item._id] ||
+      salesSummary.byName?.[String(item.name || "").trim().toLowerCase()];
+
+    setItemStatsData({
+      stats: quick || {
+        totalSoldQuantity: 0,
+        totalRevenue: 0,
+        invoiceCount: 0,
+        totalParcelQuantity: 0,
+        lastSoldAt: null,
+      },
+      item,
+    });
+
+    try {
+      const res = await api.items.getSalesStats(item._id);
+      if (res && res.success) {
+        setItemStatsData(res);
+      }
+    } catch {
+      // Keep quick stats
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const handleSyncOfflineItemsNow = async () => {
     if (syncingOfflineItems) return;
@@ -767,8 +819,16 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
           }
           renderItem={({ item }) => {
             if (!item) return null;
+            const soldData =
+              salesSummary.byItemId?.[item._id] ||
+              salesSummary.byName?.[String(item.name || "").trim().toLowerCase()];
+            const totalSoldQty = soldData?.totalSoldQuantity || 0;
+            const totalSoldRev = soldData?.totalRevenue || 0;
+
             return (
-              <View
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() => handleOpenItemStats(item)}
                 style={gridColumns > 1 ? { flex: 1, maxWidth: `${100 / gridColumns - 1}%` } : undefined}
                 className="bg-white rounded-xl p-4 mb-3 border border-gray-200 shadow-sm flex-row items-center justify-between"
               >
@@ -795,7 +855,7 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
                         </Text>
                       ) : null}
                     </View>
-                    <View className="flex-row items-center gap-3 mt-1.5">
+                    <View className="flex-row items-center flex-wrap gap-2 mt-1.5">
                       <Text className="text-xs font-bold text-blue-900">
                         Sale: Rs. {item.sellingPrice || 0}
                       </Text>
@@ -804,6 +864,20 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
                           GST: {item.taxRate}%
                         </Text>
                       ) : null}
+                      {totalSoldQty > 0 ? (
+                        <View className="bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-full flex-row items-center">
+                          <Ionicons name="trending-up" size={11} color="#059669" />
+                          <Text className="text-[10px] font-extrabold text-emerald-800 ml-1">
+                            Sold: {totalSoldQty} {item.unit || "PCS"} (Rs. {totalSoldRev})
+                          </Text>
+                        </View>
+                      ) : (
+                        <View className="bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded">
+                          <Text className="text-[9.5px] font-semibold text-gray-500">
+                            Tap to view sales
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </View>
@@ -826,19 +900,25 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
                   </View>
 
                   <TouchableOpacity
-                    onPress={() => handleOpenEdit(item)}
+                    onPress={(e) => {
+                      e.stopPropagation && e.stopPropagation();
+                      handleOpenEdit(item);
+                    }}
                     className="bg-blue-50 border border-blue-200 w-9 h-9 rounded-lg items-center justify-center mr-2"
                   >
                     <Ionicons name="pencil" size={16} color="#2563EB" />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => handleDeleteItem(item)}
+                    onPress={(e) => {
+                      e.stopPropagation && e.stopPropagation();
+                      handleDeleteItem(item);
+                    }}
                     className="bg-red-50 border border-red-200 w-9 h-9 rounded-lg items-center justify-center"
                   >
                     <Ionicons name="trash" size={16} color="#DC2626" />
                   </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           }}
         />
@@ -1033,24 +1113,28 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
                   </View>
                 </View>
 
-                <View className="flex-row gap-2 mb-6">
-                  {["PCS", "KG", "LTR", "BOX", "PACK"].map((u) => (
-                    <TouchableOpacity
-                      key={u}
-                      onPress={() => setFormUnit(u)}
-                      className={`flex-1 py-2 rounded-lg border items-center ${formUnit === u
-                          ? "bg-blue-600 border-blue-600"
-                          : "bg-gray-100 border-gray-300"
-                        }`}
-                    >
-                      <Text
-                        className={`text-xs font-bold ${formUnit === u ? "text-white" : "text-gray-700"
+                <View className="mb-6">
+                  <Text className="text-xs font-bold text-gray-700 mb-1.5">Measuring Unit</Text>
+                  <View className="flex-row flex-wrap gap-1.5">
+                    {["PCS", "SRV", "HRS", "MIN", "KG", "G", "LTR", "ML", "BOX", "PACK", "BTL", "SET"].map((u) => (
+                      <TouchableOpacity
+                        key={u}
+                        onPress={() => setFormUnit(u)}
+                        style={{ minWidth: 44 }}
+                        className={`py-1.5 px-2 rounded-lg border items-center justify-center ${formUnit === u
+                            ? "bg-blue-600 border-blue-600"
+                            : "bg-gray-100 border-gray-300"
                           }`}
                       >
-                        {u}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          className={`text-xs font-bold ${formUnit === u ? "text-white" : "text-gray-700"
+                            }`}
+                        >
+                          {u}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
 
                 <TouchableOpacity
@@ -1106,17 +1190,23 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
               {/* Quick suggestions */}
               <Text className="text-[11px] font-bold text-gray-500 mb-1.5 uppercase">Quick Suggestions</Text>
               <View className="flex-row flex-wrap gap-1.5 mb-3.5">
-                {["Beverages", "Fast Food", "Starters", "Main Course", "Pizza", "Desserts", "Chinese", "Biryani"].map(
-                  (sug) => (
-                    <TouchableOpacity
-                      key={sug}
-                      onPress={() => setNewCategoryName(sug)}
-                      className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg"
-                    >
-                      <Text className="text-xs font-semibold text-blue-700">{sug}</Text>
-                    </TouchableOpacity>
-                  )
-                )}
+                {(
+                  businessType === "salon"
+                    ? ["Haircut", "Hair Color", "Facial & Skin", "Spa & Massage", "Beard & Shave", "Bridal", "Retail Products"]
+                    : businessType === "retail"
+                    ? ["Groceries", "Beverages", "Snacks", "Dairy", "Personal Care", "Cleaning", "Stationery"]
+                    : businessType === "general"
+                    ? ["Services", "Hardware", "Consultation", "Labour", "Spare Parts", "General"]
+                    : ["Beverages", "Fast Food", "Starters", "Main Course", "Pizza", "Desserts", "Chinese", "Biryani"]
+                ).map((sug) => (
+                  <TouchableOpacity
+                    key={sug}
+                    onPress={() => setNewCategoryName(sug)}
+                    className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg"
+                  >
+                    <Text className="text-xs font-semibold text-blue-700">{sug}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
 
               <View className="mb-4">
@@ -1149,6 +1239,207 @@ export default function InventoryScreen({ isActive = true, onOpenDrawer, onBack 
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ────────────────── ITEM SALES & ANALYTICS MODAL ────────────────── */}
+      <Modal
+        visible={statsModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setStatsModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/60 justify-end sm:justify-center items-center p-0 sm:p-4">
+          <TouchableWithoutFeedback onPress={() => setStatsModalVisible(false)}>
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+          </TouchableWithoutFeedback>
+
+          <View className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[88%] shadow-2xl">
+            {/* Header */}
+            <View className="flex-row justify-between items-start pb-3 border-b border-gray-200 mb-4">
+              <View className="flex-row items-center flex-1 pr-3">
+                <SafeProductImage uri={selectedStatsItem?.imageUrl} />
+                <View className="flex-1">
+                  <Text className="text-lg font-black text-gray-900 leading-snug">
+                    {selectedStatsItem?.name || "Item Details"}
+                  </Text>
+                  <View className="flex-row items-center gap-2 mt-0.5">
+                    <Text className="text-xs font-semibold text-blue-700">
+                      {selectedStatsItem?.category || "General"}
+                    </Text>
+                    {selectedStatsItem?.barcode ? (
+                      <Text className="text-[11px] text-gray-500">
+                        SKU: {selectedStatsItem.barcode}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setStatsModalVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                className="p-1"
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {statsLoading && !itemStatsData?.stats?.totalSoldQuantity ? (
+                <View className="py-8 items-center justify-center">
+                  <ActivityIndicator size="large" color="#2563EB" />
+                  <Text className="text-xs font-bold text-gray-500 mt-2">
+                    Calculating sales analytics...
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* 4 Key Performance Metrics Cards */}
+              <View className="flex-row gap-2.5 mb-2.5">
+                <View className="flex-1 bg-blue-50 border border-blue-200 rounded-2xl p-3.5">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="text-[11px] font-bold text-blue-700 uppercase tracking-wide">
+                      Total Sold
+                    </Text>
+                    <Ionicons name="trending-up" size={16} color="#2563EB" />
+                  </View>
+                  <Text className="text-xl font-black text-blue-900">
+                    {itemStatsData?.stats?.totalSoldQuantity || 0}
+                  </Text>
+                  <Text className="text-[10px] text-blue-600 font-semibold mt-0.5">
+                    {selectedStatsItem?.unit || "PCS"} volume sold
+                  </Text>
+                </View>
+
+                <View className="flex-1 bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide">
+                      Sales Revenue
+                    </Text>
+                    <Ionicons name="cash-outline" size={16} color="#059669" />
+                  </View>
+                  <Text className="text-xl font-black text-emerald-900">
+                    ₹{itemStatsData?.stats?.totalRevenue || 0}
+                  </Text>
+                  <Text className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+                    Gross revenue earned
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row gap-2.5 mb-4">
+                <View className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                      Times Invoiced
+                    </Text>
+                    <Ionicons name="receipt-outline" size={16} color="#0F172A" />
+                  </View>
+                  <Text className="text-xl font-black text-slate-900">
+                    {itemStatsData?.stats?.invoiceCount || 0}
+                  </Text>
+                  <Text className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                    Bills created with this item
+                  </Text>
+                </View>
+
+                <View className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3.5">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="text-[11px] font-bold text-gray-700 uppercase tracking-wide">
+                      Stock Left
+                    </Text>
+                    <Ionicons name="cube-outline" size={16} color="#4B5563" />
+                  </View>
+                  <Text
+                    className={`text-xl font-black ${(selectedStatsItem?.stock || 0) <= (selectedStatsItem?.lowStockThreshold || 5) ? "text-red-600" : "text-gray-900"}`}
+                  >
+                    {selectedStatsItem?.stock || 0}
+                  </Text>
+                  <Text className="text-[10px] text-gray-500 font-semibold mt-0.5">
+                    {selectedStatsItem?.unit || "PCS"} available now
+                  </Text>
+                </View>
+              </View>
+
+              {/* Pricing & Margin Detail Sheet */}
+              <View className="bg-gray-50 rounded-2xl p-4 border border-gray-200 mb-4">
+                <Text className="text-xs font-extrabold text-gray-800 uppercase tracking-wider mb-2.5">
+                  Pricing & Margins
+                </Text>
+
+                <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                  <Text className="text-xs text-gray-600">Selling Price</Text>
+                  <Text className="text-xs font-bold text-gray-900">₹{selectedStatsItem?.sellingPrice || 0}</Text>
+                </View>
+
+                <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                  <Text className="text-xs text-gray-600">Cost / Purchase Price</Text>
+                  <Text className="text-xs font-bold text-gray-700">₹{selectedStatsItem?.costPrice || selectedStatsItem?.purchasePrice || 0}</Text>
+                </View>
+
+                <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                  <Text className="text-xs text-gray-600">Gross Margin per Unit</Text>
+                  <Text className="text-xs font-extrabold text-emerald-700">
+                    ₹{Math.max(0, (selectedStatsItem?.sellingPrice || 0) - (selectedStatsItem?.costPrice || selectedStatsItem?.purchasePrice || 0))}
+                  </Text>
+                </View>
+
+                <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                  <Text className="text-xs text-gray-600">GST / Tax Rate</Text>
+                  <Text className="text-xs font-bold text-gray-700">{selectedStatsItem?.taxRate || 0}%</Text>
+                </View>
+
+                {itemStatsData?.stats?.totalParcelQuantity > 0 ? (
+                  <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                    <Text className="text-xs text-gray-600">
+                      {businessType === "salon" ? "Retail Takeaway Sales" : "Parcel Volume"}
+                    </Text>
+                    <Text className="text-xs font-bold text-gray-800">
+                      {itemStatsData.stats.totalParcelQuantity} {selectedStatsItem?.unit || "PCS"}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {itemStatsData?.stats?.lastSoldAt ? (
+                  <View className="flex-row justify-between py-1.5">
+                    <Text className="text-xs text-gray-600">Last Sold On</Text>
+                    <Text className="text-xs font-semibold text-gray-800">
+                      {new Date(itemStatsData.stats.lastSoldAt).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Quick Actions */}
+              <View className="flex-row gap-2.5 mb-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    const itemToEdit = selectedStatsItem;
+                    setStatsModalVisible(false);
+                    setTimeout(() => handleOpenEdit(itemToEdit), 250);
+                  }}
+                  className="flex-1 bg-blue-600 py-3 rounded-xl flex-row items-center justify-center shadow-xs"
+                >
+                  <Ionicons name="pencil" size={15} color="#FFFFFF" />
+                  <Text className="text-white font-extrabold text-xs ml-1.5">Edit Item Details</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setStatsModalVisible(false)}
+                  className="flex-1 bg-gray-100 py-3 rounded-xl items-center justify-center border border-gray-200"
+                >
+                  <Text className="text-gray-800 font-extrabold text-xs">Close</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
     </View>
   );

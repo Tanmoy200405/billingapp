@@ -421,6 +421,8 @@ export const api = {
   },
   items: {
     getAll: (params = "") => request(`/items${params ? `?${params}` : ""}`),
+    getSalesSummary: () => request("/items/sales-summary"),
+    getSalesStats: (id) => request(`/items/${id}/sales-stats`),
     getCategories: () => request("/items/categories"),
     addCategory: (name) =>
       request("/items/categories", {

@@ -47,6 +47,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    businessType: {
+      type: String,
+      enum: ["restaurant", "salon", "retail", "general"],
+      default: "restaurant",
+    },
     thermalPrinterSize: {
       type: String,
       enum: ["2inch", "3inch", "A4", "A5"],

@@ -53,10 +53,13 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [address, setAddress] = useState(user?.address || "");
   const [upiId, setUpiId] = useState(user?.upiId || "");
   const [logo, setLogo] = useState(user?.logo || "");
+  const [businessType, setBusinessType] = useState(user?.businessType || "restaurant");
   const [invoiceStyle, setInvoiceStyle] = useState(user?.invoiceStyle || "modern_zudio");
   const [saving, setSaving] = useState(false);
   const [printerSize, setPrinterSize] = useState(user?.thermalPrinterSize || "2inch");
   const [printTarget, setPrintTarget] = useState("both");
+  const [autoPrintBill, setAutoPrintBill] = useState(false);
+  const [showReceiptModalOnSave, setShowReceiptModalOnSave] = useState(true);
   const [billShowLogo, setBillShowLogo] = useState(true);
   const [billShowToken, setBillShowToken] = useState(true);
   const [billShowPhone, setBillShowPhone] = useState(true);
@@ -117,6 +120,8 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         if (opts.showEmail !== undefined) setBillShowEmail(opts.showEmail);
         if (opts.showGstin !== undefined) setBillShowGstin(opts.showGstin);
         if (opts.showBillType !== undefined) setBillShowType(opts.showBillType);
+        if (opts.autoPrintBill !== undefined) setAutoPrintBill(Boolean(opts.autoPrintBill));
+        if (opts.showReceiptModalOnSave !== undefined) setShowReceiptModalOnSave(Boolean(opts.showReceiptModalOnSave));
         if (opts.footerNote) setBillFooter(opts.footerNote);
       }
     } catch {}
@@ -128,6 +133,8 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         paperWidth: printerSize,
         invoiceStyle,
         printTarget,
+        autoPrintBill,
+        showReceiptModalOnSave,
         showLogo: billShowLogo,
         showTokenNumber: billShowToken,
         showCustomerPhone: billShowPhone,
@@ -168,6 +175,8 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
         paperWidth: printerSize,
         invoiceStyle,
         printTarget,
+        autoPrintBill,
+        showReceiptModalOnSave,
         showLogo: billShowLogo,
         showTokenNumber: billShowToken,
         showCustomerPhone: billShowPhone,
@@ -396,6 +405,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
     const res = await api.auth.updateProfile({
       name: ownerName.trim() || undefined,
       businessName: businessName.trim(),
+      businessType,
       email: email.trim() || undefined,
       gstin: gstin.trim() || undefined,
       address: address.trim() || undefined,
@@ -686,8 +696,53 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-semibold"
                   value={businessName}
                   onChangeText={setBusinessName}
-                  placeholder="e.g. Chai & More Bistro"
+                  placeholder="e.g. Chai & More Bistro / Glamour Salon"
                 />
+              </View>
+              <View className="mb-3">
+                <Text className="text-xs font-bold text-gray-700 mb-1">
+                  Business & Billing Category
+                </Text>
+                <Text className="text-[11px] text-gray-500 mb-2">
+                  Adapts billing terminology, slips, order formats, and inventory units.
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {[
+                    { key: "restaurant", label: "Restaurant & Café", icon: "restaurant-outline", desc: "Dine-in, Parcel, Kitchen KOT" },
+                    { key: "salon", label: "Salon, Spa & Beauty", icon: "cut-outline", desc: "In-Salon Services, Job Slips, Retail" },
+                    { key: "retail", label: "Retail & Grocery Shop", icon: "cart-outline", desc: "In-Store, Carry / Delivery, Counter Copy" },
+                    { key: "general", label: "General & Services", icon: "briefcase-outline", desc: "Universal Invoicing, Work Slips" },
+                  ].map((cat) => (
+                    <TouchableOpacity
+                      key={cat.key}
+                      onPress={() => setBusinessType(cat.key)}
+                      style={{ flex: 1, minWidth: "46%" }}
+                      className={`p-2.5 rounded-xl border ${
+                        businessType === cat.key
+                          ? "bg-blue-50 border-blue-600 shadow-xs"
+                          : "bg-gray-50 border-gray-200"
+                      }`}
+                    >
+                      <View className="flex-row items-center mb-1">
+                        <Ionicons
+                          name={cat.icon}
+                          size={15}
+                          color={businessType === cat.key ? "#2563EB" : "#6B7280"}
+                        />
+                        <Text
+                          className={`text-xs font-extrabold ml-1.5 ${
+                            businessType === cat.key ? "text-blue-900" : "text-gray-800"
+                          }`}
+                        >
+                          {cat.label}
+                        </Text>
+                      </View>
+                      <Text className="text-[10px] text-gray-500 leading-tight">
+                        {cat.desc}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
               <View className="mb-3">
                 <Text className="text-xs font-bold text-gray-700 mb-1">Registered Phone Number</Text>
@@ -1035,12 +1090,21 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   )}
                 </TouchableOpacity>
               </View>
-              <Text className="text-xs font-bold text-gray-700 mb-2">Print Target / For Whom</Text>
+              <Text className="text-xs font-bold text-gray-700 mb-2">Print Target / Default Copies</Text>
               <View className="flex-row gap-2 mb-4">
                 {[
-                  { key: "both", label: "Both (Customer + KOT)", icon: "copy-outline" },
+                  {
+                    key: "both",
+                    label: businessType === "salon" ? "Both (Cust+Slip)" : businessType === "retail" || businessType === "general" ? "Both (Cust+Slip)" : "Both (Cust+KOT)",
+                    icon: "copy-outline",
+                  },
                   { key: "customer", label: "Customer Only", icon: "receipt-outline" },
-                  { key: "kot", label: "Cooker KOT Only", icon: "restaurant-outline" },
+                  {
+                    key: "kot",
+                    label: businessType === "salon" ? "Service Slip" : businessType === "retail" || businessType === "general" ? "Store Slip" : "Cooker KOT",
+                    icon: businessType === "salon" ? "cut-outline" : businessType === "retail" || businessType === "general" ? "newspaper-outline" : "restaurant-outline",
+                  },
+                  { key: "none", label: "No Print", icon: "close-circle-outline" },
                 ].map((t) => (
                   <TouchableOpacity
                     key={t.key}
@@ -1093,6 +1157,8 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
               </View>
               <Text className="text-xs font-bold text-gray-700 mb-2">Bill Header & Content Toggles</Text>
               {[
+                { label: "Auto-Print Bill on Save (Launch printer dialog on every invoice)", state: autoPrintBill, set: setAutoPrintBill },
+                { label: "Show Receipt Popup Modal After Billing", state: showReceiptModalOnSave, set: setShowReceiptModalOnSave },
                 { label: "Show Store Logo", state: billShowLogo, set: setBillShowLogo },
                 { label: "Show Bill / Token Number", state: billShowToken, set: setBillShowToken },
                 { label: "Show Customer Phone on Bill", state: billShowPhone, set: setBillShowPhone },
@@ -1447,8 +1513,8 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   backgroundColor: previewTab === "cooker" ? "#FFFFFF" : "transparent",
                 }}
               >
-                <Text style={{ fontSize: 10.5, fontWeight: "700", color: previewTab === "cooker" ? "#B45309" : "#6B7280" }}>
-                  Cooker KOT
+                <Text style={{ fontSize: 10.5, fontWeight: "700", color: previewTab === "cooker" ? "#2563EB" : "#6B7280" }}>
+                  {businessType === "salon" ? "Service Slip" : businessType === "retail" || businessType === "general" ? "Store Slip" : "Cooker KOT"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1513,37 +1579,51 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 </View>
               )}
               {(previewTab === "both" || previewTab === "cooker") && (
-                <View style={{ backgroundColor: "#FFFBEB", borderRadius: 12, padding: 12, borderWidth: 2, borderColor: "#B45309" }}>
+                <View style={{ backgroundColor: "#F8FAFC", borderRadius: 12, padding: 12, borderWidth: 2, borderColor: "#0F172A" }}>
                   <View style={{ alignItems: "center", marginBottom: 6 }}>
-                    <Text style={{ fontSize: 10, fontWeight: "900", color: "#B45309", textTransform: "uppercase", letterSpacing: 1 }}>
-                      *** COOKER / KITCHEN KOT ***
+                    <Text style={{ fontSize: 10, fontWeight: "900", color: "#0F172A", textTransform: "uppercase", letterSpacing: 1 }}>
+                      {businessType === "salon"
+                        ? "*** SERVICE SLIP / JOB CARD ***"
+                        : businessType === "retail" || businessType === "general"
+                        ? "*** STORE / COUNTER SLIP ***"
+                        : "*** COOKER / KITCHEN KOT ***"}
                     </Text>
                     <Text style={{ fontSize: 11, fontWeight: "700", color: "#333", marginTop: 2 }}>
                       {businessName || user?.businessName || "MY STORE"}
                     </Text>
                   </View>
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#B45309", marginVertical: 6 }} />
-                  <Text style={{ fontFamily: "monospace", fontSize: 32, fontWeight: "900", textAlign: "center", letterSpacing: 2, color: "#92400E" }}>
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#0F172A", marginVertical: 6 }} />
+                  <Text style={{ fontFamily: "monospace", fontSize: 32, fontWeight: "900", textAlign: "center", letterSpacing: 2, color: "#0F172A" }}>
                     TOKEN: #1
                   </Text>
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#B45309", marginVertical: 6 }} />
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#0F172A", marginVertical: 6 }} />
                   <Text style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "700" }}>Bill No: #INV-1001</Text>
                   <Text style={{ fontFamily: "monospace", fontSize: 11 }}>Time: 28/10/26 08:30 PM</Text>
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#B45309", marginVertical: 6 }} />
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#0F172A", marginVertical: 6 }} />
                   <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#000", paddingBottom: 3, marginBottom: 4 }}>
-                    <Text style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "900", flex: 3 }}>ORDERED ITEM</Text>
+                    <Text style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "900", flex: 3 }}>
+                      {businessType === "salon"
+                        ? "SERVICE / PRODUCT"
+                        : businessType === "retail" || businessType === "general"
+                        ? "ITEM / PRODUCT"
+                        : "ORDERED ITEM"}
+                    </Text>
                     <Text style={{ fontFamily: "monospace", fontSize: 11, fontWeight: "900", width: 40, textAlign: "right" }}>QTY</Text>
                   </View>
                   <View style={{ flexDirection: "row", paddingVertical: 3 }}>
                     <Text style={{ fontFamily: "monospace", fontSize: 12, fontWeight: "700", flex: 3 }}>1. Coffee Cappuccino</Text>
                     <Text style={{ fontFamily: "monospace", fontSize: 15, fontWeight: "900", width: 40, textAlign: "right" }}>x 1</Text>
                   </View>
-                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#B45309", marginVertical: 6 }} />
+                  <View style={{ borderTopWidth: 1, borderStyle: "dashed", borderColor: "#0F172A", marginVertical: 6 }} />
                   <Text style={{ fontFamily: "monospace", fontSize: 12, fontWeight: "900", textAlign: "center" }}>
                     TOTAL QUANTITY: 1
                   </Text>
                   <Text style={{ fontSize: 10, color: "#666", textAlign: "center", marginTop: 3 }}>
-                    [ Kitchen Copy - Prepare Order ]
+                    {businessType === "salon"
+                      ? "[ Staff / Stylist Copy - Service Record ]"
+                      : businessType === "retail" || businessType === "general"
+                      ? "[ Store Counter Duplicate Copy ]"
+                      : "[ Kitchen Copy - Prepare Order ]"}
                   </Text>
                 </View>
               )}

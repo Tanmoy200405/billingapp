@@ -366,6 +366,7 @@ export default function App() {
                   {visitedTabs.inventory && (
                     <View style={{ flex: 1, display: activeTab === "inventory" ? "flex" : "none" }}>
                       <InventoryScreen
+                        user={user}
                         isActive={activeTab === "inventory" && !isCreatingInvoice}
                         onOpenDrawer={() => setDrawerVisible(true)}
                         onBack={() => navigateTab("dashboard")}

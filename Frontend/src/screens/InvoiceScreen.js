@@ -26,6 +26,19 @@ import { useResponsive } from "../utils/responsive";
 
 export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInvoice }) {
   const { isWide, isDesktop, posColumns, headerTopPadding } = useResponsive();
+  const businessType = user?.businessType || "restaurant";
+  const slipTitle =
+    businessType === "salon"
+      ? "SLIP"
+      : businessType === "retail" || businessType === "general"
+      ? "SLIP"
+      : "KOT";
+  const addItemLabel =
+    businessType === "salon"
+      ? "+ Service"
+      : businessType === "retail"
+      ? "+ Product"
+      : "+ Item";
   // Step 1: "items" (first select items) | Step 2: "invoice" (customer & payment)
   const [currentStep, setCurrentStep] = useState("items");
 
@@ -50,7 +63,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
   const [whatsappSent, setWhatsappSent] = useState(false);
   const [sendingWa, setSendingWa] = useState(false);
   const [billFormatOptions, setBillFormatOptions] = useState({});
-  const [printTarget, setPrintTarget] = useState("both"); // "both" | "customer" | "kot"
+  const [printTarget, setPrintTarget] = useState("none"); // "none" (default: no auto-print dialog) | "both" | "customer" | "cooker"
   const [customDiscount, setCustomDiscount] = useState("");
   const [customFreebie, setCustomFreebie] = useState("");
   const [matchedCustomer, setMatchedCustomer] = useState(null);
@@ -160,8 +173,10 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       if (stored) {
         const parsed = JSON.parse(stored);
         setBillFormatOptions(parsed);
-        if (parsed.printTarget) {
+        if (parsed.autoPrintBill && parsed.printTarget) {
           setPrintTarget(parsed.printTarget);
+        } else {
+          setPrintTarget("none");
         }
       }
     } catch { }
@@ -568,8 +583,19 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       setCreatedInvoice(finalRes.invoice);
       setWhatsappUrl(finalRes.whatsappUrl || "");
       setWhatsappSent(Boolean(finalRes.whatsappSent || finalRes.whatsappQueued));
-      setShowReceiptModal(true);
       setKotSent(false);
+
+      const shouldShowReceipt = billFormatOptions?.showReceiptModalOnSave !== false;
+      if (shouldShowReceipt) {
+        setShowReceiptModal(true);
+      } else {
+        showPosNotice(
+          "Bill Saved",
+          `Invoice #${finalRes.invoice.invoiceNumber} (₹${finalRes.invoice.grandTotal}) created!`
+        );
+        handleResetForNextBill();
+        if (onInvoiceSaved) onInvoiceSaved();
+      }
 
       if (editingInvoice) {
         if (Platform.OS === "web") {
@@ -584,16 +610,19 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
         }
       }
 
-      // Automatic printing only if target is not 'none'
-      const activePrintTarget = overridePrintTarget || printTarget;
-      if (activePrintTarget !== "none") {
+      // Automatic printing only if explicitly triggered via KOT button or autoPrintBill is turned ON in settings
+      const shouldAutoPrint = Boolean(billFormatOptions?.autoPrintBill);
+      const activePrintTarget = overridePrintTarget || (shouldAutoPrint ? (billFormatOptions?.printTarget || printTarget) : "none");
+      if (activePrintTarget && activePrintTarget !== "none") {
         try {
           const storeData = {
             businessName: user?.businessName || "My Store",
+            businessType: user?.businessType || "restaurant",
             phone: user?.phone || "",
             address: user?.address || "",
             email: user?.email || "",
             gstin: user?.gstin || "",
+            logo: user?.logo || "",
           };
           await printBill(finalRes.invoice, storeData, billFormatOptions, activePrintTarget);
           setKotSent(true);
@@ -644,6 +673,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     try {
       const storeData = {
         businessName: user?.businessName || "My Store",
+        businessType: user?.businessType || "restaurant",
         phone: user?.phone || "",
         address: user?.address || "",
         email: user?.email || "",
@@ -811,7 +841,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               onPress={() => setShowQuickItemModal(true)}
               className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white items-center justify-center"
             >
-              <Text className="text-xs font-bold text-gray-800">+ Item</Text>
+              <Text className="text-xs font-bold text-gray-800">{addItemLabel}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -877,7 +907,13 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 <Ionicons name="search" size={16} color="#9CA3AF" />
                 <TextInput
                   className="flex-1 ml-2 text-xs text-gray-900"
-                  placeholder="Search food item or barcode..."
+                  placeholder={
+                    businessType === "salon"
+                      ? "Search service, product or code..."
+                      : businessType === "retail"
+                      ? "Search product, barcode..."
+                      : "Search item, food or barcode..."
+                  }
                   value={itemSearch}
                   onChangeText={setItemSearch}
                   autoFocus
@@ -1193,13 +1229,18 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 disabled={loading || cart.length === 0}
                 className="flex-1 py-2.5 rounded-lg border border-gray-300 bg-white items-center justify-center"
               >
-                <Text className="text-xs font-extrabold text-gray-700">KOT</Text>
+                <Text className="text-xs font-extrabold text-gray-700">{slipTitle}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => {
                   if (cart.length === 0) {
-                    showPosNotice("Select Items", "Tap at least 1 food item to continue");
+                    showPosNotice(
+                      "Select Items",
+                      businessType === "salon"
+                        ? "Tap at least 1 service or product to continue"
+                        : "Tap at least 1 item to continue"
+                    );
                     return;
                   }
                   if (isWide) {
@@ -1589,9 +1630,32 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
 
               <View className="flex-row bg-gray-100 p-1 rounded-xl border border-gray-200">
                 {[
-                  { key: "both", label: "Both (Bill+KOT)", icon: "copy-outline" },
+                  {
+                    key: "both",
+                    label:
+                      businessType === "salon"
+                        ? "Both (Bill+Slip)"
+                        : businessType === "retail" || businessType === "general"
+                        ? "Both (Bill+Slip)"
+                        : "Both (Bill+KOT)",
+                    icon: "copy-outline",
+                  },
                   { key: "customer", label: "Customer", icon: "receipt-outline" },
-                  { key: "cooker", label: "Cooker KOT", icon: "restaurant-outline" },
+                  {
+                    key: "cooker",
+                    label:
+                      businessType === "salon"
+                        ? "Service Slip"
+                        : businessType === "retail" || businessType === "general"
+                        ? "Store Slip"
+                        : "Cooker KOT",
+                    icon:
+                      businessType === "salon"
+                        ? "cut-outline"
+                        : businessType === "retail" || businessType === "general"
+                        ? "newspaper-outline"
+                        : "restaurant-outline",
+                  },
                   { key: "none", label: "No Print", icon: "close-circle-outline" },
                 ].map((t) => (
                   <TouchableOpacity
@@ -1843,9 +1907,32 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               </Text>
               <View className="flex-row bg-gray-100 p-1 rounded-xl border border-gray-200">
                 {[
-                  { key: "both", label: "Both (Cust+KOT)", icon: "copy-outline" },
+                  {
+                    key: "both",
+                    label:
+                      businessType === "salon"
+                        ? "Both (Cust+Slip)"
+                        : businessType === "retail" || businessType === "general"
+                        ? "Both (Cust+Slip)"
+                        : "Both (Cust+KOT)",
+                    icon: "copy-outline",
+                  },
                   { key: "customer", label: "Customer", icon: "receipt-outline" },
-                  { key: "cooker", label: "Cooker KOT", icon: "restaurant-outline" },
+                  {
+                    key: "cooker",
+                    label:
+                      businessType === "salon"
+                        ? "Service Slip"
+                        : businessType === "retail" || businessType === "general"
+                        ? "Store Slip"
+                        : "Cooker KOT",
+                    icon:
+                      businessType === "salon"
+                        ? "cut-outline"
+                        : businessType === "retail" || businessType === "general"
+                        ? "newspaper-outline"
+                        : "restaurant-outline",
+                  },
                   { key: "none", label: "No Print", icon: "close-circle-outline" },
                 ].map((t) => (
                   <TouchableOpacity
@@ -1885,12 +1972,20 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                   <Ionicons name="print" size={18} color="#60A5FA" />
                   <Text className="text-white font-bold text-xs ml-2">
                     {printTarget === "both"
-                      ? "Print Both (2 Customer + 1 Cooker KOT)"
+                      ? businessType === "salon"
+                        ? "Print Both (Customer + Service Slip)"
+                        : businessType === "retail" || businessType === "general"
+                        ? "Print Both (Customer + Store Slip)"
+                        : "Print Both (2 Customer + 1 Cooker KOT)"
                       : printTarget === "customer"
                         ? "Print Customer Copies Only"
                         : printTarget === "cooker"
-                          ? "Print Cooker KOT Slip Only"
-                          : "Thermal Print (Tap to Print Both)"}
+                          ? businessType === "salon"
+                            ? "Print Service Slip Only"
+                            : businessType === "retail" || businessType === "general"
+                            ? "Print Store Slip Only"
+                            : "Print Cooker KOT Slip Only"
+                          : "Thermal Print (Tap to Print)"}
                   </Text>
                 </>
               )}
@@ -1933,9 +2028,19 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                   <Ionicons name="bag-handle-outline" size={18} color="#2563EB" />
                 </View>
                 <View>
-                  <Text className="text-base font-extrabold text-gray-900">Parcel & Dine-In Split</Text>
+                  <Text className="text-base font-extrabold text-gray-900">
+                    {businessType === "salon"
+                      ? "In-Salon & Retail Takeaway Split"
+                      : businessType === "retail" || businessType === "general"
+                      ? "In-Store & Carry/Delivery Split"
+                      : "Parcel & Dine-In Split"}
+                  </Text>
                   <Text className="text-[11px] text-gray-500">
-                    Mark all items Parcel, or split per item (some Parcel, some Eat Here)
+                    {businessType === "salon"
+                      ? "Mark all items Retail Takeaway, or split per item (some Retail, some In-Salon)"
+                      : businessType === "retail" || businessType === "general"
+                      ? "Mark all items Carry/Delivery, or split per item (some Carry, some In-Store)"
+                      : "Mark all items Parcel, or split per item (some Parcel, some Eat Here)"}
                   </Text>
                 </View>
               </View>
@@ -1960,7 +2065,11 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                       : "text-blue-800"
                   }`}
                 >
-                  Parcel All Items
+                  {businessType === "salon"
+                    ? "All Retail Takeaway"
+                    : businessType === "retail" || businessType === "general"
+                    ? "All Carry / Delivery"
+                    : "Parcel All Items"}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1976,7 +2085,11 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                     !defaultAllParcel && cartTotalParcelItems === 0 ? "text-white" : "text-gray-700"
                   }`}
                 >
-                  Eat Here All (Dine-In)
+                  {businessType === "salon"
+                    ? "All In-Salon Services"
+                    : businessType === "retail" || businessType === "general"
+                    ? "All In-Store"
+                    : "Eat Here All (Dine-In)"}
                 </Text>
               </TouchableOpacity>
             </View>

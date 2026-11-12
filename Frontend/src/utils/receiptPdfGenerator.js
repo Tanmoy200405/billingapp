@@ -350,16 +350,28 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
   const rawToken = String(invoice?.invoiceNumber || invoice?.tokenNumber || "--");
   const tokenDisplay = rawToken.replace(/[^0-9]/g, "") || rawToken;
 
+  const bType = storeInfo?.businessType || options?.businessType || "restaurant";
+
   const itemRows = (invoice?.items || []).map((it) => {
     const name = it.name || "";
     const qty = it.quantity || 0;
     const pQty = Number(it.parcelQuantity || 0);
-    const parcelTag =
-      pQty > 0
-        ? `<div style="font-size:9px;color:#059669;font-weight:800;">${
-            pQty >= qty ? "[PARCEL]" : `[${pQty} PARCEL, ${qty - pQty} DINE-IN]`
-          }</div>`
-        : "";
+    let parcelTag = "";
+    if (pQty > 0) {
+      const tagText =
+        bType === "salon"
+          ? pQty >= qty
+            ? "[RETAIL PRODUCT]"
+            : `[${pQty} RETAIL, ${qty - pQty} SERVICE]`
+          : bType === "retail" || bType === "general"
+          ? pQty >= qty
+            ? "[TAKEAWAY]"
+            : `[${pQty} TAKEAWAY, ${qty - pQty} IN-STORE]`
+          : pQty >= qty
+          ? "[PARCEL]"
+          : `[${pQty} PARCEL, ${qty - pQty} DINE-IN]`;
+      parcelTag = `<div style="font-size:9px;color:#059669;font-weight:800;">${tagText}</div>`;
+    }
     const rate = it.sellingPrice || it.rate || 0;
     const total = it.total || qty * rate;
     const hsnText = invoiceStyle === "gst_detailed" && it.hsnCode ? `<div style="font-size:9px;color:#64748B;">HSN: ${it.hsnCode}</div>` : "";
@@ -463,8 +475,9 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
   `;
 }
 
-function buildCookerReceiptCard(invoice, storeInfo = {}) {
-  const { businessName = "Kitchen" } = storeInfo;
+function buildCookerReceiptCard(invoice, storeInfo = {}, options = {}) {
+  const bType = storeInfo?.businessType || options?.businessType || "restaurant";
+  const { businessName = bType === "salon" ? "Salon" : bType === "retail" ? "Store" : "Kitchen" } = storeInfo;
   const rawToken = String(invoice?.invoiceNumber || invoice?.tokenNumber || "--");
   const tokenDisplay = rawToken.replace(/[^0-9]/g, "") || rawToken;
   const createdOn = formatReceiptDate(invoice?.createdAt || invoice?.invoiceDate);
@@ -476,12 +489,20 @@ function buildCookerReceiptCard(invoice, storeInfo = {}) {
     const pQty = Number(it.parcelQuantity || 0);
     totalItemsQty += qty;
     totalParcelQty += pQty;
+    let parcelNoteText = "";
+    if (pQty > 0) {
+      if (bType === "salon") {
+        parcelNoteText = pQty >= qty ? ">> RETAIL PRODUCT TAKEAWAY <<" : `>> ${pQty} RETAIL / ${qty - pQty} IN-SALON <<`;
+      } else if (bType === "retail" || bType === "general") {
+        parcelNoteText = pQty >= qty ? ">> CARRY / TAKEAWAY <<" : `>> ${pQty} CARRY / ${qty - pQty} IN-STORE <<`;
+      } else {
+        parcelNoteText = pQty >= qty ? ">> PARCEL PACK <<" : `>> ${pQty} PARCEL / ${qty - pQty} EAT HERE <<`;
+      }
+    }
     const parcelNote =
       pQty > 0
-        ? `<div style="font-size:11px;font-weight:900;color:#B45309;">${
-            pQty >= qty ? ">> PARCEL PACK <<" : `>> ${pQty} PARCEL / ${qty - pQty} EAT HERE <<`
-          }</div>`
-        : `<div style="font-size:10px;color:#475569;">[EAT HERE]</div>`;
+        ? `<div style="font-size:11px;font-weight:900;color:#059669;">${parcelNoteText}</div>`
+        : `<div style="font-size:10px;color:#475569;">[${bType === "salon" ? "IN-SALON" : bType === "retail" ? "IN-STORE" : "EAT HERE"}]</div>`;
     return `
       <tr>
         <td style="padding:4px 0;font-size:13px;font-weight:700;word-break:break-word">${idx + 1}. ${it.name}${parcelNote}</td>
@@ -495,7 +516,7 @@ function buildCookerReceiptCard(invoice, storeInfo = {}) {
   const parcelHeaderText =
     totalParcelQty > 0
       ? totalParcelQty >= totalItemsQty
-        ? "FULL PARCEL"
+        ? bType === "salon" ? "RETAIL PRODUCT" : "FULL PARCEL"
         : `MIXED (${totalParcelQty}P / ${totalItemsQty - totalParcelQty}D)`
       : "";
   const channelBadgeText = [
@@ -508,9 +529,30 @@ function buildCookerReceiptCard(invoice, storeInfo = {}) {
     ? `<div class="center" style="font-size:13px;font-weight:900;background:#000;color:#fff;padding:3px 6px;margin:4px 0;border-radius:4px;">${channelBadgeText}</div>`
     : "";
 
+  const slipTitle =
+    bType === "salon"
+      ? "*** SERVICE SLIP / JOB CARD ***"
+      : bType === "retail" || bType === "general"
+      ? "*** STORE / COUNTER SLIP ***"
+      : "*** COOKER / KITCHEN KOT ***";
+
+  const itemHeader =
+    bType === "salon"
+      ? "SERVICE / PRODUCT"
+      : bType === "retail" || bType === "general"
+      ? "ITEM / PRODUCT"
+      : "ORDERED ITEM";
+
+  const footerNote =
+    bType === "salon"
+      ? "[ Staff / Stylist Copy - Service Record ]"
+      : bType === "retail" || bType === "general"
+      ? "[ Store Counter Duplicate Copy ]"
+      : "[ Kitchen Copy - Prepare Order ]";
+
   return `
     <div class="receipt cooker-receipt" style="border: 2px solid #000;">
-      <div class="center"><span class="copy-badge" style="background:#000;color:#fff;">*** COOKER / KITCHEN KOT ***</span></div>
+      <div class="center"><span class="copy-badge" style="background:#000;color:#fff;">${slipTitle}</span></div>
       ${channelBadge}
       <div class="header" style="margin-top:4px;">
         <div style="font-size:12px;font-weight:700;text-transform:uppercase;">${businessName}</div>
@@ -527,7 +569,7 @@ function buildCookerReceiptCard(invoice, storeInfo = {}) {
       <table style="width:100%;border-collapse:collapse;margin:4px 0;">
         <thead>
           <tr style="border-bottom:1px solid #000;">
-            <th style="text-align:left;font-size:12px;font-weight:900;padding-bottom:3px;">ORDERED ITEM</th>
+            <th style="text-align:left;font-size:12px;font-weight:900;padding-bottom:3px;">${itemHeader}</th>
             <th style="text-align:right;font-size:12px;font-weight:900;padding-bottom:3px;">QTY</th>
           </tr>
         </thead>
@@ -540,7 +582,7 @@ function buildCookerReceiptCard(invoice, storeInfo = {}) {
         TOTAL QUANTITY: ${totalItemsQty}
       </div>
       <div class="center" style="font-size:10px;color:#555;margin-top:4px;">
-        [ Kitchen Copy - Prepare Order ]
+        ${footerNote}
       </div>
     </div>
   `;
@@ -561,7 +603,7 @@ export function buildReceiptHtml(invoice, storeInfo = {}, options = {}, mode = "
   if (mode === "single") {
     bodyContent = buildCustomerReceiptCard(invoice, storeInfo, options, "CUSTOMER COPY");
   } else if (mode === "cooker" || mode === "kot") {
-    bodyContent = buildCookerReceiptCard(invoice, storeInfo);
+    bodyContent = buildCookerReceiptCard(invoice, storeInfo, options);
   } else if (mode === "customer") {
     bodyContent = `
       ${buildCustomerReceiptCard(invoice, storeInfo, options, "CUSTOMER COPY - 1")}
@@ -577,7 +619,7 @@ export function buildReceiptHtml(invoice, storeInfo = {}, options = {}, mode = "
       ${buildCustomerReceiptCard(invoice, storeInfo, options, "CUSTOMER COPY - 2")}
       <div class="cut-line">✂ - - - - - - - - - - - - - - - - - - ✂</div>
       <div class="page-break"></div>
-      ${buildCookerReceiptCard(invoice, storeInfo)}
+      ${buildCookerReceiptCard(invoice, storeInfo, options)}
     `;
   }
 
