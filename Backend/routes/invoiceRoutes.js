@@ -123,6 +123,11 @@ router.get("/public/:id", async (req, res) => {
       .join("");
     const isPaid = (invoice.paymentStatus || "PAID").toUpperCase() === "PAID";
     const totalSavings = (invoice.discountTotal || 0) + (invoice.regularDiscountAmount || 0);
+    const shouldShowMap = (
+      storeUser?.showGoogleMapOnBill !== false &&
+      invoice.showGoogleMapOnBill !== false &&
+      Boolean(storeUser?.googleMapLocation || invoice.googleMapLocation)
+    );
     const html = `
       <!DOCTYPE html>
       <html lang="en">
@@ -187,7 +192,7 @@ router.get("/public/:id", async (req, res) => {
             </div>
             ${storeUser?.address ? `<div style="font-size: 11.5px; color: #64748B; margin-top: 4px;">${storeUser.address}</div>` : ''}
             ${phone ? `<div style="font-size: 11.5px; color: #64748B;">Phone: ${phone}</div>` : ''}
-            ${(storeUser?.googleMapLocation || invoice.googleMapLocation) ? `
+            ${shouldShowMap ? `
               <div style="margin-top: 8px;">
                 <a href="${(storeUser?.googleMapLocation || invoice.googleMapLocation).startsWith('http') ? (storeUser?.googleMapLocation || invoice.googleMapLocation) : 'https://' + (storeUser?.googleMapLocation || invoice.googleMapLocation)}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #2563EB; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 4px 12px; border-radius: 20px; text-decoration: none;">
                   📍 Open Store on Google Maps
@@ -226,7 +231,7 @@ router.get("/public/:id", async (req, res) => {
           <a class="btn-download" href="/api/invoices/public/${invoice._id}/pdf" download="Bill_${invoice.invoiceNumber || 'receipt'}.pdf">
             📥 Download Official PDF Receipt
           </a>
-          ${(storeUser?.googleMapLocation || invoice.googleMapLocation) ? `
+          ${shouldShowMap ? `
             <a href="${(storeUser?.googleMapLocation || invoice.googleMapLocation).startsWith('http') ? (storeUser?.googleMapLocation || invoice.googleMapLocation) : 'https://' + (storeUser?.googleMapLocation || invoice.googleMapLocation)}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 20px 10px; background: #EFF6FF; border: 1.5px solid #2563EB; color: #2563EB; text-decoration: none; font-weight: 700; font-size: 13.5px; padding: 12px; border-radius: 14px;">
               📍 Get Directions on Google Maps
             </a>
@@ -676,6 +681,10 @@ router.post("/", async (req, res) => {
     }
     const destinationPhone = normalizeWhatsAppNumber(rawDestination);
     const currentTimestamp = new Date();
+    const shouldShowMapRequested = req.body.showGoogleMapOnBill !== undefined
+      ? Boolean(req.body.showGoogleMapOnBill)
+      : req.user?.showGoogleMapOnBill !== false;
+
     const invoice = await Invoice.create({
       userId: req.user._id,
       invoiceNumber,
@@ -704,6 +713,7 @@ router.post("/", async (req, res) => {
       dueAmount,
       whatsappSent: false,
       googleMapLocation: (req.body.googleMapLocation || req.user?.googleMapLocation || "").trim(),
+      showGoogleMapOnBill: shouldShowMapRequested,
       notes,
     });
     if (stockUpdates.length > 0) {
@@ -732,6 +742,9 @@ router.post("/", async (req, res) => {
       business.googleMapLocation = resolvedMapLocation;
       await business.save().catch(() => {});
     }
+    const shouldShowMap =
+      invoice.showGoogleMapOnBill !== false &&
+      business.showGoogleMapOnBill !== false;
     const backendBase = getPublicBackendBase();
     const publicPdfUrl = `${backendBase}/api/invoices/public/${invoice._id}/pdf`;
     const itemsSummary = processedItems
@@ -760,7 +773,7 @@ router.post("/", async (req, res) => {
     const freebieLine = invoice.freebieItemGiven
       ? `🎁 Complimentary Gift: ${invoice.freebieItemGiven}\n`
       : "";
-    const mapLocationLine = (resolvedMapLocation || business.googleMapLocation)
+    const mapLocationLine = (shouldShowMap && (resolvedMapLocation || business.googleMapLocation))
       ? `📍 *Find Us on Google Maps:*\n${resolvedMapLocation || business.googleMapLocation}\n\n`
       : "";
     const whatsappText =
@@ -844,6 +857,9 @@ router.post("/:id/send-whatsapp", async (req, res) => {
       business.googleMapLocation = resolvedMapLocation;
       await business.save().catch(() => {});
     }
+    const shouldShowMap =
+      invoice.showGoogleMapOnBill !== false &&
+      business.showGoogleMapOnBill !== false;
     const backendBase = getPublicBackendBase();
     const publicPdfUrl = `${backendBase}/api/invoices/public/${invoice._id}/pdf`;
     const itemsSummary = (invoice.items || [])
@@ -872,7 +888,7 @@ router.post("/:id/send-whatsapp", async (req, res) => {
     const freebieLine = invoice.freebieItemGiven
       ? `🎁 Complimentary Gift: ${invoice.freebieItemGiven}\n`
       : "";
-    const mapLocationLine = (resolvedMapLocation || business.googleMapLocation)
+    const mapLocationLine = (shouldShowMap && (resolvedMapLocation || business.googleMapLocation))
       ? `📍 *Find Us on Google Maps:*\n${resolvedMapLocation || business.googleMapLocation}\n\n`
       : "";
     const whatsappText =

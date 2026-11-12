@@ -551,6 +551,10 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       customDiscountPercent: Number(customDiscount) || (activeCustomer?.customDiscountPercent || 0),
       customFreebieItem: customFreebie.trim() || (activeCustomer?.assignedFreebie || ""),
       googleMapLocation: user?.googleMapLocation || billFormatOptions?.googleMapLocation || "",
+      showGoogleMapOnBill:
+        billFormatOptions?.showGoogleMapLocation !== undefined
+          ? Boolean(billFormatOptions.showGoogleMapLocation)
+          : user?.showGoogleMapOnBill !== false,
       items: cart.map((c) => ({
         itemId: c._id,
         name: c.name,

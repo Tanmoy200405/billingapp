@@ -67,7 +67,9 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
   const [billShowEmail, setBillShowEmail] = useState(true);
   const [billShowGstin, setBillShowGstin] = useState(true);
   const [billShowType, setBillShowType] = useState(true);
-  const [billShowMapLocation, setBillShowMapLocation] = useState(true);
+  const [billShowMapLocation, setBillShowMapLocation] = useState(
+    user?.showGoogleMapOnBill !== undefined ? Boolean(user.showGoogleMapOnBill) : true
+  );
   const [billFooter, setBillFooter] = useState("Thank you! Visit again.");
   const [showPreview, setShowPreview] = useState(false);
   const [previewTab, setPreviewTab] = useState("both");
@@ -151,6 +153,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       const updateRes = await api.auth.updateProfile({
         invoiceStyle,
         thermalPrinterSize: printerSize,
+        showGoogleMapOnBill: billShowMapLocation,
         ...(googleMapLocation.trim() ? { googleMapLocation: googleMapLocation.trim() } : {}),
       });
       if (updateRes?.success && updateRes?.user && onProfileUpdated) {
@@ -419,6 +422,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       gstin: gstin.trim() || undefined,
       address: address.trim() || undefined,
       googleMapLocation: googleMapLocation.trim() || "",
+      showGoogleMapOnBill: billShowMapLocation,
       upiId: upiId.trim() || undefined,
       logo: logo || "",
       invoiceStyle,

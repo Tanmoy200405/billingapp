@@ -57,6 +57,10 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    showGoogleMapOnBill: {
+      type: Boolean,
+      default: true,
+    },
     thermalPrinterSize: {
       type: String,
       enum: ["2inch", "3inch", "A4", "A5"],

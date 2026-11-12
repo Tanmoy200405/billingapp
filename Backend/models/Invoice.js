@@ -164,6 +164,10 @@ const invoiceSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    showGoogleMapOnBill: {
+      type: Boolean,
+      default: true,
+    },
     notes: {
       type: String,
       trim: true,

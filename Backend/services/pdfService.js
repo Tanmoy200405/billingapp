@@ -25,6 +25,10 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
       const storeGstin = (storeInfo.gstin || "").toString().trim();
       const storeLogo = (storeInfo.logo || "").toString().trim();
       const storeMapLocation = (storeInfo.googleMapLocation || invoice.googleMapLocation || "").toString().trim();
+      const showMapLocation =
+        storeInfo.showGoogleMapOnBill !== false &&
+        invoice.showGoogleMapOnBill !== false &&
+        Boolean(storeMapLocation);
 
       const pageWidth = 240; // ~80mm crisp POS receipt width
       const leftX = 14;
@@ -61,7 +65,7 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
       if (storePhone) estimatedHeight += 12;
       if (storeEmail) estimatedHeight += 12;
       if (storeGstin) estimatedHeight += 12;
-      if (storeMapLocation) estimatedHeight += 24;
+      if (showMapLocation) estimatedHeight += 24;
 
       for (const it of items) {
         const nm = (it.name || "Item").toString();
@@ -185,7 +189,7 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
           });
       }
 
-      if (storeMapLocation) {
+      if (showMapLocation) {
         const cleanMapUrl = storeMapLocation.startsWith("http")
           ? storeMapLocation
           : `https://${storeMapLocation}`;
@@ -387,7 +391,7 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
           align: "center",
         });
 
-      if (storeMapLocation) {
+      if (showMapLocation) {
         const cleanMapUrl = storeMapLocation.startsWith("http")
           ? storeMapLocation
           : `https://${storeMapLocation}`;
