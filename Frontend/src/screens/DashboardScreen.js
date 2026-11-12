@@ -222,10 +222,13 @@ export default function DashboardScreen({
               style={{ width: 28, height: 28, borderRadius: 14, marginRight: 8, borderWidth: 1, borderColor: "#FFFFFF" }}
             />
           ) : (
-            <Ionicons name="storefront" size={18} color="#DBEAFE" style={{ marginRight: 6 }} />
+            <Image
+              source={require("../../assets/bistromate_logo.png")}
+              style={{ width: 28, height: 28, borderRadius: 14, marginRight: 8, borderWidth: 1, borderColor: "#FFFFFF" }}
+            />
           )}
           <Text className="text-white text-base font-black uppercase tracking-wider" numberOfLines={1}>
-            {user?.businessName || "MY STORE"}
+            {user?.businessName || "BISTROMATE"}
           </Text>
         </View>
         <View className="flex-row items-center gap-1">

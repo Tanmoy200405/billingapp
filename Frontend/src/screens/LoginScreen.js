@@ -10,6 +10,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Modal,
+  Image,
 } from "react-native";
 import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { api, setAuthToken } from "../config/api";
@@ -222,19 +223,31 @@ export default function LoginScreen({ onNavigate, onLoginSuccess }) {
           elevation: isWide ? 4 : 0,
         }}
       >
-        <TouchableOpacity
-          onPress={() => onNavigate("welcome")}
-          className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center mb-6"
-        >
-          <Ionicons name="arrow-back" size={20} color="#374151" />
-        </TouchableOpacity>
+        <View className="flex-row items-center justify-between mb-4">
+          <TouchableOpacity
+            onPress={() => onNavigate("welcome")}
+            className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
+          >
+            <Ionicons name="arrow-back" size={20} color="#374151" />
+          </TouchableOpacity>
+          <View className="w-10 h-10" />
+        </View>
 
-        <Text className="text-3xl font-extrabold text-blue-900 text-center">
-          Login here
-        </Text>
-        <Text className="text-sm font-semibold text-gray-700 text-center mt-2 mb-6">
-          Welcome back you've been missed!
-        </Text>
+        <View className="items-center mb-6">
+          <View className="w-16 h-16 rounded-2xl overflow-hidden bg-[#10353B] items-center justify-center shadow-md mb-2.5 border border-slate-200">
+            <Image
+              source={require("../../assets/bistromate_logo.png")}
+              style={{ width: 60, height: 60 }}
+              resizeMode="contain"
+            />
+          </View>
+          <Text className="text-2xl font-black text-slate-900 text-center tracking-tight">
+            Bistromate
+          </Text>
+          <Text className="text-xs font-semibold text-gray-500 text-center mt-0.5">
+            Sign in to your restaurant & billing workspace
+          </Text>
+        </View>
 
         <View className="flex-row bg-gray-100 p-1 rounded-xl mb-6">
           <TouchableOpacity

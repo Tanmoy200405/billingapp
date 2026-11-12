@@ -233,7 +233,7 @@ export async function sendEmailViaSes({ to, subject, html, text }) {
   if (isSmtpConfigured()) {
     const transporter = getSmtpTransporter();
     const info = await transporter.sendMail({
-      from: `"BillingApp" <${fromEmail}>`,
+      from: `"Bistromate" <${fromEmail}>`,
       to: Array.isArray(to) ? to.join(", ") : to,
       subject,
       ...(text ? { text } : {}),

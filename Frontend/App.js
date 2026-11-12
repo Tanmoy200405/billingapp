@@ -142,7 +142,7 @@ export default function App() {
       if (currentScreen === "main" && activeTab === "dashboard") {
         Alert.alert(
           "Exit App",
-          "Do you want to exit the billing app?",
+          "Do you want to exit Bistromate?",
           [
             { text: "Cancel", style: "cancel", onPress: () => null },
             { text: "Exit", style: "destructive", onPress: () => BackHandler.exitApp() },
@@ -237,13 +237,14 @@ export default function App() {
                         style={{ width: 38, height: 38, borderRadius: 10, marginRight: 10, borderWidth: 1, borderColor: "#FFFFFF" }}
                       />
                     ) : (
-                      <View className="w-9 h-9 rounded-xl bg-white/20 items-center justify-center mr-2.5 border border-white/30">
-                        <Ionicons name="storefront" size={18} color="#FFFFFF" />
-                      </View>
+                      <Image
+                        source={require("./assets/bistromate_logo.png")}
+                        style={{ width: 38, height: 38, borderRadius: 10, marginRight: 10, borderWidth: 1, borderColor: "#FFFFFF" }}
+                      />
                     )}
                     <View className="flex-1">
                       <Text className="text-white text-sm font-extrabold uppercase tracking-wide" numberOfLines={1}>
-                        {user?.businessName || "BillingApp"}
+                        {user?.businessName || "Bistromate"}
                       </Text>
                       <Text className="text-blue-100 text-[11px]" numberOfLines={1}>
                         {user?.phone || "POS Workspace"}

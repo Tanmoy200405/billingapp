@@ -38,13 +38,13 @@ const app = createServiceApp({
       return res.status(200).json(getWhatsAppStatus(req.params.userId));
     });
     internalRouter.post("/whatsapp/send-system", async (req, res) => {
-      const { phone, message } = req.body || {};
-      const result = await sendSystemWhatsAppMessage(phone, message);
+      const { phone, message, options } = req.body || {};
+      const result = await sendSystemWhatsAppMessage(phone, message, options);
       return res.status(200).json(result);
     });
     internalRouter.post("/whatsapp/send", async (req, res) => {
-      const { phone, message, userId } = req.body || {};
-      const result = await sendWhatsAppMessage(phone, message, userId);
+      const { phone, message, userId, options } = req.body || {};
+      const result = await sendWhatsAppMessage(phone, message, userId, options);
       return res.status(200).json(result);
     });
     internalRouter.post("/whatsapp/send-document", async (req, res) => {

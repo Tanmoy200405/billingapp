@@ -57,7 +57,7 @@ router.get("/", (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BillingApp Company Admin — WhatsApp & Email Setup</title>
+  <title>Bistromate Company Admin — WhatsApp & Email Setup</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F8FAFC; color: #0F172A; margin: 0; padding: 24px; }
     .container { max-width: 760px; margin: 0 auto; }
@@ -84,7 +84,7 @@ router.get("/", (req, res) => {
 <body>
   <div class="container">
     <div class="header">
-      <h1>BillingApp Company Admin Messaging</h1>
+      <h1>Bistromate Company Admin Messaging</h1>
       <p>Link your official Company WhatsApp &amp; Email (separate from all store users) for Login OTP, Register OTP &amp; Alerts</p>
     </div>
 
@@ -347,7 +347,8 @@ router.post("/whatsapp/test", async (req, res) => {
   if (!phone) return res.status(400).json({ success: false, message: "Recipient phone required" });
   const result = await sendSystemWhatsAppMessage(
     phone,
-    message || "BillingApp Company WhatsApp test message — your system OTP sender is active!"
+    message || "Bistromate Company WhatsApp test message — your system OTP sender is active!",
+    { attachLogo: true }
   );
   return res.status(result.success ? 200 : 400).json(result);
 });
@@ -358,8 +359,8 @@ router.post("/email/test", async (req, res) => {
   try {
     const result = await sendEmailViaSes({
       to,
-      subject: "BillingApp Company Email Test",
-      text: "Your BillingApp AWS SES company email configuration is working!",
+      subject: "Bistromate Company Email Test",
+      text: "Your Bistromate AWS SES company email configuration is working!",
     });
     return res.status(result.sent ? 200 : 400).json({ success: result.sent, ...result });
   } catch (err) {

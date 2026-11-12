@@ -714,7 +714,7 @@ async function ensureConnectedForUser(userKey) {
   return state;
 }
 
-export const sendWhatsAppMessage = async (recipientPhone, textMessage, userId = null) => {
+export const sendWhatsAppMessage = async (recipientPhone, textMessage, userId = null, options = {}) => {
   if (shouldForwardToMessagingService()) {
     try {
       const resp = await fetch(`${getMessagingServiceBaseUrl()}/internal/whatsapp/send`, {
@@ -724,6 +724,7 @@ export const sendWhatsAppMessage = async (recipientPhone, textMessage, userId = 
           phone: recipientPhone,
           message: textMessage,
           userId: userId ? userId.toString() : null,
+          options,
         }),
       });
       if (resp.ok) return await resp.json();
@@ -755,6 +756,23 @@ export const sendWhatsAppMessage = async (recipientPhone, textMessage, userId = 
       }
     } catch {}
 
+    let imgBuffer = options?.imageBuffer || null;
+    if (!imgBuffer && options?.attachLogo) {
+      const logoPath = path.join(__dirname, "../assets/bistromate_logo.png");
+      if (fs.existsSync(logoPath)) {
+        try {
+          imgBuffer = fs.readFileSync(logoPath);
+        } catch {}
+      }
+    }
+
+    if (imgBuffer) {
+      try {
+        await state.sock.sendMessage(jid, { image: imgBuffer, caption: textMessage });
+        return { success: true };
+      } catch {}
+    }
+
     await state.sock.sendMessage(jid, { text: textMessage });
     return { success: true };
   } catch (error) {
@@ -764,13 +782,13 @@ export const sendWhatsAppMessage = async (recipientPhone, textMessage, userId = 
 
 export const SYSTEM_SESSION_ID = "system";
 
-export const sendSystemWhatsAppMessage = async (recipientPhone, textMessage) => {
+export const sendSystemWhatsAppMessage = async (recipientPhone, textMessage, options = {}) => {
   if (shouldForwardToMessagingService()) {
     try {
       const resp = await fetch(`${getMessagingServiceBaseUrl()}/internal/whatsapp/send-system`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: recipientPhone, message: textMessage }),
+        body: JSON.stringify({ phone: recipientPhone, message: textMessage, options }),
       });
       if (resp.ok) return await resp.json();
     } catch (err) {
@@ -784,7 +802,7 @@ export const sendSystemWhatsAppMessage = async (recipientPhone, textMessage) => 
     const key = normalizeUserKey(rawKey);
     const state = await ensureConnectedForUser(key);
     if (state?.sock && state.connectionStatus === "connected") {
-      return sendWhatsAppMessage(recipientPhone, textMessage, key);
+      return sendWhatsAppMessage(recipientPhone, textMessage, key, options);
     }
   }
 

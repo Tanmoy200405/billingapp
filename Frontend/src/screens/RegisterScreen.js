@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { api, setAuthToken } from "../config/api";
@@ -125,21 +126,33 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
             elevation: isWide ? 4 : 0,
           }}
         >
-          <TouchableOpacity
-            onPress={() => (otpStep ? setOtpStep(false) : onNavigate("welcome"))}
-            className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center mb-4"
-          >
-            <Ionicons name="arrow-back" size={20} color="#374151" />
-          </TouchableOpacity>
+          <View className="flex-row items-center justify-between mb-2">
+            <TouchableOpacity
+              onPress={() => (otpStep ? setOtpStep(false) : onNavigate("welcome"))}
+              className="w-10 h-10 rounded-full bg-gray-100 items-center justify-center"
+            >
+              <Ionicons name="arrow-back" size={20} color="#374151" />
+            </TouchableOpacity>
+            <View className="w-10 h-10" />
+          </View>
 
-          <Text className="text-3xl font-extrabold text-blue-900 text-center">
-            {otpStep ? "Verify WhatsApp" : "Create Account"}
-          </Text>
-          <Text className="text-xs text-gray-500 text-center mt-1 mb-6 px-4">
-            {otpStep
-              ? otpInfoMsg || "Enter the 6-digit code sent to your WhatsApp number."
-              : "Register quickly with your WhatsApp number. You can add your Store Name, Email, GSTIN, and Logo anytime inside Settings."}
-          </Text>
+          <View className="items-center mb-4">
+            <View className="w-14 h-14 rounded-2xl overflow-hidden bg-[#10353B] items-center justify-center shadow-md mb-2 border border-slate-200">
+              <Image
+                source={require("../../assets/bistromate_logo.png")}
+                style={{ width: 50, height: 50 }}
+                resizeMode="contain"
+              />
+            </View>
+            <Text className="text-2xl font-black text-slate-900 text-center tracking-tight">
+              {otpStep ? "Verify WhatsApp" : "Create Bistromate Account"}
+            </Text>
+            <Text className="text-xs text-gray-500 text-center mt-0.5 px-4">
+              {otpStep
+                ? otpInfoMsg || "Enter the 6-digit code sent to your WhatsApp number."
+                : "Setup your restaurant, billing & kitchen workspace in seconds"}
+            </Text>
+          </View>
 
           {!otpStep ? (
             <>
@@ -246,7 +259,7 @@ export default function RegisterScreen({ onNavigate, onRegisterSuccess }) {
 
           <View className="items-center mt-5 pb-2">
             <Text className="text-[11px] text-gray-400 text-center">
-              Each store can link its own WhatsApp in Settings; OTPs come from official BillingApp support.
+              Each store can link its own WhatsApp in Settings; OTPs come from official Bistromate support.
             </Text>
           </View>
         </View>

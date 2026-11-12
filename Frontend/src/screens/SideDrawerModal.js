@@ -34,11 +34,15 @@ export default function SideDrawerModal({
                   style={{ width: 80, height: 80, borderRadius: 40 }}
                 />
               ) : (
-                <FontAwesome5 name="store" size={32} color="#2563EB" />
+                <Image
+                  source={require("../../assets/bistromate_logo.png")}
+                  style={{ width: 80, height: 80, borderRadius: 40 }}
+                  resizeMode="cover"
+                />
               )}
             </View>
             <Text className="text-white text-lg font-extrabold text-center uppercase tracking-wider">
-              {user?.businessName || "My Store"}
+              {user?.businessName || "Bistromate"}
             </Text>
             {user?.address ? (
               <Text className="text-blue-100 text-[11px] text-center font-medium mt-0.5" numberOfLines={1}>

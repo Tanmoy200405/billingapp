@@ -115,9 +115,9 @@ async function handleEmailJob(payload) {
 }
 
 async function handleSystemWhatsAppJob(payload) {
-  const { phone, message } = payload || {};
+  const { phone, message, options } = payload || {};
   if (!phone || !message) return;
-  await sendSystemWhatsAppMessage(phone, message).catch((err) => {
+  await sendSystemWhatsAppMessage(phone, message, options).catch((err) => {
     console.warn("[Worker] System WhatsApp error:", err.message);
   });
 }

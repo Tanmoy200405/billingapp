@@ -768,7 +768,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
 
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
-      {/* ────────────────── HEADER (BillingApp Blue Theme) ────────────────── */}
+      {/* ────────────────── HEADER (Bistromate Blue Theme) ────────────────── */}
       <View
         style={{ paddingTop: headerTopPadding, backgroundColor: "#2563EB" }}
         className="px-3 pb-3 flex-row items-center justify-between"

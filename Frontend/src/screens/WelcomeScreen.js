@@ -1,6 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { View, Text, TouchableOpacity, Image } from "react-native";
 import { useResponsive } from "../utils/responsive";
 
 export default function WelcomeScreen({ onNavigate }) {
@@ -34,19 +33,23 @@ export default function WelcomeScreen({ onNavigate }) {
           elevation: isWide ? 4 : 0,
         }}
       >
-        <View className="items-center mt-8 mb-8">
-          <View className="w-24 h-24 rounded-3xl bg-blue-600 items-center justify-center shadow-lg mb-8">
-            <MaterialCommunityIcons name="receipt-text" size={48} color="#FFFFFF" />
+        <View className="items-center mt-6 mb-8">
+          <View className="w-28 h-28 rounded-3xl overflow-hidden shadow-xl mb-6 border-2 border-slate-100 bg-[#10353B] items-center justify-center">
+            <Image
+              source={require("../../assets/bistromate_logo.png")}
+              style={{ width: 110, height: 110 }}
+              resizeMode="contain"
+            />
           </View>
 
-          <Text className="text-3xl font-extrabold text-blue-900 text-center">
-            Smart POS &
+          <Text className="text-3xl font-black text-slate-900 text-center tracking-tight">
+            Bistromate
           </Text>
-          <Text className="text-3xl font-extrabold text-blue-600 text-center mb-4">
-            Billing Suite
+          <Text className="text-xs font-extrabold text-blue-600 text-center uppercase tracking-widest mt-1 mb-4">
+            Your Kitchen's Smart Partner
           </Text>
           <Text className="text-sm text-gray-500 text-center max-w-xs leading-5">
-            Fast thermal billing, inventory control, WhatsApp PDF receipts, and VIP customer loyalty built for your store.
+            Fast thermal billing, table & KOT management, WhatsApp PDF receipts, inventory control, and live sync built for your business.
           </Text>
         </View>
 

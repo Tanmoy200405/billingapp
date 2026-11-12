@@ -96,8 +96,12 @@ async function sendOtpChannels({ cleanPhone, targetEmail, code, channel = "whats
   if (cleanPhone && cleanPhone.length === 10) {
     try {
       const fullNumber = `91${cleanPhone}`;
-      const waMsg = `*${title}*\n\n${introText}: *${code}*\n\nValid for 10 minutes. Do not share this code with anyone.`;
-      const waRes = await sendSystemWhatsAppMessage(fullNumber, waMsg);
+      const waMsg =
+        `*${title}*\n\n` +
+        `${introText}: *${code}*\n\n` +
+        `Valid for 10 minutes. Do not share this code with anyone.\n\n` +
+        `— *Bistromate* • Your Kitchen's Smart Partner`;
+      const waRes = await sendSystemWhatsAppMessage(fullNumber, waMsg, { attachLogo: true });
       if (waRes && waRes.success) {
         sentViaWhatsApp = true;
       }
@@ -106,7 +110,7 @@ async function sendOtpChannels({ cleanPhone, targetEmail, code, channel = "whats
     if ((!sentViaWhatsApp || channel === "sms") && isSnsSmsEnabled()) {
       await enqueueJob("SEND_SMS", {
         phone: cleanPhone,
-        message: smsText || `Your ${title} OTP is ${code}. Valid for 10 minutes. Do not share.`,
+        message: smsText || `Your ${title} OTP is ${code}. Valid for 10 minutes. Do not share. — Bistromate`,
       });
       sentViaSms = true;
     }
@@ -116,15 +120,17 @@ async function sendOtpChannels({ cleanPhone, targetEmail, code, channel = "whats
     const emailRes = await sendEmailViaSes({
       to: targetEmail,
       subject: `${title} (OTP)`,
-      text: `${introText}: ${code}. Valid for 10 minutes. Do not share this code.`,
+      text: `${introText}: ${code}. Valid for 10 minutes. Do not share this code. — Bistromate`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px;">
-          <h2 style="color: #2563EB; margin-top: 0;">${title}</h2>
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; background: #FFFFFF;">
+          <h2 style="color: #10353B; margin-top: 0; font-size: 22px;">Bistromate</h2>
+          <p style="color: #2563EB; font-weight: bold; margin-bottom: 16px;">${title}</p>
           <p style="color: #334155;">${introText}:</p>
           <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 14px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1E40AF;">
             ${code}
           </div>
           <p style="color: #64748B; font-size: 12px; margin-top: 16px;">Valid for 10 minutes. Do not share this code with anyone.</p>
+          <p style="color: #94A3B8; font-size: 11px; margin-top: 12px; border-top: 1px solid #F1F5F9; pt-2;">— Bistromate • Your Kitchen's Smart Partner</p>
         </div>
       `,
     }).catch(() => null);
@@ -166,31 +172,34 @@ async function dispatchLoginNotifications(user) {
   if (!user) return;
   const loginTime = formatIstLoginTime();
   const targetPhone = user.whatsappNumber || user.phone;
-  const storeName = user.businessName || "My Business";
+  const storeName = user.businessName || "My Restaurant";
   const ownerName = user.name || "Store Owner";
 
   if (targetPhone) {
     const waAlert =
-      `*Billing App Login Alert*\n\n` +
-      `Hi ${ownerName}, you logged into *${storeName}* at ${loginTime}.\n` +
-      `If this wasn't you, please change your password immediately.`;
+      `*Bistromate Login Alert*\n\n` +
+      `Hi ${ownerName}, you logged into *${storeName}* at ${loginTime}.\n\n` +
+      `If this was not you, please change your password immediately in Settings.\n\n` +
+      `— *Bistromate* • Your Kitchen's Smart Partner`;
     enqueueJob("SEND_SYSTEM_WHATSAPP", {
       phone: targetPhone,
       message: waAlert,
+      options: { attachLogo: true },
     }).catch(() => {});
   }
 
   if (user.email && isSesConfigured()) {
     enqueueJob("SEND_EMAIL", {
       to: user.email,
-      subject: `BillingApp Login Confirmation - ${storeName}`,
-      text: `Hi ${ownerName}, your BillingApp account (${storeName}) just logged in at ${loginTime}. If this was not you, please reset your password immediately.`,
+      subject: `Bistromate Login Confirmation - ${storeName}`,
+      text: `Hi ${ownerName}, your Bistromate account (${storeName}) just logged in at ${loginTime}. If this was not you, please reset your password immediately.`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px;">
-          <h2 style="color: #2563EB; margin-top: 0;">BillingApp Login Alert</h2>
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; background: #FFFFFF;">
+          <h2 style="color: #10353B; margin-top: 0;">Bistromate Login Alert</h2>
           <p style="color: #334155;">Hi <strong>${ownerName}</strong>,</p>
           <p style="color: #334155;">Your store account <strong>${storeName}</strong> was accessed on <strong>${loginTime}</strong>.</p>
           <p style="color: #64748B; font-size: 12px; margin-top: 20px;">If this wasn't you, please update your password immediately inside Settings.</p>
+          <p style="color: #94A3B8; font-size: 11px; margin-top: 14px; border-top: 1px solid #F1F5F9; padding-top: 8px;">— Bistromate • Your Kitchen's Smart Partner</p>
         </div>
       `,
     }).catch(() => {});
@@ -295,9 +304,9 @@ router.post("/send-otp", async (req, res) => {
       targetEmail,
       code,
       channel,
-      title: `BillingApp ${actionLabel} Verification`,
+      title: `Bistromate ${actionLabel} Verification`,
       introText: `Your 6-digit ${actionLabel.toLowerCase()} OTP is`,
-      smsText: `Your BillingApp ${actionLabel.toLowerCase()} OTP is ${code}. Valid for 10 minutes. Do not share.`,
+      smsText: `Your Bistromate ${actionLabel.toLowerCase()} OTP is ${code}. Valid for 10 minutes. Do not share.`,
     });
 
     return res.status(200).json({
@@ -468,13 +477,14 @@ router.post("/register", async (req, res) => {
     // Send Welcome notification asynchronously from Company WhatsApp & Company Email
     enqueueJob("SEND_SYSTEM_WHATSAPP", {
       phone: cleanWa,
-      message: `*Welcome to BillingApp!*\n\nHi ${user.name}, your store *${user.businessName}* is now registered.\n\nLink your own store WhatsApp anytime inside Settings → WhatsApp 24/7 to send bills automatically to your customers!`,
+      message: `*Welcome to Bistromate!*\n\nHi ${user.name}, your restaurant & store *${user.businessName}* is now registered.\n\nLink your own store WhatsApp anytime inside Settings → WhatsApp 24/7 to send bills automatically to your customers!\n\n— *Bistromate* • Your Kitchen's Smart Partner`,
+      options: { attachLogo: true },
     }).catch(() => {});
     if (user.email && isSesConfigured()) {
       enqueueJob("SEND_EMAIL", {
         to: user.email,
-        subject: `Welcome to BillingApp — ${user.businessName}`,
-        text: `Hi ${user.name}, your BillingApp store (${user.businessName}) is registered and ready!`,
+        subject: `Welcome to Bistromate — ${user.businessName}`,
+        text: `Hi ${user.name}, your Bistromate store (${user.businessName}) is registered and ready!`,
       }).catch(() => {});
     }
 
@@ -797,9 +807,9 @@ router.post("/forgot-password/send-otp", async (req, res) => {
       targetEmail,
       code,
       channel: "whatsapp",
-      title: "BillingApp Password Reset",
+      title: "Bistromate Password Reset",
       introText: "Your 6-digit password reset code is",
-      smsText: `Your BillingApp password reset OTP is ${code}. Valid for 10 minutes. Ignore if not requested.`,
+      smsText: `Your Bistromate password reset OTP is ${code}. Valid for 10 minutes. Ignore if not requested.`,
     });
 
     if (channels.length === 0) {
@@ -897,14 +907,15 @@ router.post("/forgot-password/verify", async (req, res) => {
     if (targetPhone) {
       enqueueJob("SEND_SYSTEM_WHATSAPP", {
         phone: targetPhone,
-        message: `*BillingApp Security Alert*\n\nYour password for *${user.businessName || "your account"}* was reset on ${alertTime}.\nIf you did not do this, contact support immediately.`,
+        message: `*Bistromate Security Alert*\n\nYour password for *${user.businessName || "your account"}* was reset on ${alertTime}.\nIf you did not do this, contact support immediately.\n\n— *Bistromate* • Your Kitchen's Smart Partner`,
+        options: { attachLogo: true },
       }).catch(() => {});
     }
     if (user.email && isSesConfigured()) {
       enqueueJob("SEND_EMAIL", {
         to: user.email,
-        subject: "BillingApp Security Alert: Password Reset",
-        text: `Your BillingApp password was reset on ${alertTime}. If this was not you, secure your account immediately.`,
+        subject: "Bistromate Security Alert: Password Reset",
+        text: `Your Bistromate password was reset on ${alertTime}. If this was not you, secure your account immediately.`,
       }).catch(() => {});
     }
 
@@ -1008,9 +1019,9 @@ router.post("/email-change/request", protect, async (req, res) => {
       targetEmail: normalizedNewEmail,
       code,
       channel: "whatsapp",
-      title: "BillingApp Email Change Verification",
+      title: "Bistromate Email Change Verification",
       introText: `Confirm changing your store email to ${normalizedNewEmail}. Your 6-digit verification code is`,
-      smsText: `BillingApp email change to ${normalizedNewEmail}. OTP: ${code}. Valid 10 mins.`,
+      smsText: `Bistromate email change to ${normalizedNewEmail}. OTP: ${code}. Valid 10 mins.`,
     });
 
     if (channels.length === 0) {
@@ -1109,14 +1120,15 @@ router.post("/email-change/confirm", protect, async (req, res) => {
     if (targetPhone) {
       enqueueJob("SEND_SYSTEM_WHATSAPP", {
         phone: targetPhone,
-        message: `*BillingApp Security Alert*\n\nYour store email was changed to *${normalizedNewEmail}* on ${alertTime}.\nIf this wasn't you, contact support immediately.`,
+        message: `*Bistromate Security Alert*\n\nYour store email was changed to *${normalizedNewEmail}* on ${alertTime}.\nIf this wasn't you, contact support immediately.\n\n— *Bistromate* • Your Kitchen's Smart Partner`,
+        options: { attachLogo: true },
       }).catch(() => {});
     }
     if (oldEmail && oldEmail !== normalizedNewEmail && isSesConfigured()) {
       enqueueJob("SEND_EMAIL", {
         to: oldEmail,
-        subject: "BillingApp Security Alert: Email Address Changed",
-        text: `Your BillingApp store email was changed from ${oldEmail} to ${normalizedNewEmail} on ${alertTime}. If this wasn't you, please contact support immediately.`,
+        subject: "Bistromate Security Alert: Email Address Changed",
+        text: `Your Bistromate store email was changed from ${oldEmail} to ${normalizedNewEmail} on ${alertTime}. If this wasn't you, please contact support immediately.`,
       }).catch(() => {});
     }
 
@@ -1174,14 +1186,15 @@ router.post("/change-password", protect, async (req, res) => {
     if (targetPhone) {
       enqueueJob("SEND_SYSTEM_WHATSAPP", {
         phone: targetPhone,
-        message: `*BillingApp Security Alert*\n\nYour password for *${user.businessName || "your account"}* was updated on ${alertTime}.`,
+        message: `*Bistromate Security Alert*\n\nYour password for *${user.businessName || "your account"}* was updated on ${alertTime}.\n\n— *Bistromate* • Your Kitchen's Smart Partner`,
+        options: { attachLogo: true },
       }).catch(() => {});
     }
     if (user.email && isSesConfigured()) {
       enqueueJob("SEND_EMAIL", {
         to: user.email,
-        subject: "BillingApp Security Alert: Password Changed",
-        text: `Your BillingApp account password was updated on ${alertTime}.`,
+        subject: "Bistromate Security Alert: Password Changed",
+        text: `Your Bistromate account password was updated on ${alertTime}.`,
       }).catch(() => {});
     }
 

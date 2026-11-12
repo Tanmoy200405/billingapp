@@ -7,7 +7,7 @@ import { startQueueWorker } from "./services/jobQueueService.js";
 import { getAwsMessagingStatus } from "./services/awsMessagingService.js";
 
 async function startStandaloneWorker() {
-  console.log("[Worker] Booting standalone BillingApp SQS/Messaging worker...");
+  console.log("[Worker] Booting standalone Bistromate SQS/Messaging worker...");
   await connectDB();
   await initAllWhatsAppSessions().catch((err) =>
     console.warn("[Worker] WhatsApp init warning:", err.message)
