@@ -1294,6 +1294,76 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                 </View>
               ) : null}
 
+              {/* Daily Selling (Today & Yesterday) Highlight Card */}
+              <View style={{ backgroundColor: "#2563EB" }} className="rounded-2xl p-4 mb-3 shadow-sm">
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-row items-center">
+                    <Ionicons name="calendar" size={17} color="#FFFFFF" />
+                    <Text className="text-white text-xs font-black uppercase tracking-wider ml-1.5">
+                      Today's Daily Selling
+                    </Text>
+                  </View>
+                  <View className="bg-white/20 px-2 py-0.5 rounded-full">
+                    <Text className="text-white text-[10px] font-bold">Today (IST)</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-center justify-between bg-white/10 rounded-xl p-3 mb-2">
+                  <View>
+                    <Text className="text-blue-100 text-[11px] font-medium">Quantity Sold Today</Text>
+                    <Text className="text-white text-2xl font-black">
+                      {itemStatsData?.stats?.todaySoldQuantity || 0}{" "}
+                      <Text className="text-xs font-bold text-blue-200">
+                        {selectedStatsItem?.unit || "PCS"}
+                      </Text>
+                    </Text>
+                  </View>
+                  <View className="items-end">
+                    <Text className="text-blue-100 text-[11px] font-medium">Today's Revenue</Text>
+                    <Text className="text-emerald-300 text-2xl font-black">
+                      ₹{itemStatsData?.stats?.todayRevenue || 0}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-row justify-between items-center px-1">
+                  <Text className="text-blue-100 text-xs font-semibold">
+                    Yesterday: {itemStatsData?.stats?.yesterdaySoldQuantity || 0} {selectedStatsItem?.unit || "PCS"} sold
+                  </Text>
+                  <Text className="text-blue-100 text-xs font-bold">
+                    ₹{itemStatsData?.stats?.yesterdayRevenue || 0}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 7-Day Daily Selling History */}
+              {Array.isArray(itemStatsData?.stats?.dailyBreakdown) && itemStatsData.stats.dailyBreakdown.length > 0 ? (
+                <View className="bg-white rounded-2xl p-3.5 border border-gray-200 mb-3 shadow-xs">
+                  <Text className="text-xs font-extrabold text-gray-800 uppercase tracking-wider mb-2">
+                    Recent Daily Breakdown
+                  </Text>
+                  {itemStatsData.stats.dailyBreakdown.map((day, idx) => (
+                    <View
+                      key={day.date}
+                      className={`flex-row justify-between items-center py-2 ${
+                        idx < itemStatsData.stats.dailyBreakdown.length - 1 ? "border-b border-gray-100" : ""
+                      }`}
+                    >
+                      <View className="flex-row items-center">
+                        <Ionicons name="time-outline" size={14} color="#6B7280" />
+                        <Text className="text-xs font-bold text-gray-800 ml-1.5">{day.date}</Text>
+                      </View>
+                      <Text className="text-xs font-bold text-blue-700">
+                        {day.soldQuantity} {selectedStatsItem?.unit || "PCS"}
+                      </Text>
+                      <Text className="text-xs font-extrabold text-emerald-700">
+                        ₹{day.revenue}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
               {/* 4 Key Performance Metrics Cards */}
               <View className="flex-row gap-2.5 mb-2.5">
                 <View className="flex-1 bg-blue-50 border border-blue-200 rounded-2xl p-3.5">

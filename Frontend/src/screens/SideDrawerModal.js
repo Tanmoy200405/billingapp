@@ -26,7 +26,7 @@ export default function SideDrawerModal({
     >
       <View className="flex-1 bg-black/50 flex-row">
         <View className="w-3/4 max-w-xs bg-white h-full shadow-2xl">
-          <View className="bg-blue-600 px-6 pt-12 pb-8 items-center">
+          <View style={{ backgroundColor: "#2563EB" }} className="px-6 pt-12 pb-8 items-center">
             <View className="w-20 h-20 rounded-full bg-gray-200 border-2 border-white items-center justify-center mb-3 shadow overflow-hidden">
               {user?.logo ? (
                 <Image
@@ -40,6 +40,11 @@ export default function SideDrawerModal({
             <Text className="text-white text-lg font-extrabold text-center uppercase tracking-wider">
               {user?.businessName || "My Store"}
             </Text>
+            {user?.address ? (
+              <Text className="text-blue-100 text-[11px] text-center font-medium mt-0.5" numberOfLines={1}>
+                📍 {user.address}
+              </Text>
+            ) : null}
             <Text className="text-blue-100 text-xs font-semibold mt-1">
               {user?.phone || ""}
             </Text>

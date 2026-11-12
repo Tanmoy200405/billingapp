@@ -48,7 +48,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
   const [customerName, setCustomerName] = useState("Walk-in Customer");
   const [customerPhone, setCustomerPhone] = useState("");
   const [cart, setCart] = useState([]);
-  const [paymentMode, setPaymentMode] = useState("CASH");
+  const [paymentMode, setPaymentMode] = useState("UPI");
   const [orderSource, setOrderSource] = useState("COUNTER");
   const [externalOrderId, setExternalOrderId] = useState("");
   const [cashAmount, setCashAmount] = useState("");
@@ -766,8 +766,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       {/* ────────────────── HEADER (BillingApp Blue Theme) ────────────────── */}
       <View
-        style={{ paddingTop: headerTopPadding }}
-        className="bg-blue-600 px-3 pb-3 flex-row items-center justify-between"
+        style={{ paddingTop: headerTopPadding, backgroundColor: "#2563EB" }}
+        className="px-3 pb-3 flex-row items-center justify-between"
       >
         <View className="flex-row items-center flex-1 pr-2">
           <TouchableOpacity
@@ -783,19 +783,20 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             <Ionicons name="arrow-back" size={23} color="#FFFFFF" />
           </TouchableOpacity>
           <View className="flex-1">
-            <Text className="text-white text-lg font-extrabold" numberOfLines={1}>
+            <View className="flex-row items-center">
+              <Ionicons name="storefront" size={15} color="#DBEAFE" style={{ marginRight: 5 }} />
+              <Text className="text-white text-base font-black uppercase tracking-wider" numberOfLines={1}>
+                {user?.businessName || "MY STORE"}
+              </Text>
+            </View>
+            <Text className="text-blue-100 text-xs font-semibold mt-0.5" numberOfLines={1}>
               {editingInvoice
                 ? `Edit Bill #${editingInvoice.invoiceNumber}`
                 : isWide
                 ? "Select Items & Checkout"
                 : currentStep === "items"
-                ? "Select Items"
+                ? `Select Items • Bill #${nextInvoiceNum}`
                 : "Finalize Invoice"}
-            </Text>
-            <Text className="text-blue-100 text-[10px] font-medium" numberOfLines={1}>
-              {`v${CURRENT_APP_VERSION}${user?.phone ? ` | ${user.phone}` : ""}${
-                user?.businessName ? ` | ${user.businessName}` : ""
-              }`}
             </Text>
           </View>
         </View>
@@ -1176,15 +1177,15 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               ) : null}
             </View>
 
-            {/* Quick Payment & Aggregator Pills */}
+            {/* Quick Payment & Aggregator Pills (UPI at Front) */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
               {[
-                { label: "Cash", mode: "CASH", src: "COUNTER" },
                 { label: "UPI", mode: "UPI", src: "COUNTER" },
+                { label: "Cash", mode: "CASH", src: "COUNTER" },
                 { label: "UPI/Cash", mode: "UPI/CASH", src: "COUNTER" },
+                { label: "Bank", mode: "BANK", src: "COUNTER" },
                 { label: "Swiggy", mode: "SWIGGY", src: "SWIGGY" },
                 { label: "Zomato", mode: "ZOMATO", src: "ZOMATO" },
-                { label: "Bank", mode: "BANK", src: "COUNTER" },
                 { label: "Credit", mode: "CREDIT", src: "COUNTER" },
               ].map((pill) => {
                 const isSelected = paymentMode === pill.mode;
@@ -1525,14 +1526,15 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 Payment Mode
               </Text>
               <View className="flex-row gap-2 flex-wrap">
-                {["CASH", "UPI", "UPI/CASH", "BANK", "CHEQUE", "CREDIT", "SWIGGY", "ZOMATO"].map((mode) => (
+                {["UPI", "CASH", "UPI/CASH", "BANK", "CHEQUE", "CREDIT", "SWIGGY", "ZOMATO"].map((mode) => (
                   <TouchableOpacity
                     key={mode}
                     onPress={() => handlePaymentModeChange(mode)}
-                    className={`px-3 py-2 rounded-xl border ${paymentMode === mode
-                        ? "bg-blue-600 border-blue-600"
-                        : "bg-gray-100 border-gray-200"
-                      }`}
+                    style={{
+                      backgroundColor: paymentMode === mode ? "#2563EB" : "#F1F5F9",
+                      borderColor: paymentMode === mode ? "#2563EB" : "#E2E8F0",
+                    }}
+                    className={`px-3 py-2 rounded-xl border`}
                   >
                     <Text
                       className={`text-xs font-bold ${paymentMode === mode ? "text-white" : "text-gray-700"

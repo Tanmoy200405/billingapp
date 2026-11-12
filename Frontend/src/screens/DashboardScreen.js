@@ -200,8 +200,8 @@ export default function DashboardScreen({
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       <View
-        style={{ paddingTop: headerTopPadding }}
-        className="bg-blue-600 px-4 pb-4 flex-row items-center justify-between shadow-md"
+        style={{ paddingTop: headerTopPadding, backgroundColor: "#2563EB" }}
+        className="px-4 pb-4 flex-row items-center justify-between shadow-md"
       >
         {!isWide ? (
           <TouchableOpacity onPress={onOpenDrawer} className="p-1">
@@ -215,15 +215,17 @@ export default function DashboardScreen({
             </Text>
           </View>
         )}
-        <View className="flex-row items-center">
+        <View className="flex-row items-center flex-1 justify-center px-2">
           {user?.logo ? (
             <Image
               source={{ uri: user.logo }}
               style={{ width: 28, height: 28, borderRadius: 14, marginRight: 8, borderWidth: 1, borderColor: "#FFFFFF" }}
             />
-          ) : null}
-          <Text className="text-white text-base font-extrabold uppercase tracking-widest">
-            {user?.businessName || "COMPANY NAME"}
+          ) : (
+            <Ionicons name="storefront" size={18} color="#DBEAFE" style={{ marginRight: 6 }} />
+          )}
+          <Text className="text-white text-base font-black uppercase tracking-wider" numberOfLines={1}>
+            {user?.businessName || "MY STORE"}
           </Text>
         </View>
         <View className="flex-row items-center gap-1">

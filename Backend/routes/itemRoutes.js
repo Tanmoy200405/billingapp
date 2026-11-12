@@ -298,6 +298,70 @@ router.get("/:id/sales-stats", async (req, res) => {
       lastSoldAt: null,
     };
 
+    // Daily breakdown for this item in Asia/Kolkata timezone
+    const dailyAgg = await Invoice.aggregate([
+      { $match: { userId: req.user._id } },
+      { $unwind: "$items" },
+      {
+        $match: {
+          $or: [
+            { "items.itemId": item._id },
+            { "items.name": { $regex: nameRegex } },
+          ],
+        },
+      },
+      {
+        $project: {
+          quantity: "$items.quantity",
+          total: "$items.total",
+          parcelQuantity: { $ifNull: ["$items.parcelQuantity", 0] },
+          dateStr: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: { $ifNull: ["$invoiceDate", "$createdAt"] },
+              timezone: "Asia/Kolkata",
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$dateStr",
+          soldQuantity: { $sum: "$quantity" },
+          revenue: { $sum: "$total" },
+          parcelQuantity: { $sum: "$parcelQuantity" },
+          invoiceCount: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: -1 } },
+      { $limit: 7 },
+    ]);
+
+    const now = new Date();
+    const istDateFormatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const todayStr = istDateFormatter.format(now);
+    const yesterdayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayStr = istDateFormatter.format(yesterdayDate);
+
+    const todayRecord = dailyAgg.find((d) => d._id === todayStr);
+    const yesterdayRecord = dailyAgg.find((d) => d._id === yesterdayStr);
+
+    stats.todaySoldQuantity = todayRecord ? todayRecord.soldQuantity : 0;
+    stats.todayRevenue = todayRecord ? todayRecord.revenue : 0;
+    stats.yesterdaySoldQuantity = yesterdayRecord ? yesterdayRecord.soldQuantity : 0;
+    stats.yesterdayRevenue = yesterdayRecord ? yesterdayRecord.revenue : 0;
+    stats.dailyBreakdown = dailyAgg.map((d) => ({
+      date: d._id,
+      soldQuantity: d.soldQuantity,
+      revenue: d.revenue,
+      invoiceCount: d.invoiceCount,
+    }));
+
     return res.status(200).json({
       success: true,
       item,
