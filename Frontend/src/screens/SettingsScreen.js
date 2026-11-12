@@ -842,7 +842,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
             <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm">
               <View className="flex-row items-center justify-between mb-2">
                 <View className="flex-row items-center flex-1 pr-2">
-                  <Ionicons name="fast-food-outline" size={18} color="#EA580C" />
+                  <Ionicons name="fast-food-outline" size={18} color="#2563EB" />
                   <Text className="text-sm font-bold text-gray-900 ml-2">
                     Swiggy / Zomato Webhook (Live Orders)
                   </Text>
@@ -850,8 +850,8 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                 <Switch
                   value={aggregatorEnabled}
                   onValueChange={setAggregatorEnabled}
-                  trackColor={{ false: "#CBD5E1", true: "#FB923C" }}
-                  thumbColor={aggregatorEnabled ? "#EA580C" : "#F8FAFC"}
+                  trackColor={{ false: "#CBD5E1", true: "#93C5FD" }}
+                  thumbColor={aggregatorEnabled ? "#2563EB" : "#F8FAFC"}
                 />
               </View>
               <Text className="text-xs text-gray-500 mb-3">
@@ -1185,7 +1185,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                       waStatus === "connected"
                         ? "bg-emerald-500"
                         : waStatus === "scan_qr"
-                        ? "bg-amber-500"
+                        ? "bg-blue-500"
                         : "bg-gray-400"
                     }`}
                   />
@@ -1194,7 +1194,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                       waStatus === "connected"
                         ? "text-emerald-700"
                         : waStatus === "scan_qr"
-                        ? "text-amber-700"
+                        ? "text-blue-700"
                         : "text-gray-500"
                     }`}
                   >

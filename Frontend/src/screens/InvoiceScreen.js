@@ -730,11 +730,11 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       : `Parcel ${cartTotalParcelItems}/${cartTotalItems}`;
 
   return (
-    <View style={{ flex: 1 }} className="flex-1 bg-slate-100">
-      {/* ────────────────── HEADER (Screenshot Style) ────────────────── */}
+    <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
+      {/* ────────────────── HEADER (BillingApp Blue Theme) ────────────────── */}
       <View
-        style={{ paddingTop: headerTopPadding, backgroundColor: "#5B5CE2" }}
-        className="px-3 pb-3 flex-row items-center justify-between"
+        style={{ paddingTop: headerTopPadding }}
+        className="bg-blue-600 px-3 pb-3 flex-row items-center justify-between"
       >
         <View className="flex-row items-center flex-1 pr-2">
           <TouchableOpacity
@@ -759,7 +759,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 ? "Select Items"
                 : "Finalize Invoice"}
             </Text>
-            <Text className="text-indigo-100 text-[10px] font-medium" numberOfLines={1}>
+            <Text className="text-blue-100 text-[10px] font-medium" numberOfLines={1}>
               {`v${CURRENT_APP_VERSION}${user?.phone ? ` | ${user.phone}` : ""}${
                 user?.businessName ? ` | ${user.businessName}` : ""
               }`}
@@ -818,7 +818,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               onPress={handleHoldButtonPress}
               className={`flex-1 py-1.5 px-2 rounded-lg border items-center justify-center flex-row ${
                 heldBills.length > 0
-                  ? "bg-amber-50 border-amber-400"
+                  ? "bg-slate-800 border-slate-800"
                   : cart.length > 0
                   ? "bg-white border-gray-300"
                   : "bg-gray-50 border-gray-200"
@@ -826,7 +826,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             >
               <Text
                 className={`text-xs font-extrabold ${
-                  heldBills.length > 0 ? "text-amber-800" : "text-gray-700"
+                  heldBills.length > 0 ? "text-white" : "text-gray-700"
                 }`}
               >
                 {heldBills.length > 0 ? `HOLD (${heldBills.length})` : "HOLD"}
@@ -837,18 +837,18 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               onPress={() => setShowParcelModal(true)}
               className={`flex-1 py-1.5 px-2 rounded-lg border items-center justify-center flex-row ${
                 cartTotalParcelItems > 0 || defaultAllParcel
-                  ? "bg-orange-50 border-orange-400"
+                  ? "bg-emerald-50 border-emerald-500"
                   : "bg-white border-gray-300"
               }`}
             >
               <Ionicons
                 name="bag-handle-outline"
                 size={13}
-                color={cartTotalParcelItems > 0 || defaultAllParcel ? "#C2410C" : "#374151"}
+                color={cartTotalParcelItems > 0 || defaultAllParcel ? "#059669" : "#374151"}
               />
               <Text
                 className={`text-xs font-extrabold ml-1 ${
-                  cartTotalParcelItems > 0 || defaultAllParcel ? "text-orange-700" : "text-gray-700"
+                  cartTotalParcelItems > 0 || defaultAllParcel ? "text-emerald-700" : "text-gray-700"
                 }`}
                 numberOfLines={1}
               >
@@ -859,13 +859,13 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             <TouchableOpacity
               onPress={() => setShowItemImages((prev) => !prev)}
               className={`p-1.5 rounded-lg border ${
-                showItemImages ? "bg-white border-gray-300" : "bg-indigo-50 border-indigo-400"
+                showItemImages ? "bg-white border-gray-300" : "bg-blue-50 border-blue-400"
               }`}
             >
               <Ionicons
                 name={showItemImages ? "images-outline" : "eye-off-outline"}
                 size={17}
-                color={showItemImages ? "#475569" : "#4338CA"}
+                color={showItemImages ? "#475569" : "#2563EB"}
               />
             </TouchableOpacity>
           </View>
@@ -908,15 +908,15 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                       onPress={() => setSelectedCategory(cat)}
                       className={`px-2 py-2.5 mb-1.5 rounded-lg border ${
                         isActiveCat
-                          ? "bg-emerald-200 border-emerald-500"
+                          ? "bg-blue-600 border-blue-600"
                           : selectedCount > 0
-                          ? "bg-emerald-50 border-emerald-300"
+                          ? "bg-blue-50 border-blue-300"
                           : "bg-white border-gray-200"
                       }`}
                     >
                       <Text
                         className={`text-[11px] font-bold leading-4 ${
-                          isActiveCat ? "text-gray-900" : "text-gray-700"
+                          isActiveCat ? "text-white" : selectedCount > 0 ? "text-blue-900" : "text-gray-700"
                         }`}
                       >
                         {cat} ({selectedCount})
@@ -946,7 +946,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                     </Text>
                     <TouchableOpacity
                       onPress={() => setShowQuickItemModal(true)}
-                      className="mt-3 bg-indigo-600 px-3 py-1.5 rounded-lg"
+                      className="mt-3 bg-blue-600 px-3 py-1.5 rounded-lg"
                     >
                       <Text className="text-white text-xs font-bold">+ Add Food Item</Text>
                     </TouchableOpacity>
@@ -964,8 +964,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                       style={{
                         flex: 1,
                         maxWidth: `${100 / gridColumns - 1}%`,
-                        backgroundColor: qtyInCart > 0 ? "#BBF7D0" : "#FFFFFF",
-                        borderColor: qtyInCart > 0 ? "#4ADE80" : "#E2E8F0",
+                        backgroundColor: qtyInCart > 0 ? "#EFF6FF" : "#FFFFFF",
+                        borderColor: qtyInCart > 0 ? "#2563EB" : "#E2E8F0",
                         borderWidth: 1,
                         borderRadius: 8,
                         padding: 6,
@@ -1038,8 +1038,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                               paddingVertical: 2,
                               borderRadius: 5,
                               borderWidth: 1,
-                              borderColor: qtyInCart > 0 ? "#16A34A" : "#94A3B8",
-                              backgroundColor: qtyInCart > 0 ? "#DCFCE7" : "#FFFFFF",
+                              borderColor: qtyInCart > 0 ? "#2563EB" : "#94A3B8",
+                              backgroundColor: qtyInCart > 0 ? "#DBEAFE" : "#FFFFFF",
                               alignItems: "center",
                             }}
                           >
@@ -1059,13 +1059,13 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                                 paddingVertical: 2,
                                 borderRadius: 5,
                                 borderWidth: 1,
-                                borderColor: parcelInCart > 0 ? "#EA580C" : "#94A3B8",
-                                backgroundColor: parcelInCart > 0 ? "#FFEDD5" : "#FFFFFF",
+                                borderColor: parcelInCart > 0 ? "#059669" : "#94A3B8",
+                                backgroundColor: parcelInCart > 0 ? "#ECFDF5" : "#FFFFFF",
                               }}
                             >
                               <Text
                                 className="text-[9px] font-extrabold"
-                                style={{ color: parcelInCart > 0 ? "#C2410C" : "#475569" }}
+                                style={{ color: parcelInCart > 0 ? "#059669" : "#475569" }}
                               >
                                 {parcelInCart > 0
                                   ? parcelInCart >= qtyInCart
@@ -1081,7 +1081,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                           style={{
                             borderWidth: 1,
                             borderStyle: "dashed",
-                            borderColor: "#6366F1",
+                            borderColor: "#2563EB",
                             borderRadius: 5,
                             paddingHorizontal: 6,
                             paddingVertical: 2,
@@ -1115,7 +1115,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                   <Ionicons
                     name={paymentMode === "CREDIT" ? "square-outline" : "checkbox"}
                     size={18}
-                    color="#5B5CE2"
+                    color="#2563EB"
                   />
                   <Text className="text-xs font-bold text-gray-800 ml-1">
                     {paymentMode === "CREDIT" ? "Credit (Unpaid)" : `Received:${Number(grandTotal).toFixed(1)}`}
@@ -1126,9 +1126,9 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               {cartTotalParcelItems > 0 ? (
                 <TouchableOpacity
                   onPress={() => setShowParcelModal(true)}
-                  className="bg-orange-100 border border-orange-300 px-2 py-0.5 rounded-full"
+                  className="bg-emerald-100 border border-emerald-400 px-2 py-0.5 rounded-full"
                 >
-                  <Text className="text-[10px] font-extrabold text-orange-800">
+                  <Text className="text-[10px] font-extrabold text-emerald-800">
                     {cartTotalParcelItems === cartTotalItems
                       ? "ALL PARCEL"
                       : `${cartTotalParcelItems}P / ${cartTotalItems - cartTotalParcelItems}D`}
@@ -1161,8 +1161,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                       }
                     }}
                     style={{
-                      backgroundColor: isSelected ? "#5B5CE2" : "#FFFFFF",
-                      borderColor: "#5B5CE2",
+                      backgroundColor: isSelected ? "#2563EB" : "#FFFFFF",
+                      borderColor: "#2563EB",
                       borderWidth: 1,
                     }}
                     className="px-3 py-1 rounded-full mr-1.5"
@@ -1209,7 +1209,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                   }
                 }}
                 disabled={loading}
-                style={{ backgroundColor: cart.length > 0 ? "#5B5CE2" : "#94A3B8" }}
+                style={{ backgroundColor: cart.length > 0 ? "#2563EB" : "#94A3B8" }}
                 className="flex-1.5 px-4 py-2.5 rounded-lg items-center justify-center"
               >
                 {loading ? (
@@ -1255,9 +1255,9 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
               <View className="flex-row gap-2 flex-wrap">
                 {[
                   { id: "COUNTER", label: "Counter", activeBg: "bg-blue-600 border-blue-600" },
-                  { id: "TAKEAWAY", label: "Takeaway", activeBg: "bg-indigo-600 border-indigo-600" },
-                  { id: "SWIGGY", label: "Swiggy", activeBg: "bg-orange-500 border-orange-500" },
-                  { id: "ZOMATO", label: "Zomato", activeBg: "bg-red-600 border-red-600" },
+                  { id: "TAKEAWAY", label: "Takeaway", activeBg: "bg-slate-800 border-slate-800" },
+                  { id: "SWIGGY", label: "Swiggy", activeBg: "bg-emerald-600 border-emerald-600" },
+                  { id: "ZOMATO", label: "Zomato", activeBg: "bg-blue-800 border-blue-800" },
                 ].map((ch) => (
                   <TouchableOpacity
                     key={ch.id}
@@ -1330,22 +1330,22 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
 
               {/* Visit Count & Customer Profile Badge */}
               {activeCustomer ? (
-                <View className="bg-amber-50 border border-amber-300 rounded-xl p-3 my-2">
+                <View className="bg-blue-50 border border-blue-200 rounded-xl p-3 my-2">
                   <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center">
-                      <Ionicons name="person-circle" size={24} color="#D97706" />
+                      <Ionicons name="person-circle" size={24} color="#2563EB" />
                       <View className="ml-2">
-                        <Text className="text-sm font-extrabold text-amber-950">
+                        <Text className="text-sm font-extrabold text-blue-950">
                           {activeCustomer.name}
                         </Text>
-                        <Text className="text-[11px] font-bold text-amber-800">
-                          Total Visits: <Text className="font-extrabold text-amber-900 text-xs">{activeCustomer.visitCount || 1}</Text> • Total Spent: Rs. {activeCustomer.totalSpent || 0}
+                        <Text className="text-[11px] font-bold text-blue-800">
+                          Total Visits: <Text className="font-extrabold text-blue-900 text-xs">{activeCustomer.visitCount || 1}</Text> • Total Spent: Rs. {activeCustomer.totalSpent || 0}
                         </Text>
                       </View>
                     </View>
                     {(activeCustomer.isRegular || (activeCustomer.visitCount || 0) >= (user?.vipVisitThreshold || 3)) ? (
-                      <View className="bg-amber-200 px-2 py-0.5 rounded-full">
-                        <Text className="text-[10px] font-extrabold text-amber-900">VIP / Regular</Text>
+                      <View className="bg-emerald-100 px-2 py-0.5 rounded-full">
+                        <Text className="text-[10px] font-extrabold text-emerald-800">VIP / Regular</Text>
                       </View>
                     ) : null}
                   </View>
@@ -1412,7 +1412,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 </Text>
                 <View className="flex-row items-center gap-3">
                   <TouchableOpacity onPress={() => setShowParcelModal(true)}>
-                    <Text className="text-xs font-bold text-orange-600">
+                    <Text className="text-xs font-bold text-emerald-700">
                       {cartTotalParcelItems > 0 ? `Parcel (${cartTotalParcelItems}/${cartTotalItems})` : "Parcel / Dine-in"}
                     </Text>
                   </TouchableOpacity>
@@ -1438,9 +1438,9 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                       {(c.parcelQuantity || 0) > 0 ? (
                         <TouchableOpacity
                           onPress={() => setShowParcelModal(true)}
-                          className="bg-orange-100 px-1.5 py-0.5 rounded"
+                          className="bg-emerald-100 px-1.5 py-0.5 rounded"
                         >
-                          <Text className="text-[10px] font-extrabold text-orange-800">
+                          <Text className="text-[10px] font-extrabold text-emerald-800">
                             {c.parcelQuantity >= c.quantity
                               ? "PARCEL"
                               : `${c.parcelQuantity} Parcel · ${c.quantity - c.parcelQuantity} Dine-in`}
@@ -1707,8 +1707,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                     <View className="flex-row items-center">
                       <Text className="text-sm font-bold text-gray-900 mr-2">{item.name}</Text>
                       {item.isRegular ? (
-                        <View className="bg-amber-100 px-1.5 py-0.5 rounded">
-                          <Text className="text-[10px] font-bold text-amber-800">Regular</Text>
+                        <View className="bg-emerald-100 px-1.5 py-0.5 rounded">
+                          <Text className="text-[10px] font-bold text-emerald-800">Regular</Text>
                         </View>
                       ) : null}
                     </View>
@@ -1735,8 +1735,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 #{createdInvoice?.invoiceNumber}
               </Text>
               {createdInvoice?.isOfflinePending ? (
-                <View className="bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full mt-1.5">
-                  <Text className="text-[10px] font-extrabold text-amber-800">
+                <View className="bg-blue-100 border border-blue-300 px-2.5 py-0.5 rounded-full mt-1.5">
+                  <Text className="text-[10px] font-extrabold text-blue-800">
                     Saved Offline • Auto-syncs when online
                   </Text>
                 </View>
@@ -1929,8 +1929,8 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
           <View style={{ width: "100%", maxWidth: 460 }} className="bg-white rounded-t-3xl sm:rounded-2xl p-5 max-h-[85%]">
             <View className="flex-row items-center justify-between mb-3">
               <View className="flex-row items-center">
-                <View className="w-9 h-9 rounded-full bg-orange-100 items-center justify-center mr-2.5">
-                  <Ionicons name="bag-handle-outline" size={18} color="#EA580C" />
+                <View className="w-9 h-9 rounded-full bg-blue-100 items-center justify-center mr-2.5">
+                  <Ionicons name="bag-handle-outline" size={18} color="#2563EB" />
                 </View>
                 <View>
                   <Text className="text-base font-extrabold text-gray-900">Parcel & Dine-In Split</Text>
@@ -1949,15 +1949,15 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 onPress={() => toggleParcelAll(true)}
                 className={`flex-1 py-2.5 px-3 rounded-xl border items-center ${
                   defaultAllParcel || (cart.length > 0 && cartTotalParcelItems === cartTotalItems)
-                    ? "bg-orange-600 border-orange-600"
-                    : "bg-orange-50 border-orange-300"
+                    ? "bg-blue-600 border-blue-600"
+                    : "bg-blue-50 border-blue-300"
                 }`}
               >
                 <Text
                   className={`text-xs font-extrabold ${
                     defaultAllParcel || (cart.length > 0 && cartTotalParcelItems === cartTotalItems)
                       ? "text-white"
-                      : "text-orange-800"
+                      : "text-blue-800"
                   }`}
                 >
                   Parcel All Items
@@ -2001,7 +2001,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                         <Text className="text-xs font-extrabold text-gray-900" numberOfLines={1}>
                           {c.name} (x{c.quantity})
                         </Text>
-                        <Text className="text-[11px] font-semibold text-orange-700 mt-0.5">
+                        <Text className="text-[11px] font-semibold text-emerald-700 mt-0.5">
                           {pQty} Parcel · {dineQty} Eat Here
                         </Text>
                       </View>
@@ -2017,7 +2017,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                         </Text>
                         <TouchableOpacity
                           onPress={() => setItemParcelQty(c._id, pQty + 1)}
-                          className="w-7 h-7 rounded-lg bg-orange-600 items-center justify-center"
+                          className="w-7 h-7 rounded-lg bg-emerald-600 items-center justify-center"
                         >
                           <Ionicons name="add" size={15} color="#FFFFFF" />
                         </TouchableOpacity>
@@ -2030,7 +2030,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
 
             <TouchableOpacity
               onPress={() => setShowParcelModal(false)}
-              style={{ backgroundColor: "#5B5CE2" }}
+              style={{ backgroundColor: "#2563EB" }}
               className="w-full py-3 rounded-xl items-center mt-3"
             >
               <Text className="text-white font-bold text-sm">Done</Text>
@@ -2051,19 +2051,19 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             </View>
 
             {cart.length > 0 ? (
-              <View className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
-                <Text className="text-xs font-extrabold text-amber-900 mb-2">
+              <View className="bg-slate-100 border border-slate-300 rounded-xl p-3 mb-4">
+                <Text className="text-xs font-extrabold text-slate-900 mb-2">
                   Park Current Cart ({cartTotalItems} items · Rs. {grandTotal})
                 </Text>
                 <TextInput
-                  className="bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs text-gray-900 mb-2"
+                  className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-gray-900 mb-2"
                   placeholder="Optional Table / Customer note (e.g. Table 4)"
                   value={holdNote}
                   onChangeText={setHoldNote}
                 />
                 <TouchableOpacity
                   onPress={() => handleHoldCurrentBill(holdNote)}
-                  className="bg-amber-600 py-2.5 rounded-lg items-center"
+                  className="bg-slate-800 py-2.5 rounded-lg items-center"
                 >
                   <Text className="text-white font-bold text-xs">Put Current Bill on Hold</Text>
                 </TouchableOpacity>
@@ -2148,7 +2148,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
             <TouchableOpacity
               onPress={handleSaveQuickItem}
               disabled={savingQuickItem}
-              style={{ backgroundColor: "#5B5CE2" }}
+              style={{ backgroundColor: "#2563EB" }}
               className="w-full py-3 rounded-xl items-center"
             >
               {savingQuickItem ? (

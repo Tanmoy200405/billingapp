@@ -356,7 +356,7 @@ function buildCustomerReceiptCard(invoice, storeInfo = {}, options = {}, copyTit
     const pQty = Number(it.parcelQuantity || 0);
     const parcelTag =
       pQty > 0
-        ? `<div style="font-size:9px;color:#C2410C;font-weight:800;">${
+        ? `<div style="font-size:9px;color:#059669;font-weight:800;">${
             pQty >= qty ? "[PARCEL]" : `[${pQty} PARCEL, ${qty - pQty} DINE-IN]`
           }</div>`
         : "";

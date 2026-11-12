@@ -353,15 +353,15 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   Rs. {Number(salesData.summary?.totalCash || 0).toLocaleString("en-IN")}
                 </Text>
               </View>
-              <View className="flex-1 bg-purple-50/70 p-3 rounded-xl border border-purple-200">
-                <Text className="text-[10px] font-bold text-purple-800">UPI Received</Text>
-                <Text className="text-sm font-black text-purple-900 mt-0.5">
+              <View className="flex-1 bg-blue-50/70 p-3 rounded-xl border border-blue-200">
+                <Text className="text-[10px] font-bold text-blue-800">UPI Received</Text>
+                <Text className="text-sm font-black text-blue-900 mt-0.5">
                   Rs. {Number(salesData.summary?.totalUpi || 0).toLocaleString("en-IN")}
                 </Text>
               </View>
-              <View className="flex-1 bg-blue-50/70 p-3 rounded-xl border border-blue-200">
-                <Text className="text-[10px] font-bold text-blue-800">GST Collected</Text>
-                <Text className="text-sm font-black text-blue-900 mt-0.5">
+              <View className="flex-1 bg-slate-100 p-3 rounded-xl border border-slate-300">
+                <Text className="text-[10px] font-bold text-slate-700">GST Collected</Text>
+                <Text className="text-sm font-black text-slate-900 mt-0.5">
                   Rs. {Number(salesData.summary?.totalTax || 0).toLocaleString("en-IN")}
                 </Text>
               </View>
@@ -376,21 +376,21 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   {salesData.summary?.counterOrders || 0} orders
                 </Text>
               </View>
-              <View className="flex-1 bg-orange-50 p-3 rounded-xl border border-orange-200">
-                <Text className="text-[10px] font-bold text-orange-700">Swiggy Orders</Text>
-                <Text className="text-sm font-black text-orange-900 mt-0.5">
+              <View className="flex-1 bg-blue-50 p-3 rounded-xl border border-blue-200">
+                <Text className="text-[10px] font-bold text-blue-700">Swiggy Orders</Text>
+                <Text className="text-sm font-black text-blue-900 mt-0.5">
                   Rs. {Number(salesData.summary?.totalSwiggy || 0).toLocaleString("en-IN")}
                 </Text>
-                <Text className="text-[10px] text-orange-700">
+                <Text className="text-[10px] text-blue-700">
                   {salesData.summary?.swiggyOrders || 0} orders
                 </Text>
               </View>
-              <View className="flex-1 bg-red-50 p-3 rounded-xl border border-red-200">
-                <Text className="text-[10px] font-bold text-red-700">Zomato Orders</Text>
-                <Text className="text-sm font-black text-red-900 mt-0.5">
+              <View className="flex-1 bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                <Text className="text-[10px] font-bold text-emerald-700">Zomato Orders</Text>
+                <Text className="text-sm font-black text-emerald-900 mt-0.5">
                   Rs. {Number(salesData.summary?.totalZomato || 0).toLocaleString("en-IN")}
                 </Text>
-                <Text className="text-[10px] text-red-700">
+                <Text className="text-[10px] text-emerald-700">
                   {salesData.summary?.zomatoOrders || 0} orders
                 </Text>
               </View>
@@ -453,13 +453,13 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   onPress={() => setTopDays(p.days)}
                   className={`flex-1 py-2 rounded-xl items-center border ${
                     topDays === p.days
-                      ? "bg-orange-50 border-orange-500 shadow-xs"
+                      ? "bg-blue-50 border-blue-500 shadow-xs"
                       : "bg-white border-gray-200"
                   }`}
                 >
                   <Text
                     className={`text-xs font-black ${
-                      topDays === p.days ? "text-orange-700" : "text-gray-600"
+                      topDays === p.days ? "text-blue-700" : "text-gray-600"
                     }`}
                   >
                     {p.label}
@@ -471,7 +471,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
             {/* Prominent Category-Wise Selling Per Day Trigger */}
             <TouchableOpacity
               onPress={handleOpenCategorySales}
-              className="bg-indigo-600 rounded-2xl p-4 mb-3 flex-row items-center justify-between shadow-md active:bg-indigo-700"
+              className="bg-blue-600 rounded-2xl p-4 mb-3 flex-row items-center justify-between shadow-md active:bg-blue-700"
             >
               <View className="flex-row items-center flex-1 mr-3">
                 <View className="w-11 h-11 rounded-xl bg-white/20 items-center justify-center mr-3">
@@ -481,7 +481,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   <Text className="text-white text-sm font-black tracking-wide">
                     Category-Wise Selling Per Day
                   </Text>
-                  <Text className="text-indigo-100 text-[11px] mt-0.5">
+                  <Text className="text-blue-100 text-[11px] mt-0.5">
                     Tap to view day-by-day category breakdown for the whole year ➔
                   </Text>
                 </View>
@@ -491,16 +491,16 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
 
             {/* Overall Top Ranked Items in this Period */}
             {overallTopData.length > 0 ? (
-              <View className="bg-white rounded-2xl p-4 border border-orange-200 shadow-sm mb-3">
+              <View className="bg-white rounded-2xl p-4 border border-blue-200 shadow-sm mb-3">
                 <View className="flex-row items-center justify-between mb-2.5">
                   <View className="flex-row items-center">
-                    <Ionicons name="ribbon" size={18} color="#EA580C" />
+                    <Ionicons name="ribbon" size={18} color="#2563EB" />
                     <Text className="text-xs font-black text-gray-900 ml-1.5 uppercase tracking-wider">
                       Overall Top Sellers ({topDays === 365 ? "Whole Year" : `${topDays} Days`})
                     </Text>
                   </View>
                   <TouchableOpacity onPress={handleOpenCategorySales}>
-                    <Text className="text-[11px] font-bold text-indigo-600">Categories ➔</Text>
+                    <Text className="text-[11px] font-bold text-blue-600">Categories ➔</Text>
                   </TouchableOpacity>
                 </View>
                 {overallTopData.slice(0, 5).map((it, idx) => (
@@ -512,7 +512,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                     <View className="flex-row items-center flex-1 pr-2">
                       <View
                         style={{
-                          backgroundColor: idx === 0 ? "#F59E0B" : idx === 1 ? "#94A3B8" : idx === 2 ? "#D97706" : "#F3F4F6",
+                          backgroundColor: idx === 0 ? "#2563EB" : idx === 1 ? "#059669" : idx === 2 ? "#475569" : "#F3F4F6",
                           width: 22,
                           height: 22,
                           borderRadius: 11,
@@ -544,10 +544,10 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
               </View>
             ) : null}
 
-            <View className="bg-white p-3.5 rounded-2xl border border-orange-200 shadow-sm">
+            <View className="bg-white p-3.5 rounded-2xl border border-blue-200 shadow-sm">
               <View className="flex-row items-center">
-                <Ionicons name="calendar-outline" size={16} color="#F97316" />
-                <Text className="text-xs text-orange-700 font-extrabold ml-1.5">
+                <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+                <Text className="text-xs text-blue-700 font-extrabold ml-1.5">
                   Day-by-Day Top Selling Products ({topDays === 365 ? "Yearly" : `${topDays} Days`})
                 </Text>
               </View>
@@ -589,14 +589,14 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   activeOpacity={0.85}
                   onPress={handleOpenCategorySales}
                 >
-                  <View className="flex-row items-center justify-between px-4 py-2 bg-orange-50 border-b border-orange-100">
+                  <View className="flex-row items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100">
                     <View className="flex-row items-center">
-                      <Ionicons name="calendar-outline" size={13} color="#F97316" />
-                      <Text className="text-xs font-extrabold text-orange-700 ml-2">
+                      <Ionicons name="calendar-outline" size={13} color="#2563EB" />
+                      <Text className="text-xs font-extrabold text-blue-700 ml-2">
                         {new Date(dayData.date).toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}
                       </Text>
                     </View>
-                    <Text className="text-[10px] font-bold text-orange-600">Category details ➔</Text>
+                    <Text className="text-[10px] font-bold text-blue-600">Category details ➔</Text>
                   </View>
                   {(dayData.topItems || []).map((it, idx) => (
                     <View key={idx} className="px-4 py-3 border-b border-gray-100 flex-row items-center">

@@ -247,16 +247,16 @@ export default function DashboardScreen({
       >
         <ResponsiveContainer maxWidth={1200}>
           {pendingOffline.length > 0 ? (
-            <View className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 mb-3.5 flex-row items-center justify-between">
+            <View className="bg-blue-50 border border-blue-300 rounded-2xl p-3.5 mb-3.5 flex-row items-center justify-between">
               <View className="flex-row items-center flex-1 pr-2">
-                <View className="w-8 h-8 rounded-xl bg-amber-100 items-center justify-center mr-2.5">
-                  <Ionicons name="cloud-offline-outline" size={18} color="#B45309" />
+                <View className="w-8 h-8 rounded-xl bg-blue-100 items-center justify-center mr-2.5">
+                  <Ionicons name="cloud-offline-outline" size={18} color="#2563EB" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-xs font-extrabold text-amber-900">
+                  <Text className="text-xs font-extrabold text-blue-900">
                     {pendingOffline.length} Offline Bill{pendingOffline.length > 1 ? "s" : ""} Pending Sync
                   </Text>
-                  <Text className="text-[10px] text-amber-700 font-medium">
+                  <Text className="text-[10px] text-blue-700 font-medium">
                     Will auto-upload & send WhatsApp PDFs as soon as internet connects
                   </Text>
                 </View>
@@ -264,7 +264,7 @@ export default function DashboardScreen({
               <TouchableOpacity
                 onPress={handleSyncOfflineNow}
                 disabled={syncingOffline}
-                className="bg-amber-600 px-3 py-1.5 rounded-xl flex-row items-center"
+                className="bg-blue-600 px-3 py-1.5 rounded-xl flex-row items-center"
               >
                 {syncingOffline ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -331,203 +331,199 @@ export default function DashboardScreen({
               style={isWide ? { flex: 1.4, marginBottom: 0 } : undefined}
               className="bg-white rounded-2xl p-4 mb-4 border border-blue-200 shadow-sm"
             >
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Reports Overview
-            </Text>
-            <View className="flex-row items-center">
-              <Text className="text-xs font-bold text-blue-600 mr-1">
-                Check Reports
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color="#2563EB" />
-            </View>
-          </View>
-          <View className="flex-row justify-between items-center">
-            <View>
-              <Text className="text-xs text-gray-500">Today Sales</Text>
-              <Text className="text-2xl font-black text-gray-900 mt-0.5">
-                Rs. {stats?.todaySalesTotal || 0}
-              </Text>
-            </View>
-            <View className="items-end">
-              <Text className="text-xs text-gray-500">Invoices</Text>
-              <Text className="text-base font-bold text-blue-700 mt-0.5">
-                {stats?.todayInvoiceCount || 0} bills
-              </Text>
-            </View>
-          </View>
-          <View className="flex-row gap-2 mt-3 pt-3 border-t border-gray-100">
-            <View className="flex-1 bg-blue-50/70 p-2 rounded-lg">
-              <Text className="text-[10px] text-gray-500">Regular Customers</Text>
-              <Text className="text-xs font-bold text-blue-900 mt-0.5">
-                {stats?.regularCustomers || 0} active
-              </Text>
-            </View>
-            <View className="flex-1 bg-amber-50/70 p-2 rounded-lg">
-              <Text className="text-[10px] text-gray-500">To Collect (Udhar)</Text>
-              <Text className="text-xs font-bold text-amber-900 mt-0.5">
-                Rs. {stats?.totalReceivable || 0}
-              </Text>
-            </View>
-            <View className="flex-1 bg-red-50/70 p-2 rounded-lg">
-              <Text className="text-[10px] text-gray-500">Low Stock</Text>
-              <Text className="text-xs font-bold text-red-700 mt-0.5">
-                {stats?.lowStockCount || 0} items
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-        </View>
-        <View className="flex-row items-center justify-between mb-2 px-1">
-          <View>
-            <Text className="text-xs font-extrabold text-gray-700 uppercase tracking-widest">
-              Today's Sale Transactions
-            </Text>
-            <Text className="text-[10px] text-gray-400">
-              Resets daily at midnight • Full history in Reports
-            </Text>
-          </View>
-          <View className="bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-            <Text className="text-[10px] font-bold text-blue-700">
-              {recentTransactions.length} today
-            </Text>
-          </View>
-        </View>
-        {loading && !refreshing ? (
-          <View className="py-12 items-center">
-            <ActivityIndicator size="small" color="#2563EB" />
-          </View>
-        ) : recentTransactions.length === 0 ? (
-          <TouchableOpacity
-            onPress={onCreateInvoice}
-            activeOpacity={0.8}
-            className="bg-white rounded-2xl p-8 items-center justify-center border border-gray-200 active:bg-blue-50"
-          >
-            <FontAwesome5 name="file-invoice-dollar" size={36} color="#2563EB" />
-            <Text className="text-gray-700 font-bold text-sm mt-3">
-              No sales recorded yet today
-            </Text>
-            <Text className="text-gray-400 text-center text-xs mt-1">
-              Recent transactions reset fresh daily. Past invoices are safely stored in Reports ➔ Sales.
-            </Text>
-            <Text className="text-blue-600 font-bold text-xs mt-2">
-              Tap here or "+ Sale Invoice" below to create today's first bill!
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={isWide ? { flexDirection: "row", flexWrap: "wrap", gap: 12 } : undefined}>
-            {recentTransactions.map((tx) => (
-              <TouchableOpacity
-                key={tx._id}
-                activeOpacity={0.8}
-                style={isWide ? { width: isDesktop ? "48.9%" : "48.6%", marginBottom: 0 } : undefined}
-                onPress={async () => {
-                  if (tx.isOfflinePending || String(tx._id).startsWith("offline_")) {
-                    setSelectedBill(tx);
-                    return;
-                  }
-                  setBillLoading(true);
-                  try {
-                    const res = await api.invoices.getOne(tx._id);
-                    if (res && res.success && res.invoice) {
-                      setSelectedBill(res.invoice);
-                    } else {
-                      setSelectedBill(tx);
-                    }
-                  } catch {
-                    setSelectedBill(tx);
-                  } finally {
-                    setBillLoading(false);
-                  }
-                }}
-                className="bg-white rounded-xl p-3.5 mb-2.5 border border-gray-200 shadow-sm flex-row items-center justify-between active:bg-blue-50"
-              >
-              <View className="flex-1 pr-2">
-                <View className="flex-row items-center">
-                  <Text className="text-sm font-extrabold text-gray-900 mr-2">
-                    {tx.partyName || "Cash Sale"}
-                  </Text>
-                  {tx.isOfflinePending ? (
-                    <View className="bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded mr-1">
-                      <Text className="text-[9px] font-bold text-amber-800">
-                        Offline
-                      </Text>
-                    </View>
-                  ) : null}
-                  {tx.isRegularCustomer ? (
-                    <View className="bg-amber-100 px-1.5 py-0.2 rounded">
-                      <Text className="text-[9px] font-bold text-amber-800">
-                        Regular
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text className="text-[11px] text-gray-500 mt-0.5 font-bold">
-                  Bill #{tx.invoiceNumber} • {new Date(tx.invoiceDate || tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Reports Overview
                 </Text>
-                {tx.items && tx.items.length > 0 ? (
-                  <Text className="text-xs text-blue-900 font-semibold mt-1" numberOfLines={2}>
-                    🛍️ {tx.items.map((it) => `${it.name || it.itemName} (x${it.quantity || it.qty || 1})`).join(", ")}
+                <View className="flex-row items-center">
+                  <Text className="text-xs font-bold text-blue-600 mr-1">
+                    Check Reports
                   </Text>
-                ) : null}
-                <View className="flex-row items-center gap-1.5 mt-2">
-                  <View
-                    className={`px-2 py-0.5 rounded border ${tx.paymentMode === "CASH"
-                        ? "bg-emerald-50 border-emerald-300"
-                        : tx.paymentMode === "UPI"
-                          ? "bg-purple-50 border-purple-300"
-                          : tx.paymentMode === "UPI/CASH"
-                            ? "bg-amber-50 border-amber-300"
-                            : "bg-blue-50 border-blue-300"
-                      }`}
-                  >
-                    <Text
-                      className={`text-[10px] font-bold ${tx.paymentMode === "CASH"
-                          ? "text-emerald-700"
-                          : tx.paymentMode === "UPI"
-                            ? "text-purple-700"
-                            : tx.paymentMode === "UPI/CASH"
-                              ? "text-amber-800"
-                              : "text-blue-700"
-                        }`}
-                    >
-                      {tx.paymentMode}
-                    </Text>
-                  </View>
-                  <Text className="text-[10px] text-blue-500 font-bold">Tap to view full bill details →</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#2563EB" />
                 </View>
               </View>
-              <View className="items-end justify-between ml-2">
-                <Text className="text-base font-black text-gray-900 mb-1">
-                  Rs. {tx.grandTotal}
-                </Text>
-                <View className="flex-row items-center gap-1.5 mt-1">
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation && e.stopPropagation();
-                      handleEditInvoice(tx);
-                    }}
-                    className="bg-blue-50 border border-blue-300 px-2.5 py-1.5 rounded-lg flex-row items-center active:bg-blue-100"
-                  >
-                    <Ionicons name="create-outline" size={13} color="#2563EB" />
-                    <Text className="text-blue-800 text-[11px] font-bold ml-1">Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation && e.stopPropagation();
-                      handleDeleteInvoice(tx._id, tx.invoiceNumber);
-                    }}
-                    className="bg-red-50 border border-red-300 px-2.5 py-1.5 rounded-lg flex-row items-center active:bg-red-100"
-                  >
-                    <Ionicons name="trash-outline" size={13} color="#DC2626" />
-                    <Text className="text-red-700 text-[11px] font-bold ml-1">Del</Text>
-                  </TouchableOpacity>
+              <View className="flex-row justify-between items-center">
+                <View>
+                  <Text className="text-xs text-gray-500">Today Sales</Text>
+                  <Text className="text-2xl font-black text-gray-900 mt-0.5">
+                    Rs. {stats?.todaySalesTotal || 0}
+                  </Text>
+                </View>
+                <View className="items-end">
+                  <Text className="text-xs text-gray-500">Invoices</Text>
+                  <Text className="text-base font-bold text-blue-700 mt-0.5">
+                    {stats?.todayInvoiceCount || 0} bills
+                  </Text>
+                </View>
+              </View>
+              <View className="flex-row gap-2 mt-3 pt-3 border-t border-gray-100">
+                <View className="flex-1 bg-blue-50/70 p-2 rounded-lg">
+                  <Text className="text-[10px] text-gray-500">Regular Customers</Text>
+                  <Text className="text-xs font-bold text-blue-900 mt-0.5">
+                    {stats?.regularCustomers || 0} active
+                  </Text>
+                </View>
+                <View className="flex-1 bg-slate-100 p-2 rounded-lg">
+                  <Text className="text-[10px] text-gray-500">To Collect (Udhar)</Text>
+                  <Text className="text-xs font-bold text-slate-900 mt-0.5">
+                    Rs. {stats?.totalReceivable || 0}
+                  </Text>
+                </View>
+                <View className="flex-1 bg-red-50/70 p-2 rounded-lg">
+                  <Text className="text-[10px] text-gray-500">Low Stock</Text>
+                  <Text className="text-xs font-bold text-red-700 mt-0.5">
+                    {stats?.lowStockCount || 0} items
+                  </Text>
                 </View>
               </View>
             </TouchableOpacity>
-          ))}
           </View>
-        )}
+          <View className="flex-row items-center justify-between mb-2 px-1">
+            <View>
+              <Text className="text-xs font-extrabold text-gray-700 uppercase tracking-widest">
+                Today's Sale Transactions
+              </Text>
+              <Text className="text-[10px] text-gray-400">
+                Resets daily at midnight • Full history in Reports
+              </Text>
+            </View>
+            <View className="bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+              <Text className="text-[10px] font-bold text-blue-700">
+                {recentTransactions.length} today
+              </Text>
+            </View>
+          </View>
+          {loading && !refreshing ? (
+            <View className="py-12 items-center">
+              <ActivityIndicator size="small" color="#2563EB" />
+            </View>
+          ) : recentTransactions.length === 0 ? (
+            <TouchableOpacity
+              onPress={onCreateInvoice}
+              activeOpacity={0.8}
+              className="bg-white rounded-2xl p-8 items-center justify-center border border-gray-200 active:bg-blue-50"
+            >
+              <FontAwesome5 name="file-invoice-dollar" size={36} color="#2563EB" />
+              <Text className="text-gray-700 font-bold text-sm mt-3">
+                No sales recorded yet today
+              </Text>
+              <Text className="text-gray-400 text-center text-xs mt-1">
+                Recent transactions reset fresh daily. Past invoices are safely stored in Reports ➔ Sales.
+              </Text>
+              <Text className="text-blue-600 font-bold text-xs mt-2">
+                Tap here or "+ Sale Invoice" below to create today's first bill!
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={isWide ? { flexDirection: "row", flexWrap: "wrap", gap: 12 } : undefined}>
+              {recentTransactions.map((tx) => (
+                <TouchableOpacity
+                  key={tx._id}
+                  activeOpacity={0.8}
+                  style={isWide ? { width: isDesktop ? "48.9%" : "48.6%", marginBottom: 0 } : undefined}
+                  onPress={async () => {
+                    if (tx.isOfflinePending || String(tx._id).startsWith("offline_")) {
+                      setSelectedBill(tx);
+                      return;
+                    }
+                    setBillLoading(true);
+                    try {
+                      const res = await api.invoices.getOne(tx._id);
+                      if (res && res.success && res.invoice) {
+                        setSelectedBill(res.invoice);
+                      } else {
+                        setSelectedBill(tx);
+                      }
+                    } catch {
+                      setSelectedBill(tx);
+                    } finally {
+                      setBillLoading(false);
+                    }
+                  }}
+                  className="bg-white rounded-xl p-3.5 mb-2.5 border border-gray-200 shadow-sm flex-row items-center justify-between active:bg-blue-50"
+                >
+                  <View className="flex-1 pr-2">
+                    <View className="flex-row items-center">
+                      <Text className="text-sm font-extrabold text-gray-900 mr-2">
+                        {tx.partyName || "Cash Sale"}
+                      </Text>
+                      {tx.isOfflinePending ? (
+                        <View className="bg-blue-100 border border-blue-300 px-1.5 py-0.2 rounded mr-1">
+                          <Text className="text-[9px] font-bold text-blue-800">
+                            Offline
+                          </Text>
+                        </View>
+                      ) : null}
+                      {tx.isRegularCustomer ? (
+                        <View className="bg-emerald-100 px-1.5 py-0.2 rounded">
+                          <Text className="text-[9px] font-bold text-emerald-800">
+                            Regular
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text className="text-[11px] text-gray-500 mt-0.5 font-bold">
+                      Bill #{tx.invoiceNumber} • {new Date(tx.invoiceDate || tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </Text>
+                    {tx.items && tx.items.length > 0 ? (
+                      <Text className="text-xs text-blue-900 font-semibold mt-1" numberOfLines={2}>
+                        🛍️ {tx.items.map((it) => `${it.name || it.itemName} (x${it.quantity || it.qty || 1})`).join(", ")}
+                      </Text>
+                    ) : null}
+                    <View className="flex-row items-center gap-1.5 mt-2">
+                      <View
+                        className={`px-2 py-0.5 rounded border ${tx.paymentMode === "CASH"
+                          ? "bg-emerald-50 border-emerald-300"
+                          : tx.paymentMode === "UPI/CASH"
+                            ? "bg-slate-100 border-slate-300"
+                            : "bg-blue-50 border-blue-300"
+                          }`}
+                      >
+                        <Text
+                          className={`text-[10px] font-bold ${tx.paymentMode === "CASH"
+                            ? "text-emerald-700"
+                            : tx.paymentMode === "UPI/CASH"
+                              ? "text-slate-700"
+                              : "text-blue-700"
+                            }`}
+                        >
+                          {tx.paymentMode}
+                        </Text>
+                      </View>
+                      <Text className="text-[10px] text-blue-500 font-bold">Tap to view full bill details →</Text>
+                    </View>
+                  </View>
+                  <View className="items-end justify-between ml-2">
+                    <Text className="text-base font-black text-gray-900 mb-1">
+                      Rs. {tx.grandTotal}
+                    </Text>
+                    <View className="flex-row items-center gap-1.5 mt-1">
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation && e.stopPropagation();
+                          handleEditInvoice(tx);
+                        }}
+                        className="bg-blue-50 border border-blue-300 px-2.5 py-1.5 rounded-lg flex-row items-center active:bg-blue-100"
+                      >
+                        <Ionicons name="create-outline" size={13} color="#2563EB" />
+                        <Text className="text-blue-800 text-[11px] font-bold ml-1">Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation && e.stopPropagation();
+                          handleDeleteInvoice(tx._id, tx.invoiceNumber);
+                        }}
+                        className="bg-red-50 border border-red-300 px-2.5 py-1.5 rounded-lg flex-row items-center active:bg-red-100"
+                      >
+                        <Ionicons name="trash-outline" size={13} color="#DC2626" />
+                        <Text className="text-red-700 text-[11px] font-bold ml-1">Del</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </ResponsiveContainer>
       </ScrollView>
       <View
