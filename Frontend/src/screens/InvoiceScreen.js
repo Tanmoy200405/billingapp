@@ -799,7 +799,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 : isWide
                 ? "Select Items & Checkout"
                 : currentStep === "items"
-                ? `Select Items • Bill #${nextInvoiceNum}`
+                ? "Select Items • New Bill"
                 : "Finalize Invoice"}
             </Text>
           </View>
