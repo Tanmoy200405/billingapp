@@ -25,7 +25,7 @@ export function createServiceApp({ serviceName, defaultPort, mountRoutes, onBoot
   }
 
   const app = express();
-  const port = Number(process.env.PORT || defaultPort);
+  const port = Number(defaultPort || process.env.PORT || 5000);
 
   app.use(
     cors({
