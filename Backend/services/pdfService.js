@@ -532,26 +532,3 @@ export function generateInvoicePdfBuffer(invoice, storeInfo = {}) {
   });
 }
 
-      if (showMapLocation) {
-        const cleanMapUrl = storeMapLocation.startsWith("http")
-          ? storeMapLocation
-          : `https://${storeMapLocation}`;
-        doc.y += 4;
-        doc
-          .fontSize(7.5)
-          .font("Helvetica-Bold")
-          .fillColor("#2563EB")
-          .text("📍 Locate Us on Google Maps", leftX, doc.y, {
-            width: contentWidth,
-            align: "center",
-            link: cleanMapUrl,
-            underline: true,
-          });
-      }
-
-      doc.end();
-    } catch (err) {
-      reject(err);
-    }
-  });
-}

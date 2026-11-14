@@ -2,7 +2,7 @@ import express from "express";
 import Area from "../models/Area.js";
 import Table from "../models/Table.js";
 import Invoice from "../models/Invoice.js";
-import protect from "../middleware/authMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 router.use(protect);

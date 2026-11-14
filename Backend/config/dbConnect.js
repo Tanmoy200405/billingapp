@@ -1,8 +1,6 @@
 import mongoose from "mongoose";
 import dns from "node:dns";
 
-// In local environments (especially Windows / certain ISPs), SRV lookup needs public DNS.
-// On cloud environments like Vercel, overriding DNS can interfere with internal Lambda resolution.
 if (!process.env.VERCEL) {
   try {
     dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
@@ -12,6 +10,17 @@ if (!process.env.VERCEL) {
 }
 
 let cachedPromise = null;
+
+// Ensure event listeners clear any dead/stuck cached promises
+mongoose.connection.on("disconnected", () => {
+  cachedPromise = null;
+  console.warn("[MongoDB] Connection disconnected. Cached promise cleared.");
+});
+
+mongoose.connection.on("error", (err) => {
+  cachedPromise = null;
+  console.error("[MongoDB] Connection error event:", err.message);
+});
 
 const connectDB = async () => {
   if (mongoose.connection.readyState === 1) {
@@ -32,7 +41,9 @@ const connectDB = async () => {
   cachedPromise = mongoose
     .connect(uri, {
       serverSelectionTimeoutMS: 8000,
-      socketTimeoutMS: 45000,
+      socketTimeoutMS: 30000,
+      connectTimeoutMS: 10000,
+      maxPoolSize: 10,
     })
     .then((conn) => {
       console.log(`MongoDB Connected: ${conn.connection.host}`);

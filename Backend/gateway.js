@@ -144,12 +144,17 @@ const server = http.createServer(async (req, res) => {
         "x-forwarded-for": req.socket?.remoteAddress || "",
       },
       agent: keepAliveAgent,
+      timeout: 25000,
     },
     (proxyRes) => {
       res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
       proxyRes.pipe(res, { end: true });
     }
   );
+
+  proxyReq.on("timeout", () => {
+    proxyReq.destroy(new Error("Gateway timeout waiting for upstream service"));
+  });
 
   proxyReq.on("error", (err) => {
     if (!res.headersSent) {

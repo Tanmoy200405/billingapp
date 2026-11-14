@@ -58,12 +58,16 @@ export function createServiceApp({ serviceName, defaultPort, mountRoutes, onBoot
 
   app.use(async (req, res, next) => {
     try {
-      await connectDB();
+      const dbPromise = connectDB();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Database connection timed out")), 7000)
+      );
+      await Promise.race([dbPromise, timeoutPromise]);
       next();
     } catch (error) {
-      return res.status(500).json({
+      return res.status(503).json({
         success: false,
-        message: "Database connection failed",
+        message: "Database connection temporarily unavailable",
         error: error.message,
       });
     }
