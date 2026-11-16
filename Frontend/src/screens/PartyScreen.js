@@ -281,8 +281,12 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
           setVipVisitThreshold(res.vipVisitThreshold);
           setVipOfferThreshold(String(res.vipVisitThreshold));
         }
-        if (res.vipOffer) {
+        if (res.vipSchemeEnabled !== undefined) {
+          setVipOfferEnabled(Boolean(res.vipSchemeEnabled && res.vipOffer?.enabled !== false));
+        } else if (res.vipOffer) {
           setVipOfferEnabled(res.vipOffer.enabled !== false);
+        }
+        if (res.vipOffer) {
           setVipOfferDiscount(String(res.vipOffer.discountPercent || 10));
           setVipOfferFreebie(res.vipOffer.freebieItem || "");
           setVipOfferMinBill(String(res.vipOffer.minBillAmount || 0));
@@ -305,6 +309,7 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
     setSavingVipOffer(true);
     try {
       const res = await api.parties.updateVipOffer({
+        vipSchemeEnabled: vipOfferEnabled,
         vipVisitThreshold: thresholdNum,
         vipOffer: {
           enabled: vipOfferEnabled,

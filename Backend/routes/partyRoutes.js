@@ -17,8 +17,9 @@ router.use(protect);
 
 router.get("/vip-offer", async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("vipVisitThreshold vipOffer businessName").lean();
+    const user = await User.findById(req.user._id).select("vipSchemeEnabled vipVisitThreshold vipOffer businessName").lean();
     const threshold = Number(user?.vipVisitThreshold) || 3;
+    const vipSchemeEnabled = user?.vipSchemeEnabled !== false;
     const vipOffer = user?.vipOffer || {
       enabled: true,
       discountPercent: 10,
@@ -26,18 +27,21 @@ router.get("/vip-offer", async (req, res) => {
       minBillAmount: 0,
       customMessage: "Special VIP Diner Club Offer",
     };
-    const qualifyingCount = await Party.countDocuments({
-      userId: req.user._id,
-      type: "customer",
-      $or: [
-        { isRegular: true },
-        { isRegular: "true" },
-        { visitCount: { $gte: threshold } },
-        { customDiscountPercent: { $gt: 0 } },
-      ],
-    });
+    const qualifyingCount = vipSchemeEnabled
+      ? await Party.countDocuments({
+          userId: req.user._id,
+          type: "customer",
+          $or: [
+            { isRegular: true },
+            { isRegular: "true" },
+            { visitCount: { $gte: threshold } },
+            { customDiscountPercent: { $gt: 0 } },
+          ],
+        })
+      : 0;
     return res.status(200).json({
       success: true,
+      vipSchemeEnabled,
       vipVisitThreshold: threshold,
       vipOffer,
       qualifyingCount,
@@ -49,25 +53,31 @@ router.get("/vip-offer", async (req, res) => {
 
 router.put("/vip-offer", async (req, res) => {
   try {
-    const { vipVisitThreshold, vipOffer } = req.body;
+    const { vipSchemeEnabled, vipVisitThreshold, vipOffer } = req.body;
     const updateObj = {};
+    if (vipSchemeEnabled !== undefined) {
+      updateObj.vipSchemeEnabled = Boolean(vipSchemeEnabled);
+    }
     if (vipVisitThreshold !== undefined) {
       updateObj.vipVisitThreshold = Math.max(1, Number(vipVisitThreshold) || 1);
     }
     if (vipOffer && typeof vipOffer === "object") {
       updateObj.vipOffer = {
-        enabled: vipOffer.enabled !== false,
+        enabled: vipSchemeEnabled !== undefined ? Boolean(vipSchemeEnabled && vipOffer.enabled !== false) : vipOffer.enabled !== false,
         discountPercent: Math.max(0, Math.min(100, Number(vipOffer.discountPercent) || 0)),
         freebieItem: (vipOffer.freebieItem || "").trim(),
         minBillAmount: Math.max(0, Number(vipOffer.minBillAmount) || 0),
         customMessage: (vipOffer.customMessage || "").trim() || "Special VIP Diner Club Offer",
       };
+    } else if (vipSchemeEnabled !== undefined) {
+      updateObj["vipOffer.enabled"] = Boolean(vipSchemeEnabled);
     }
     const updatedUser = await User.findByIdAndUpdate(req.user._id, { $set: updateObj }, { new: true })
-      .select("vipVisitThreshold vipOffer")
+      .select("vipSchemeEnabled vipVisitThreshold vipOffer")
       .lean();
     return res.status(200).json({
       success: true,
+      vipSchemeEnabled: updatedUser.vipSchemeEnabled !== false,
       vipVisitThreshold: updatedUser.vipVisitThreshold,
       vipOffer: updatedUser.vipOffer,
       message: "VIP criteria and universal offer updated successfully.",
@@ -273,6 +283,9 @@ const buildWhatsAppMessage = (party, business) => {
 
 router.get("/vip-count", async (req, res) => {
   try {
+    if (req.user?.vipSchemeEnabled === false) {
+      return res.status(200).json({ success: true, count: 0, disabled: true });
+    }
     const vipThreshold = Number(req.user?.vipVisitThreshold) || 3;
     const count = await Party.countDocuments({
       userId: req.user._id,
@@ -286,6 +299,9 @@ router.get("/vip-count", async (req, res) => {
 
 router.post("/send-bulk-vip-offer", async (req, res) => {
   try {
+    if (req.user?.vipSchemeEnabled === false) {
+      return res.status(200).json({ success: false, sent: 0, message: "VIP scheme is currently disabled in Settings." });
+    }
     const vipThreshold = Number(req.user?.vipVisitThreshold) || 3;
     const vips = await Party.find({
       userId: req.user._id,

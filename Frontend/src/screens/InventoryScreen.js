@@ -184,6 +184,19 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
           setCachedData("items_all", sorted);
         }
       }
+
+      // Live sales summary for real-time "Sold Today" badges & analytics
+      api.items
+        .getSalesSummary()
+        .then((sRes) => {
+          if (sRes && sRes.success) {
+            setSalesSummary({
+              byItemId: sRes.byItemId || {},
+              byName: sRes.byName || {},
+            });
+          }
+        })
+        .catch(() => {});
     } catch (e) {
       console.warn("loadItems warning:", e.message);
     } finally {
@@ -237,6 +250,43 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
         setCachedData("items_categories", unique);
       }
     } catch {}
+  };
+
+  const handleOpenItemStats = async (item) => {
+    if (!item) return;
+    setSelectedStatsItem(item);
+    setStatsModalVisible(true);
+    setStatsLoading(true);
+
+    const quick =
+      salesSummary.byItemId?.[item._id] ||
+      salesSummary.byName?.[String(item.name || "").trim().toLowerCase()];
+
+    setItemStatsData({
+      stats: quick || {
+        totalSoldQuantity: 0,
+        totalRevenue: 0,
+        todaySoldQuantity: 0,
+        todayRevenue: 0,
+        yesterdaySoldQuantity: 0,
+        yesterdayRevenue: 0,
+        invoiceCount: 0,
+        totalParcelQuantity: 0,
+        lastSoldAt: null,
+      },
+      item,
+    });
+
+    try {
+      const res = await api.items.getSalesStats(item._id);
+      if (res && res.success) {
+        setItemStatsData(res);
+      }
+    } catch {
+      // Keep quick stats
+    } finally {
+      setStatsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -764,7 +814,16 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                 </View>
               ) : (
                 <View className="flex-row flex-wrap justify-between gap-y-3">
-                  {displayedItems.map((item) => (
+                  {displayedItems.map((item) => {
+                    const soldData =
+                      salesSummary.byItemId?.[item._id] ||
+                      salesSummary.byName?.[String(item.name || "").trim().toLowerCase()];
+                    const totalSoldQty = soldData?.totalSoldQuantity || 0;
+                    const totalSoldRev = soldData?.totalRevenue || 0;
+                    const todaySoldQty = soldData?.todaySoldQuantity || 0;
+                    const todaySoldRev = soldData?.todayRevenue || 0;
+
+                    return (
                     <View
                       key={item._id}
                       style={{ width: isWide ? "48.8%" : "100%" }}
@@ -808,6 +867,36 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                             </View>
                           ) : null}
                         </View>
+
+                        {/* Daily Selling & Sells Today Count */}
+                        <TouchableOpacity
+                          activeOpacity={0.75}
+                          onPress={() => handleOpenItemStats(item)}
+                          className="mt-2 pt-1.5 flex-row items-center justify-between"
+                        >
+                          <View className={`flex-row items-center px-2 py-1 rounded-xl ${
+                            todaySoldQty > 0
+                              ? "bg-emerald-50 border border-emerald-300"
+                              : "bg-blue-50/60 border border-blue-200"
+                          }`}>
+                            <Ionicons name={todaySoldQty > 0 ? "flame" : "calendar-outline"} size={13} color={todaySoldQty > 0 ? "#059669" : "#2563EB"} />
+                            <Text className={`text-[11px] font-black ml-1.5 ${todaySoldQty > 0 ? "text-emerald-800" : "text-blue-900"}`}>
+                              Sold Today: <Text className="font-black text-xs">{todaySoldQty} {item.unit || "PCS"}</Text>
+                              {todaySoldRev > 0 ? ` (Rs. ${todaySoldRev})` : ""}
+                            </Text>
+                            <Ionicons name="stats-chart" size={11} color={todaySoldQty > 0 ? "#059669" : "#2563EB"} style={{ marginLeft: 5 }} />
+                          </View>
+
+                          {totalSoldQty > 0 ? (
+                            <Text className="text-[10px] text-slate-500 font-bold ml-2">
+                              Total: {totalSoldQty} sold
+                            </Text>
+                          ) : (
+                            <Text className="text-[10px] text-blue-600 font-bold ml-2">
+                              Daily Stats →
+                            </Text>
+                          )}
+                        </TouchableOpacity>
 
                         {/* Channel Toggles (Dine-in vs Online Delivery) */}
                         {activeTab === "menu" && (
@@ -868,7 +957,8 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                         </TouchableOpacity>
                       </View>
                     </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -1407,6 +1497,277 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
             <TouchableOpacity onPress={handleSavePo} disabled={savingPo} className="w-full bg-blue-600 py-3 rounded-xl items-center shadow-xs">
               {savingPo ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text className="text-white text-xs font-black">Raise Official PO</Text>}
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal 5: Item Sales & Daily Selling Analytics Modal ── */}
+      <Modal
+        visible={statsModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setStatsModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/60 justify-end sm:justify-center items-center p-0 sm:p-4">
+          <TouchableWithoutFeedback onPress={() => setStatsModalVisible(false)}>
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+          </TouchableWithoutFeedback>
+
+          <View className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[88%] shadow-2xl">
+            {/* Header */}
+            <View className="flex-row justify-between items-start pb-3 border-b border-gray-200 mb-4">
+              <View className="flex-row items-center flex-1 pr-3">
+                <SafeProductImage uri={selectedStatsItem?.imageUrl} />
+                <View className="flex-1 ml-2">
+                  <Text className="text-lg font-black text-gray-900 leading-snug">
+                    {selectedStatsItem?.name || "Item Details"}
+                  </Text>
+                  <View className="flex-row items-center gap-2 mt-0.5">
+                    <Text className="text-xs font-semibold text-blue-700">
+                      {selectedStatsItem?.category || "General"}
+                    </Text>
+                    {selectedStatsItem?.barcode ? (
+                      <Text className="text-[11px] text-gray-500">
+                        SKU: {selectedStatsItem.barcode}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setStatsModalVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                className="p-1"
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {statsLoading && !itemStatsData?.stats?.totalSoldQuantity ? (
+                <View className="py-8 items-center justify-center">
+                  <ActivityIndicator size="large" color="#2563EB" />
+                  <Text className="text-xs font-bold text-gray-500 mt-2">
+                    Calculating sales analytics...
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Daily Selling (Today & Yesterday) Highlight Card */}
+              <View style={{ backgroundColor: "#2563EB" }} className="rounded-2xl p-4 mb-3 shadow-sm">
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-row items-center">
+                    <Ionicons name="calendar" size={17} color="#FFFFFF" />
+                    <Text className="text-white text-xs font-black uppercase tracking-wider ml-1.5">
+                      Today's Daily Selling
+                    </Text>
+                  </View>
+                  <View className="bg-white/20 px-2 py-0.5 rounded-full">
+                    <Text className="text-white text-[10px] font-bold">Today (IST)</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-center justify-between bg-white/10 rounded-xl p-3 mb-2">
+                  <View>
+                    <Text className="text-blue-100 text-[11px] font-medium">Quantity Sold Today</Text>
+                    <Text className="text-white text-2xl font-black">
+                      {itemStatsData?.stats?.todaySoldQuantity || 0}{" "}
+                      <Text className="text-xs font-bold text-blue-200">
+                        {selectedStatsItem?.unit || "PCS"}
+                      </Text>
+                    </Text>
+                  </View>
+                  <View className="items-end">
+                    <Text className="text-blue-100 text-[11px] font-medium">Today's Revenue</Text>
+                    <Text className="text-emerald-300 text-2xl font-black">
+                      ₹{itemStatsData?.stats?.todayRevenue || 0}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-row justify-between items-center px-1">
+                  <Text className="text-blue-100 text-xs font-semibold">
+                    Yesterday: {itemStatsData?.stats?.yesterdaySoldQuantity || 0} {selectedStatsItem?.unit || "PCS"} sold
+                  </Text>
+                  <Text className="text-blue-100 text-xs font-bold">
+                    ₹{itemStatsData?.stats?.yesterdayRevenue || 0}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 7-Day Daily Selling History */}
+              {Array.isArray(itemStatsData?.stats?.dailyBreakdown) && itemStatsData.stats.dailyBreakdown.length > 0 ? (
+                <View className="bg-white rounded-2xl p-3.5 border border-gray-200 mb-3 shadow-xs">
+                  <Text className="text-xs font-extrabold text-gray-800 uppercase tracking-wider mb-2">
+                    Recent Daily Breakdown
+                  </Text>
+                  {itemStatsData.stats.dailyBreakdown.map((day, idx) => (
+                    <View
+                      key={day.date}
+                      className={`flex-row justify-between items-center py-2 ${
+                        idx < itemStatsData.stats.dailyBreakdown.length - 1 ? "border-b border-gray-100" : ""
+                      }`}
+                    >
+                      <View className="flex-row items-center">
+                        <Ionicons name="time-outline" size={14} color="#6B7280" />
+                        <Text className="text-xs font-bold text-gray-800 ml-1.5">{day.date}</Text>
+                      </View>
+                      <Text className="text-xs font-bold text-blue-700">
+                        {day.soldQuantity} {selectedStatsItem?.unit || "PCS"}
+                      </Text>
+                      <Text className="text-xs font-extrabold text-emerald-700">
+                        ₹{day.revenue}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* 4 Key Performance Metrics Cards */}
+              <View className="flex-row gap-2.5 mb-2.5">
+                <View className="flex-1 bg-blue-50 border border-blue-200 rounded-2xl p-3.5">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="text-[11px] font-bold text-blue-700 uppercase tracking-wide">
+                      Total Sold
+                    </Text>
+                    <Ionicons name="trending-up" size={16} color="#2563EB" />
+                  </View>
+                  <Text className="text-xl font-black text-blue-900">
+                    {itemStatsData?.stats?.totalSoldQuantity || 0}
+                  </Text>
+                  <Text className="text-[10px] text-blue-600 font-semibold mt-0.5">
+                    {selectedStatsItem?.unit || "PCS"} volume sold
+                  </Text>
+                </View>
+
+                <View className="flex-1 bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide">
+                      Sales Revenue
+                    </Text>
+                    <Ionicons name="cash-outline" size={16} color="#059669" />
+                  </View>
+                  <Text className="text-xl font-black text-emerald-900">
+                    ₹{itemStatsData?.stats?.totalRevenue || 0}
+                  </Text>
+                  <Text className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+                    Gross revenue earned
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row gap-2.5 mb-4">
+                <View className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                      Times Invoiced
+                    </Text>
+                    <Ionicons name="receipt-outline" size={16} color="#0F172A" />
+                  </View>
+                  <Text className="text-xl font-black text-slate-900">
+                    {itemStatsData?.stats?.invoiceCount || 0}
+                  </Text>
+                  <Text className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                    Bills created with this item
+                  </Text>
+                </View>
+
+                <View className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3.5">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="text-[11px] font-bold text-gray-700 uppercase tracking-wide">
+                      Stock Left
+                    </Text>
+                    <Ionicons name="cube-outline" size={16} color="#4B5563" />
+                  </View>
+                  <Text
+                    className={`text-xl font-black ${(selectedStatsItem?.stock || 0) <= (selectedStatsItem?.lowStockThreshold || 5) ? "text-red-600" : "text-gray-900"}`}
+                  >
+                    {selectedStatsItem?.stock || 0}
+                  </Text>
+                  <Text className="text-[10px] text-gray-500 font-semibold mt-0.5">
+                    {selectedStatsItem?.unit || "PCS"} available now
+                  </Text>
+                </View>
+              </View>
+
+              {/* Pricing & Margin Detail Sheet */}
+              <View className="bg-gray-50 rounded-2xl p-4 border border-gray-200 mb-4">
+                <Text className="text-xs font-extrabold text-gray-800 uppercase tracking-wider mb-2.5">
+                  Pricing & Margins
+                </Text>
+
+                <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                  <Text className="text-xs text-gray-600">Selling Price</Text>
+                  <Text className="text-xs font-bold text-gray-900">₹{selectedStatsItem?.sellingPrice || 0}</Text>
+                </View>
+
+                <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                  <Text className="text-xs text-gray-600">Cost / Purchase Price</Text>
+                  <Text className="text-xs font-bold text-gray-700">₹{selectedStatsItem?.costPrice || selectedStatsItem?.purchasePrice || 0}</Text>
+                </View>
+
+                <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                  <Text className="text-xs text-gray-600">Gross Margin per Unit</Text>
+                  <Text className="text-xs font-extrabold text-emerald-700">
+                    ₹{Math.max(0, (selectedStatsItem?.sellingPrice || 0) - (selectedStatsItem?.costPrice || selectedStatsItem?.purchasePrice || 0))}
+                  </Text>
+                </View>
+
+                <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                  <Text className="text-xs text-gray-600">GST / Tax Rate</Text>
+                  <Text className="text-xs font-bold text-gray-700">{selectedStatsItem?.taxRate || 0}%</Text>
+                </View>
+
+                {itemStatsData?.stats?.totalParcelQuantity > 0 ? (
+                  <View className="flex-row justify-between py-1.5 border-b border-gray-200">
+                    <Text className="text-xs text-gray-600">
+                      {businessType === "salon" ? "Retail Takeaway Sales" : "Parcel Volume"}
+                    </Text>
+                    <Text className="text-xs font-bold text-gray-800">
+                      {itemStatsData.stats.totalParcelQuantity} {selectedStatsItem?.unit || "PCS"}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {itemStatsData?.stats?.lastSoldAt ? (
+                  <View className="flex-row justify-between py-1.5">
+                    <Text className="text-xs text-gray-600">Last Sold On</Text>
+                    <Text className="text-xs font-semibold text-gray-800">
+                      {new Date(itemStatsData.stats.lastSoldAt).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Quick Actions */}
+              <View className="flex-row gap-2.5 mb-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    const itemToEdit = selectedStatsItem;
+                    setStatsModalVisible(false);
+                    setTimeout(() => handleOpenEdit(itemToEdit), 250);
+                  }}
+                  className="flex-1 bg-blue-600 py-3 rounded-xl flex-row items-center justify-center shadow-xs"
+                >
+                  <Ionicons name="pencil" size={15} color="#FFFFFF" />
+                  <Text className="text-white font-extrabold text-xs ml-1.5">Edit Item Details</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setStatsModalVisible(false)}
+                  className="flex-1 bg-gray-100 py-3 rounded-xl items-center justify-center border border-gray-200"
+                >
+                  <Text className="text-gray-800 font-extrabold text-xs">Close</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

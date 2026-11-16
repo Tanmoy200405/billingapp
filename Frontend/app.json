@@ -2,7 +2,7 @@
   "expo": {
     "name": "Bistromate",
     "slug": "bistromate",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,7 +11,7 @@
     },
     "android": {
       "package": "com.tanmoy.billingapp",
-      "versionCode": 12,
+      "versionCode": 13,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",

@@ -592,6 +592,7 @@ router.post("/login", async (req, res) => {
           googleMapLocation: user.googleMapLocation || "",
           thermalPrinterSize: user.thermalPrinterSize,
           invoiceStyle: user.invoiceStyle,
+          vipSchemeEnabled: user.vipSchemeEnabled !== false,
           vipVisitThreshold: user.vipVisitThreshold || 3,
         },
       });
@@ -648,6 +649,7 @@ router.post("/login", async (req, res) => {
         showGoogleMapOnBill: user.showGoogleMapOnBill !== false,
         thermalPrinterSize: user.thermalPrinterSize,
         invoiceStyle: user.invoiceStyle,
+        vipSchemeEnabled: user.vipSchemeEnabled !== false,
         vipVisitThreshold: user.vipVisitThreshold || 3,
       },
     });
@@ -681,6 +683,7 @@ router.put("/profile", protect, async (req, res) => {
       showGoogleMapOnBill,
       thermalPrinterSize,
       invoiceStyle,
+      vipSchemeEnabled,
       vipVisitThreshold,
       aggregatorConfig,
       fssaiNumber,
@@ -738,6 +741,10 @@ router.put("/profile", protect, async (req, res) => {
         ...(showGoogleMapOnBill !== undefined && { showGoogleMapOnBill: Boolean(showGoogleMapOnBill) }),
         ...(thermalPrinterSize && { thermalPrinterSize }),
         ...(invoiceStyle && { invoiceStyle }),
+        ...(vipSchemeEnabled !== undefined && {
+          vipSchemeEnabled: Boolean(vipSchemeEnabled),
+          ...(vipSchemeEnabled === false && { "vipOffer.enabled": false }),
+        }),
         ...(vipVisitThreshold !== undefined && { vipVisitThreshold: Number(vipVisitThreshold) || 3 }),
         ...(fssaiNumber !== undefined && { fssaiNumber: fssaiNumber.trim() }),
         ...(printRestaurantLogo !== undefined && { printRestaurantLogo: Boolean(printRestaurantLogo) }),

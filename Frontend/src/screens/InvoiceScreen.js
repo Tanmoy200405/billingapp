@@ -1517,7 +1517,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                         </Text>
                       </View>
                     </View>
-                    {(activeCustomer.isRegular || (activeCustomer.visitCount || 0) >= (user?.vipVisitThreshold || 3)) ? (
+                    {(user?.vipSchemeEnabled !== false && (activeCustomer.isRegular || (activeCustomer.visitCount || 0) >= (user?.vipVisitThreshold || 3))) ? (
                       <View className="bg-emerald-100 px-2 py-0.5 rounded-full">
                         <Text className="text-[10px] font-extrabold text-emerald-800">VIP / Regular</Text>
                       </View>

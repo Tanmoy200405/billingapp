@@ -99,6 +99,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    vipSchemeEnabled: {
+      type: Boolean,
+      default: true,
+    },
     vipVisitThreshold: {
       type: Number,
       default: 3,

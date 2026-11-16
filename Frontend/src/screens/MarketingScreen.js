@@ -97,13 +97,14 @@ export default function MarketingScreen({ user, isActive = true, onOpenDrawer, o
   const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
   const [sentMap, setSentMap] = useState({});
 
+  const isVipActive = user?.vipSchemeEnabled !== false;
   const vipThreshold = Number(user?.vipVisitThreshold) || 3;
 
   const { totalCustomers, vipCount } = useMemo(() => {
     const valid = parties.filter((p) => (p?.whatsappNumber || p?.phone || "").replace(/[^0-9]/g, "").length >= 10);
-    const vips = valid.filter((p) => p.isRegular || (p.visitCount || 0) >= vipThreshold);
+    const vips = isVipActive ? valid.filter((p) => p.isRegular || (p.visitCount || 0) >= vipThreshold) : [];
     return { totalCustomers: valid.length, vipCount: vips.length };
-  }, [parties, vipThreshold]);
+  }, [parties, vipThreshold, isVipActive]);
 
   useEffect(() => {
     if (isActive) {

@@ -183,9 +183,28 @@ router.get("/barcode/:barcode", async (req, res) => {
 
 router.get("/sales-summary", async (req, res) => {
   try {
+    const istDateFormatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const todayStr = istDateFormatter.format(new Date());
+
     const summary = await Invoice.aggregate([
       { $match: { userId: req.user._id } },
       { $unwind: "$items" },
+      {
+        $addFields: {
+          invDateStr: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: { $ifNull: ["$invoiceDate", "$createdAt"] },
+              timezone: "Asia/Kolkata",
+            },
+          },
+        },
+      },
       {
         $group: {
           _id: {
@@ -196,6 +215,16 @@ router.get("/sales-summary", async (req, res) => {
           totalSoldQuantity: { $sum: "$items.quantity" },
           totalRevenue: { $sum: "$items.total" },
           totalParcelQuantity: { $sum: { $ifNull: ["$items.parcelQuantity", 0] } },
+          todaySoldQuantity: {
+            $sum: {
+              $cond: [{ $eq: ["$invDateStr", todayStr] }, "$items.quantity", 0],
+            },
+          },
+          todayRevenue: {
+            $sum: {
+              $cond: [{ $eq: ["$invDateStr", todayStr] }, "$items.total", 0],
+            },
+          },
           invoiceIds: { $addToSet: "$_id" },
           lastSoldAt: { $max: "$createdAt" },
         },
@@ -208,6 +237,8 @@ router.get("/sales-summary", async (req, res) => {
           totalSoldQuantity: 1,
           totalRevenue: 1,
           totalParcelQuantity: 1,
+          todaySoldQuantity: 1,
+          todayRevenue: 1,
           invoiceCount: { $size: "$invoiceIds" },
           lastSoldAt: 1,
         },
@@ -227,6 +258,7 @@ router.get("/sales-summary", async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      todayDate: todayStr,
       summary,
       byItemId,
       byName,

@@ -611,10 +611,11 @@ router.post("/", async (req, res) => {
       }
     }
     if (customer) {
+      const isVipSchemeActive = req.user?.vipSchemeEnabled !== false;
       const vipThreshold = Number(req.user?.vipVisitThreshold) || 3;
-      isRegularCustomer = Boolean(customer.isRegular || ((customer.visitCount || 0) >= vipThreshold));
+      isRegularCustomer = Boolean(customer.isRegular || (isVipSchemeActive && (customer.visitCount || 0) >= vipThreshold));
       const userVipOffer = req.user?.vipOffer || {};
-      const vipOfferEnabled = userVipOffer.enabled !== false;
+      const vipOfferEnabled = isVipSchemeActive && userVipOffer.enabled !== false;
 
       // Check custom individual discount first, fallback to All-VIP Offer
       if (!regularDiscountPercent && isRegularCustomer && applyRegularDiscount) {
@@ -845,8 +846,9 @@ router.post("/", async (req, res) => {
       if (isCredit) {
         customer.balance = (customer.balance || 0) + grandTotal;
       }
+      const isVipSchemeActive = req.user?.vipSchemeEnabled !== false;
       const vipThreshold = req.user?.vipVisitThreshold || 3;
-      if (!customer.isRegular && (customer.visitCount >= vipThreshold || customer.totalSpent >= 5000)) {
+      if (isVipSchemeActive && !customer.isRegular && (customer.visitCount >= vipThreshold || customer.totalSpent >= 5000)) {
         customer.isRegular = true;
       }
       await customer.save();
@@ -1137,7 +1139,8 @@ router.put("/:id", async (req, res) => {
     }
 
     if (customer) {
-      isRegularCustomer = customer.isRegular || ((customer.visitCount || 0) >= (req.user?.vipVisitThreshold || 3));
+      const isVipSchemeActive = req.user?.vipSchemeEnabled !== false;
+      isRegularCustomer = customer.isRegular || (isVipSchemeActive && ((customer.visitCount || 0) >= (req.user?.vipVisitThreshold || 3)));
       if (!regularDiscountPercent && isRegularCustomer) {
         regularDiscountPercent = customer.customDiscountPercent || 0;
       }

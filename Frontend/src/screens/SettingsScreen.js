@@ -32,15 +32,19 @@ import { useResponsive, ResponsiveContainer } from "../utils/responsive";
 export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, onProfileUpdated, initialTab = "profile" }) {
   const { isWide, headerTopPadding } = useResponsive();
   const [activeTab, setActiveTab] = useState(initialTab || "profile");
+  const [vipSchemeEnabled, setVipSchemeEnabled] = useState(user?.vipSchemeEnabled !== false);
   const [vipVisitThreshold, setVipVisitThreshold] = useState(user?.vipVisitThreshold || 3);
   const [vipInputText, setVipInputText] = useState(String(user?.vipVisitThreshold || 3));
   const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {
+    if (user?.vipSchemeEnabled !== undefined) {
+      setVipSchemeEnabled(user.vipSchemeEnabled !== false);
+    }
     if (user?.vipVisitThreshold) {
       setVipVisitThreshold(user.vipVisitThreshold);
       setVipInputText(String(user.vipVisitThreshold));
     }
-  }, [user?.vipVisitThreshold]);
+  }, [user?.vipSchemeEnabled, user?.vipVisitThreshold]);
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab);
@@ -425,6 +429,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
     const thresholdVal = Math.max(1, parseInt(vipInputText || vipVisitThreshold, 10) || 3);
     setVipVisitThreshold(thresholdVal);
     setVipInputText(String(thresholdVal));
+    AsyncStorage.setItem("party_vip_scheme_enabled", String(vipSchemeEnabled)).catch(() => {});
     AsyncStorage.setItem("party_vip_threshold", String(thresholdVal)).catch(() => {});
     const res = await api.auth.updateProfile({
       name: ownerName.trim() || undefined,
@@ -444,6 +449,7 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
       logo: logo || "",
       invoiceStyle,
       thermalPrinterSize: printerSize,
+      vipSchemeEnabled,
       vipVisitThreshold: thresholdVal,
       aggregatorConfig: {
         enabled: aggregatorEnabled,
@@ -885,51 +891,87 @@ export default function SettingsScreen({ user, onOpenDrawer, onBack, onLogout, o
                   Shown on WhatsApp invoice messages and printed bills so customers can find and review your store.
                 </Text>
               </View>
-              <View className="mb-3 pt-2 border-t border-gray-100">
-                <View className="flex-row items-center justify-between mb-1.5">
-                  <Text className="text-xs font-bold text-gray-700">VIP Qualification (Visits)</Text>
-                  <Text className="text-[11px] font-bold text-blue-600">{vipVisitThreshold} Visits</Text>
-                </View>
-                <Text className="text-[11px] text-gray-500 mb-2">
-                  Customers reaching this number of visits are dynamically awarded VIP privileges.
-                </Text>
-                <View className="flex-row items-center gap-2">
-                  {[2, 3, 4, 5].map((threshold) => (
-                    <TouchableOpacity
-                      key={threshold}
-                      onPress={() => {
-                        setVipVisitThreshold(threshold);
-                        setVipInputText(String(threshold));
-                      }}
-                      className={`flex-1 py-2 rounded-xl border items-center ${
-                        vipVisitThreshold === threshold
-                          ? "bg-blue-600 border-blue-600"
-                          : "bg-gray-100 border-gray-200"
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs font-bold ${
-                          vipVisitThreshold === threshold ? "text-white" : "text-gray-700"
-                        }`}
-                      >
-                        {threshold}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                  <TextInput
-                    className="w-14 bg-gray-100 border border-gray-300 rounded-xl py-2 text-center text-xs font-bold text-gray-900"
-                    keyboardType="numeric"
-                    placeholder="Custom"
-                    value={vipInputText}
-                    onChangeText={(txt) => {
-                      const clean = txt.replace(/[^0-9]/g, "");
-                      setVipInputText(clean);
-                      const n = parseInt(clean, 10);
-                      if (!isNaN(n) && n >= 1) setVipVisitThreshold(n);
-                    }}
-                    maxLength={3}
+              <View className="mb-3 pt-3 border-t border-gray-100">
+                <View className="flex-row items-center justify-between mb-2">
+                  <View className="flex-1 mr-3">
+                    <View className="flex-row items-center gap-1.5">
+                      <Ionicons name="ribbon" size={17} color={vipSchemeEnabled ? "#2563EB" : "#94A3B8"} />
+                      <Text className="text-xs font-bold text-gray-800">VIP Club & Loyalty Scheme</Text>
+                      <View className={`px-2 py-0.5 rounded-full ${vipSchemeEnabled ? "bg-emerald-100" : "bg-gray-200"}`}>
+                        <Text className={`text-[10px] font-extrabold ${vipSchemeEnabled ? "text-emerald-800" : "text-gray-600"}`}>
+                          {vipSchemeEnabled ? "ACTIVE" : "OFF"}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text className="text-[11px] text-gray-500 mt-0.5">
+                      {vipSchemeEnabled
+                        ? "Switch off anytime to disable all VIP perks, auto-discounts and VIP tagging across your store."
+                        : "VIP scheme is currently OFF. Diners will not receive VIP status or automatic discounts."}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={vipSchemeEnabled}
+                    onValueChange={setVipSchemeEnabled}
+                    trackColor={{ false: "#CBD5E1", true: "#93C5FD" }}
+                    thumbColor={vipSchemeEnabled ? "#2563EB" : "#F1F5F9"}
                   />
                 </View>
+
+                {vipSchemeEnabled ? (
+                  <View className="mt-2 pt-2.5 border-t border-blue-100 bg-blue-50/50 p-3 rounded-xl border border-blue-200">
+                    <View className="flex-row items-center justify-between mb-1">
+                      <Text className="text-xs font-bold text-gray-700">VIP Qualification (Visits)</Text>
+                      <Text className="text-[11px] font-bold text-blue-600">{vipVisitThreshold} Visits</Text>
+                    </View>
+                    <Text className="text-[11px] text-gray-500 mb-2">
+                      Customers reaching this visit count are automatically awarded VIP privileges.
+                    </Text>
+                    <View className="flex-row items-center gap-2">
+                      {[2, 3, 4, 5].map((threshold) => (
+                        <TouchableOpacity
+                          key={threshold}
+                          onPress={() => {
+                            setVipVisitThreshold(threshold);
+                            setVipInputText(String(threshold));
+                          }}
+                          className={`flex-1 py-2 rounded-xl border items-center ${
+                            vipVisitThreshold === threshold
+                              ? "bg-blue-600 border-blue-600 shadow-xs"
+                              : "bg-white border-gray-300"
+                          }`}
+                        >
+                          <Text
+                            className={`text-xs font-bold ${
+                              vipVisitThreshold === threshold ? "text-white" : "text-gray-700"
+                            }`}
+                          >
+                            {threshold}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TextInput
+                        className="w-14 bg-white border border-gray-300 rounded-xl py-2 text-center text-xs font-bold text-gray-900"
+                        keyboardType="numeric"
+                        placeholder="Custom"
+                        value={vipInputText}
+                        onChangeText={(txt) => {
+                          const clean = txt.replace(/[^0-9]/g, "");
+                          setVipInputText(clean);
+                          const n = parseInt(clean, 10);
+                          if (!isNaN(n) && n >= 1) setVipVisitThreshold(n);
+                        }}
+                        maxLength={3}
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <View className="mt-1 p-2.5 bg-gray-50 rounded-xl border border-gray-200 flex-row items-center">
+                    <Ionicons name="information-circle-outline" size={17} color="#64748B" />
+                    <Text className="text-[11px] text-gray-600 ml-1.5 flex-1 font-medium">
+                      VIP Scheme is switched off. Diners will not receive VIP discounts at checkout.
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
             <TouchableOpacity
