@@ -28,6 +28,7 @@ import { useResponsive, ResponsiveContainer } from "../utils/responsive";
 
 export default function PartyScreen({ user, isActive = true, onProfileUpdated, onOpenDrawer, onBack }) {
   const { isWide, gridColumns, headerTopPadding } = useResponsive();
+  const isVipSchemeActive = user?.vipSchemeEnabled !== false;
   const [parties, setParties] = useState(() => getMemoryCachedData("parties_all") || []);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -499,11 +500,11 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
     );
   };
   const displayedParties = React.useMemo(() => {
-    if (filterType === "vip") {
+    if (isVipSchemeActive && filterType === "vip") {
       return parties.filter((p) => p.isRegular || (p.visitCount || 0) >= vipVisitThreshold);
     }
     return parties;
-  }, [parties, filterType, vipVisitThreshold]);
+  }, [parties, filterType, vipVisitThreshold, isVipSchemeActive]);
   const vipCount = parties.filter((p) => p.isRegular || (p.visitCount || 0) >= vipVisitThreshold).length;
   const visitLabel = (count) => {
     if (!count || count === 0) return "New Customer";
@@ -587,7 +588,7 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
               </>
             )}
           </TouchableOpacity>
-          {vipCount > 0 ? (
+          {isVipSchemeActive && vipCount > 0 ? (
             <TouchableOpacity
               onPress={handleBulkVipOffer}
               disabled={bulkSending}
@@ -622,87 +623,89 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
         </View>
         </ResponsiveContainer>
       </View>
-      <View className="bg-white border-b border-gray-200 px-3 py-2">
-        <ResponsiveContainer maxWidth={1200}>
-        <View className="flex-row items-center justify-between flex-wrap gap-2 mb-1">
-          <View className="flex-row">
-            {[
-              { key: "all", label: "All Customers" },
-              { key: "vip", label: "VIP Only" },
-            ].map((t) => (
-              <TouchableOpacity
-                key={t.key}
-                onPress={() => setFilterType(t.key)}
-                className={`px-3 py-1.5 rounded-full mr-2 ${
-                  filterType === t.key ? "bg-blue-600" : "bg-gray-100"
-                }`}
-              >
-                <Text
-                  className={`text-xs font-bold ${
-                    filterType === t.key ? "text-white" : "text-gray-600"
+      {isVipSchemeActive ? (
+        <View className="bg-white border-b border-gray-200 px-3 py-2">
+          <ResponsiveContainer maxWidth={1200}>
+          <View className="flex-row items-center justify-between flex-wrap gap-2 mb-1">
+            <View className="flex-row">
+              {[
+                { key: "all", label: "All Customers" },
+                { key: "vip", label: "VIP Only" },
+              ].map((t) => (
+                <TouchableOpacity
+                  key={t.key}
+                  onPress={() => setFilterType(t.key)}
+                  className={`px-3 py-1.5 rounded-full mr-2 ${
+                    filterType === t.key ? "bg-blue-600" : "bg-gray-100"
                   }`}
                 >
-                  {t.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View className="flex-row items-center flex-wrap gap-1">
-            <Text className="text-[11px] font-bold text-gray-500 mr-1">VIP Criteria (visits ≥):</Text>
-            {[2, 3, 5].map((threshold) => (
-              <TouchableOpacity
-                key={threshold}
-                onPress={() => updateVipThreshold(threshold)}
-                className={`px-2 py-1 rounded-md border ${
-                  vipVisitThreshold === threshold
-                    ? "bg-amber-100 border-amber-400"
-                    : "bg-gray-50 border-gray-200"
-                }`}
-              >
-                <Text
-                  className={`text-[10px] font-bold ${
-                    vipVisitThreshold === threshold ? "text-amber-800" : "text-gray-600"
+                  <Text
+                    className={`text-xs font-bold ${
+                      filterType === t.key ? "text-white" : "text-gray-600"
+                    }`}
+                  >
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View className="flex-row items-center flex-wrap gap-1">
+              <Text className="text-[11px] font-bold text-gray-500 mr-1">VIP Criteria (visits ≥):</Text>
+              {[2, 3, 5].map((threshold) => (
+                <TouchableOpacity
+                  key={threshold}
+                  onPress={() => updateVipThreshold(threshold)}
+                  className={`px-2 py-1 rounded-md border ${
+                    vipVisitThreshold === threshold
+                      ? "bg-amber-100 border-amber-400"
+                      : "bg-gray-50 border-gray-200"
                   }`}
                 >
-                  {threshold}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <View className="flex-row items-center bg-gray-100 border border-gray-300 rounded-lg px-1.5 py-0.5 ml-1">
-              <TextInput
-                style={{ width: 42, height: 26, paddingVertical: 0, textAlign: "center", fontSize: 12, fontWeight: "700", color: "#1F2937" }}
-                keyboardType="numeric"
-                value={vipInputText}
-                onChangeText={(txt) => {
-                  const clean = txt.replace(/[^0-9]/g, "");
-                  setVipInputText(clean);
-                }}
-                onSubmitEditing={() => {
-                  Keyboard.dismiss();
-                  updateVipThreshold(vipInputText || 3, true);
-                }}
-                maxLength={3}
-                placeholder="3"
-                placeholderTextColor="#9CA3AF"
-                returnKeyType="done"
-              />
-              <TouchableOpacity
-                onPress={() => {
-                  Keyboard.dismiss();
-                  updateVipThreshold(vipInputText || 3, true);
-                }}
-                disabled={savingVipThreshold}
-                className="bg-amber-500 px-2 py-1 rounded ml-1"
-              >
-                <Text className="text-[10px] font-extrabold text-white">
-                  {savingVipThreshold ? "..." : "Set"}
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    className={`text-[10px] font-bold ${
+                      vipVisitThreshold === threshold ? "text-amber-800" : "text-gray-600"
+                    }`}
+                  >
+                    {threshold}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <View className="flex-row items-center bg-gray-100 border border-gray-300 rounded-lg px-1.5 py-0.5 ml-1">
+                <TextInput
+                  style={{ width: 42, height: 26, paddingVertical: 0, textAlign: "center", fontSize: 12, fontWeight: "700", color: "#1F2937" }}
+                  keyboardType="numeric"
+                  value={vipInputText}
+                  onChangeText={(txt) => {
+                    const clean = txt.replace(/[^0-9]/g, "");
+                    setVipInputText(clean);
+                  }}
+                  onSubmitEditing={() => {
+                    Keyboard.dismiss();
+                    updateVipThreshold(vipInputText || 3, true);
+                  }}
+                  maxLength={3}
+                  placeholder="3"
+                  placeholderTextColor="#9CA3AF"
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    updateVipThreshold(vipInputText || 3, true);
+                  }}
+                  disabled={savingVipThreshold}
+                  className="bg-amber-500 px-2 py-1 rounded ml-1"
+                >
+                  <Text className="text-[10px] font-extrabold text-white">
+                    {savingVipThreshold ? "..." : "Set"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
+          </ResponsiveContainer>
         </View>
-        </ResponsiveContainer>
-      </View>
+      ) : null}
       <View className="bg-blue-50 border-b border-blue-100 px-4 py-2">
         <ResponsiveContainer maxWidth={1200}>
           <Text className="text-[11px] text-blue-700 font-medium">
@@ -749,7 +752,7 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
           }
           renderItem={({ item }) => {
             if (!item) return null;
-            const isVip = Boolean(item.isRegular || (item.visitCount || 0) >= vipVisitThreshold);
+            const isVip = isVipSchemeActive && Boolean(item.isRegular || (item.visitCount || 0) >= vipVisitThreshold);
             return (
               <View
                 style={gridColumns > 1 ? { flex: 1, maxWidth: `${100 / gridColumns - 1}%` } : undefined}

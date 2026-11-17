@@ -64,7 +64,7 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
   const [activeTab, setActiveTab] = useState("menu");
 
   const [items, setItems] = useState(() => getMemoryCachedData("items_all") || []);
-  const [salesSummary, setSalesSummary] = useState({ byItemId: {}, byName: {} });
+  const [salesSummary, setSalesSummary] = useState(() => getMemoryCachedData("items_sales_summary") || { byItemId: {}, byName: {} });
   const [selectedStatsItem, setSelectedStatsItem] = useState(null);
   const [statsModalVisible, setStatsModalVisible] = useState(false);
   const [itemStatsData, setItemStatsData] = useState(null);
@@ -77,7 +77,10 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
   const [editingItem, setEditingItem] = useState(null);
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
-  const [categories, setCategories] = useState(() => getMemoryCachedData("items_categories") || ["General"]);
+  const [categories, setCategories] = useState(() => {
+    const cached = getMemoryCachedData("items_categories") || ["General"];
+    return Array.from(new Set(["General", ...cached.filter(Boolean)]));
+  });
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
@@ -184,25 +187,28 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
           setCachedData("items_all", sorted);
         }
       }
-
-      // Live sales summary for real-time "Sold Today" badges & analytics
-      api.items
-        .getSalesSummary()
-        .then((sRes) => {
-          if (sRes && sRes.success) {
-            setSalesSummary({
-              byItemId: sRes.byItemId || {},
-              byName: sRes.byName || {},
-            });
-          }
-        })
-        .catch(() => {});
     } catch (e) {
       console.warn("loadItems warning:", e.message);
     } finally {
       setLoading(false);
     }
   }, [search, selectedCategory, filterLowStock]);
+
+  const loadSalesSummary = useCallback(async () => {
+    try {
+      const sRes = await api.items.getSalesSummary();
+      if (sRes && sRes.success) {
+        const payload = {
+          byItemId: sRes.byItemId || {},
+          byName: sRes.byName || {},
+        };
+        setSalesSummary(payload);
+        setCachedData("items_sales_summary", payload);
+      }
+    } catch (e) {
+      console.warn("loadSalesSummary error:", e.message);
+    }
+  }, []);
 
   const loadTransfers = async () => {
     setTransfersLoading(true);
@@ -243,9 +249,9 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
       const res = await api.items.getCategories();
       if (res.success && Array.isArray(res.categories)) {
         const normalized = res.categories.map((c) =>
-          typeof c === "string" ? c : c.name || "General"
+          typeof c === "string" ? c.trim() : (c.name || "General").trim()
         );
-        const unique = ["General", ...new Set(normalized.filter(Boolean))];
+        const unique = Array.from(new Set(["General", ...normalized.filter(Boolean)]));
         setCategories(unique);
         setCachedData("items_categories", unique);
       }
@@ -293,10 +299,11 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
     if (isActive) {
       loadItems();
       loadCategories();
+      loadSalesSummary();
       if (activeTab === "transfers") loadTransfers();
       if (activeTab === "po") loadPurchaseOrders();
     }
-  }, [isActive, loadItems, activeTab]);
+  }, [isActive, loadItems, loadSalesSummary, activeTab]);
 
   // ── Quick Channel Availability Toggle ──
   const handleToggleChannel = async (item, channel) => {
@@ -772,7 +779,7 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: isWide ? 20 : 12, paddingBottom: 120, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={loading || transfersLoading || poLoading} onRefresh={() => { loadItems(); if (activeTab === "transfers") loadTransfers(); if (activeTab === "po") loadPurchaseOrders(); }} />}
+        refreshControl={<RefreshControl refreshing={loading || transfersLoading || poLoading} onRefresh={() => { loadItems(); loadCategories(); loadSalesSummary(); if (activeTab === "transfers") loadTransfers(); if (activeTab === "po") loadPurchaseOrders(); }} />}
       >
         <ResponsiveContainer maxWidth={1200}>
           {/* ═══════════════════════════════════════════════════════════════ */}
@@ -813,7 +820,7 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                   </TouchableOpacity>
                 </View>
               ) : (
-                <View className="flex-row flex-wrap justify-between gap-y-3">
+                <View className={isWide ? "flex-row flex-wrap justify-between gap-y-3" : "flex-col gap-y-3"}>
                   {displayedItems.map((item) => {
                     const soldData =
                       salesSummary.byItemId?.[item._id] ||

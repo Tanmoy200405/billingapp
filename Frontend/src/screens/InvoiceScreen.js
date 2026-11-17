@@ -14,6 +14,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Keyboard,
+  BackHandler,
 } from "react-native";
 import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { api } from "../config/api";
@@ -204,6 +205,86 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       setCurrentStep("invoice");
     }
   }, [editingInvoice]);
+
+  // Handle Android hardware back press cleanly
+  useEffect(() => {
+    const handleHardwareBack = () => {
+      // 1. If any modal is open, close modal
+      if (showReceiptModal) {
+        setShowReceiptModal(false);
+        if (onInvoiceSaved) onInvoiceSaved();
+        onBack();
+        return true;
+      }
+      if (showDynamicQrModal) {
+        setShowDynamicQrModal(false);
+        return true;
+      }
+      if (showPartyModal) {
+        setShowPartyModal(false);
+        return true;
+      }
+      if (showHoldModal) {
+        setShowHoldModal(false);
+        return true;
+      }
+      if (showParcelModal) {
+        setShowParcelModal(false);
+        return true;
+      }
+      if (showQuickItemModal) {
+        setShowQuickItemModal(false);
+        return true;
+      }
+      if (showTablePicker) {
+        setShowTablePicker(false);
+        return true;
+      }
+
+      // 2. If on "Finalize Invoice" step on mobile, step back to "Select Items" with selected items intact!
+      if (!isWide && currentStep === "invoice") {
+        setCurrentStep("items");
+        return true;
+      }
+
+      // 3. If on "items" step and cart has items, confirm before discarding
+      if (cart.length > 0) {
+        Alert.alert(
+          "Discard Bill?",
+          "You have selected items in this bill. Do you want to discard them and return to dashboard?",
+          [
+            { text: "Keep Editing", style: "cancel" },
+            {
+              text: "Discard & Exit",
+              style: "destructive",
+              onPress: () => onBack(),
+            },
+          ]
+        );
+        return true;
+      }
+
+      // 4. Cart is empty, navigate back to dashboard
+      onBack();
+      return true;
+    };
+
+    const backSub = BackHandler.addEventListener("hardwareBackPress", handleHardwareBack);
+    return () => backSub.remove();
+  }, [
+    isWide,
+    currentStep,
+    cart.length,
+    showReceiptModal,
+    showDynamicQrModal,
+    showPartyModal,
+    showHoldModal,
+    showParcelModal,
+    showQuickItemModal,
+    showTablePicker,
+    onBack,
+    onInvoiceSaved,
+  ]);
 
   const loadBillFormat = async () => {
     try {

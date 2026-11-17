@@ -66,6 +66,7 @@ export default function TableScreen({
   isActive = true,
   onOpenDrawer,
   onStartTableOrder,
+  onStartOrder,
 }) {
   const { isWide, headerTopPadding } = useResponsive();
 
@@ -166,8 +167,9 @@ export default function TableScreen({
 
   const handleStartOrderFromTable = (table) => {
     setActiveTable(null);
-    if (onStartTableOrder) {
-      onStartTableOrder(table);
+    const startFn = onStartTableOrder || onStartOrder;
+    if (startFn) {
+      startFn(table);
     }
   };
 
@@ -619,8 +621,16 @@ export default function TableScreen({
           animationType="slide"
           onRequestClose={() => setActiveTable(null)}
         >
-          <View className="flex-1 bg-black/50 justify-end">
-            <View className="bg-white rounded-t-3xl p-6 shadow-2xl max-w-lg mx-auto w-full">
+          <View style={{ flex: 1, backgroundColor: "rgba(0, 0, 0, 0.55)", justifyContent: "flex-end" }}>
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setActiveTable(null)}
+              style={{ flex: 1 }}
+            />
+            <View
+              style={{ width: "100%", maxWidth: 520, alignSelf: "center" }}
+              className="bg-white rounded-t-3xl p-6 shadow-2xl"
+            >
               {/* Modal Header */}
               <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
                 <View className="flex-row items-center">
@@ -632,7 +642,7 @@ export default function TableScreen({
                       Table {activeTable.tableNo}
                     </Text>
                     <Text className="text-xs font-semibold text-slate-500">
-                      {activeTable.areaId?.name || activeTable.areaName} • {activeTable.capacity} Seats
+                      {activeTable.areaId?.name || activeTable.areaName || "General Area"} • {activeTable.capacity || 4} Seats
                     </Text>
                   </View>
                 </View>
@@ -792,8 +802,8 @@ export default function TableScreen({
           animationType="fade"
           onRequestClose={() => setShowTransferModal(false)}
         >
-          <View className="flex-1 bg-black/60 items-center justify-center p-4">
-            <View className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl">
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "center", padding: 16 }}>
+            <View style={{ width: "100%", maxWidth: 384, alignSelf: "center" }} className="bg-white rounded-3xl p-6 shadow-2xl">
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-lg font-black text-slate-900">
                   Transfer Order
@@ -881,8 +891,8 @@ export default function TableScreen({
           animationType="fade"
           onRequestClose={() => setShowReserveModal(false)}
         >
-          <View className="flex-1 bg-black/60 items-center justify-center p-4">
-            <View className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl">
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "center", padding: 16 }}>
+            <View style={{ width: "100%", maxWidth: 384, alignSelf: "center" }} className="bg-white rounded-3xl p-6 shadow-2xl">
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-lg font-black text-slate-900">
                   Reserve Table {activeTable.tableNo}
@@ -954,8 +964,8 @@ export default function TableScreen({
           animationType="fade"
           onRequestClose={() => setShowTableModal(false)}
         >
-          <View className="flex-1 bg-black/60 items-center justify-center p-4">
-            <View className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl">
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "center", padding: 16 }}>
+            <View style={{ width: "100%", maxWidth: 384, alignSelf: "center" }} className="bg-white rounded-3xl p-6 shadow-2xl">
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-lg font-black text-slate-900">
                   {editingTable ? "Edit Table" : "Add New Table"}
@@ -1055,8 +1065,8 @@ export default function TableScreen({
           animationType="fade"
           onRequestClose={() => setShowAreaModal(false)}
         >
-          <View className="flex-1 bg-black/60 items-center justify-center p-4">
-            <View className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl">
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "center", padding: 16 }}>
+            <View style={{ width: "100%", maxWidth: 384, alignSelf: "center" }} className="bg-white rounded-3xl p-6 shadow-2xl">
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-lg font-black text-slate-900">
                   {editingArea ? "Edit Dine-in Area" : "Add Dine-in Area"}

@@ -153,7 +153,7 @@ const request = async (endpoint, options = {}) => {
     ...options.headers,
   };
 
-  const executeFetch = async () => {
+  const executeFetchWithRetry = async (retriesLeft = 2) => {
     const timeoutMs =
       endpoint.includes("import") || endpoint.includes("pdf") || endpoint.includes("whatsapp")
         ? 45000
@@ -199,12 +199,32 @@ const request = async (endpoint, options = {}) => {
 
       return data;
     } catch (error) {
+      const isNetworkOrConnectError =
+        error?.name !== "AbortError" &&
+        (String(error?.message || "").includes("Failed to connect") ||
+         String(error?.message || "").includes("ConnectException") ||
+         String(error?.message || "").includes("Network request failed") ||
+         String(error?.message || "").includes("ECONNREFUSED") ||
+         String(error?.message || "").includes("ENETUNREACH"));
+
+      if (retriesLeft > 0 && isNetworkOrConnectError) {
+        if (timeoutId) clearTimeout(timeoutId);
+        // Wait 600ms before retrying transient network hiccup
+        await new Promise((r) => setTimeout(r, 600));
+        return executeFetchWithRetry(retriesLeft - 1);
+      }
+
+      let userMsg = error?.name === "AbortError"
+        ? "Request timed out. Please check your connection."
+        : error?.message || "Network connection error";
+
+      if (isNetworkOrConnectError) {
+        userMsg = "Unable to connect to server. Please check your internet connection.";
+      }
+
       return {
         success: false,
-        message:
-          error?.name === "AbortError"
-            ? "Request timed out. Please check your connection."
-            : error.message || "Network connection error",
+        message: userMsg,
       };
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
@@ -213,12 +233,12 @@ const request = async (endpoint, options = {}) => {
   };
 
   if (useCache) {
-    const pendingPromise = executeFetch();
+    const pendingPromise = executeFetchWithRetry();
     inFlightGets.set(url, pendingPromise);
     return pendingPromise;
   }
 
-  return executeFetch();
+  return executeFetchWithRetry();
 };
 
 export const prefetchCoreData = async () => {

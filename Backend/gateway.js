@@ -112,12 +112,12 @@ const server = http.createServer(async (req, res) => {
       "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
     return sendJson(res, 200, {
       success: true,
-      latestVersion: process.env.APP_LATEST_VERSION || "1.2.1",
+      latestVersion: process.env.APP_LATEST_VERSION || "1.2.2",
       minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
       apkUrl: process.env.APP_APK_URL || defaultApkUrl,
       releaseNotes:
         process.env.APP_RELEASE_NOTES ||
-        "Version 1.2.1: Settings toggle to switch VIP Scheme ON/OFF, real-time Sells Today product sales count in inventory, and instant daily sales analytics.",
+        "Version 1.2.2: Fix table click black screen, disable predefined tables, deduplicate inventory categories, optimize sales today performance, hide VIP when disabled, and fix finalize bill back navigation.",
       forceUpdate: false,
       timestamp: new Date().toISOString(),
     });

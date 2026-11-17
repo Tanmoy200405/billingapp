@@ -370,6 +370,11 @@ export default function App() {
                           setTableForInvoice(table);
                           setIsCreatingInvoice(true);
                         }}
+                        onStartTableOrder={(table) => {
+                          setEditingInvoice(null);
+                          setTableForInvoice(table);
+                          setIsCreatingInvoice(true);
+                        }}
                         onOpenInvoice={(invoiceId) => {
                           api.invoices.getById(invoiceId).then((res) => {
                             if (res?.success && res.invoice) {

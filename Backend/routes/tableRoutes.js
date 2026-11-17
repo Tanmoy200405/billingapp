@@ -7,39 +7,11 @@ import { protect } from "../middleware/authMiddleware.js";
 const router = express.Router();
 router.use(protect);
 
-const DEFAULT_AREAS = [
-  { name: "Main Dining", code: "MAIN", serviceChargeRate: 0, color: "#2563EB", sortOrder: 1 },
-  { name: "AC Hall", code: "AC", serviceChargeRate: 5, color: "#059669", sortOrder: 2 },
-  { name: "Rooftop Garden", code: "ROOF", serviceChargeRate: 5, color: "#7C3AED", sortOrder: 3 },
-];
-
+// Predefined tables are intentionally disabled per user specification.
+// Users create their own custom dining areas and tables from scratch.
 async function ensureDefaultAreasAndTables(userId) {
-  let areas = await Area.find({ userId }).sort({ sortOrder: 1 }).lean();
-  if (!areas || areas.length === 0) {
-    const toInsert = DEFAULT_AREAS.map((a) => ({ ...a, userId }));
-    const insertedAreas = await Area.insertMany(toInsert);
-    areas = insertedAreas.map((a) => a.toObject());
-
-    // Also seed default tables for these areas
-    const mainArea = areas.find((a) => a.name === "Main Dining") || areas[0];
-    const acArea = areas.find((a) => a.name === "AC Hall") || areas[1] || areas[0];
-    const roofArea = areas.find((a) => a.name === "Rooftop Garden") || areas[2] || areas[0];
-
-    const initialTables = [
-      { tableNo: "T-01", areaId: mainArea._id, areaName: mainArea.name, capacity: 4, sortOrder: 1 },
-      { tableNo: "T-02", areaId: mainArea._id, areaName: mainArea.name, capacity: 4, sortOrder: 2 },
-      { tableNo: "T-03", areaId: mainArea._id, areaName: mainArea.name, capacity: 2, sortOrder: 3 },
-      { tableNo: "T-04", areaId: mainArea._id, areaName: mainArea.name, capacity: 6, sortOrder: 4 },
-      { tableNo: "AC-01", areaId: acArea._id, areaName: acArea.name, capacity: 4, sortOrder: 5 },
-      { tableNo: "AC-02", areaId: acArea._id, areaName: acArea.name, capacity: 6, sortOrder: 6 },
-      { tableNo: "AC-03", areaId: acArea._id, areaName: acArea.name, capacity: 8, sortOrder: 7 },
-      { tableNo: "R-01", areaId: roofArea._id, areaName: roofArea.name, capacity: 4, sortOrder: 8 },
-      { tableNo: "R-02", areaId: roofArea._id, areaName: roofArea.name, capacity: 6, sortOrder: 9 },
-    ].map((t) => ({ ...t, userId, status: "AVAILABLE" }));
-
-    await Table.insertMany(initialTables);
-  }
-  return areas;
+  const areas = await Area.find({ userId }).sort({ sortOrder: 1 }).lean();
+  return areas || [];
 }
 
 // ─────────────────────────────────────────────────────────────

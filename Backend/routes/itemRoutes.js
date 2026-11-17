@@ -181,8 +181,20 @@ router.get("/barcode/:barcode", async (req, res) => {
   }
 });
 
+const salesSummaryCache = new Map();
+export const invalidateSalesSummaryCache = (userId) => {
+  if (userId) salesSummaryCache.delete(String(userId));
+  else salesSummaryCache.clear();
+};
+
 router.get("/sales-summary", async (req, res) => {
   try {
+    const userIdStr = String(req.user._id);
+    const cached = salesSummaryCache.get(userIdStr);
+    if (cached && Date.now() - cached.timestamp < 30000) {
+      return res.status(200).json(cached.data);
+    }
+
     const istDateFormatter = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Kolkata",
       year: "numeric",
@@ -256,13 +268,20 @@ router.get("/sales-summary", async (req, res) => {
       }
     }
 
-    return res.status(200).json({
+    const responsePayload = {
       success: true,
       todayDate: todayStr,
       summary,
       byItemId,
       byName,
+    };
+
+    salesSummaryCache.set(userIdStr, {
+      timestamp: Date.now(),
+      data: responsePayload,
     });
+
+    return res.status(200).json(responsePayload);
   } catch (error) {
     return res.status(500).json({
       success: false,
