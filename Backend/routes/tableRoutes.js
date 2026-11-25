@@ -7,9 +7,31 @@ import { protect } from "../middleware/authMiddleware.js";
 const router = express.Router();
 router.use(protect);
 
-// Predefined tables are intentionally disabled per user specification.
+// Predefined tables are intentionally disabled and legacy seeded ones are purged per user specification.
 // Users create their own custom dining areas and tables from scratch.
+const LEGACY_PREDEFINED_TABLES = ["T-01", "T-02", "T-03", "T-04", "AC-01", "AC-02", "AC-03", "R-01", "R-02"];
+const LEGACY_PREDEFINED_AREAS = ["Main Dining", "AC Hall", "Rooftop Garden"];
+
 async function ensureDefaultAreasAndTables(userId) {
+  try {
+    // Purge any unoccupied legacy seeded tables/areas so user has a clean slate
+    await Table.deleteMany({
+      userId,
+      tableNo: { $in: LEGACY_PREDEFINED_TABLES },
+      status: { $nin: ["OCCUPIED", "BILLED"] },
+    });
+    // Check if any tables remain in those legacy areas before deleting areas
+    for (const areaName of LEGACY_PREDEFINED_AREAS) {
+      const area = await Area.findOne({ userId, name: areaName });
+      if (area) {
+        const remainingInArea = await Table.countDocuments({ userId, areaId: area._id });
+        if (remainingInArea === 0) {
+          await Area.deleteOne({ _id: area._id, userId });
+        }
+      }
+    }
+  } catch {}
+
   const areas = await Area.find({ userId }).sort({ sortOrder: 1 }).lean();
   return areas || [];
 }

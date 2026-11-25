@@ -417,11 +417,13 @@ export default function App() {
 
                   {visitedTabs.reports && (
                     <View style={{ flex: 1, display: activeTab === "reports" ? "flex" : "none" }}>
-                      <ReportsScreen
-                        isActive={activeTab === "reports" && !isCreatingInvoice}
-                        onOpenDrawer={() => setDrawerVisible(true)}
-                        onBack={() => navigateTab("dashboard")}
-                      />
+                      <ErrorBoundary>
+                        <ReportsScreen
+                          isActive={activeTab === "reports" && !isCreatingInvoice}
+                          onOpenDrawer={() => setDrawerVisible(true)}
+                          onBack={() => navigateTab("dashboard")}
+                        />
+                      </ErrorBoundary>
                     </View>
                   )}
 

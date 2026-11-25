@@ -11,6 +11,8 @@ import {
   isSnsSmsEnabled,
   isSesConfigured,
   sendEmailViaSes,
+  renderOtpEmailHtml,
+  renderLoginAlertEmailHtml,
 } from "../services/awsMessagingService.js";
 const router = express.Router();
 const generateToken = (id) => {
@@ -121,18 +123,7 @@ async function sendOtpChannels({ cleanPhone, targetEmail, code, channel = "whats
       to: targetEmail,
       subject: `${title} (OTP)`,
       text: `${introText}: ${code}. Valid for 10 minutes. Do not share this code. — Bistromate`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; background: #FFFFFF;">
-          <h2 style="color: #10353B; margin-top: 0; font-size: 22px;">Bistromate</h2>
-          <p style="color: #2563EB; font-weight: bold; margin-bottom: 16px;">${title}</p>
-          <p style="color: #334155;">${introText}:</p>
-          <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 14px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #1E40AF;">
-            ${code}
-          </div>
-          <p style="color: #64748B; font-size: 12px; margin-top: 16px;">Valid for 10 minutes. Do not share this code with anyone.</p>
-          <p style="color: #94A3B8; font-size: 11px; margin-top: 12px; border-top: 1px solid #F1F5F9; pt-2;">— Bistromate • Your Kitchen's Smart Partner</p>
-        </div>
-      `,
+      html: renderOtpEmailHtml({ title, introText, code }),
     }).catch(() => null);
     if (emailRes?.sent) sentViaEmail = true;
   }
@@ -193,15 +184,7 @@ async function dispatchLoginNotifications(user) {
       to: user.email,
       subject: `Bistromate Login Confirmation - ${storeName}`,
       text: `Hi ${ownerName}, your Bistromate account (${storeName}) just logged in at ${loginTime}. If this was not you, please reset your password immediately.`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; background: #FFFFFF;">
-          <h2 style="color: #10353B; margin-top: 0;">Bistromate Login Alert</h2>
-          <p style="color: #334155;">Hi <strong>${ownerName}</strong>,</p>
-          <p style="color: #334155;">Your store account <strong>${storeName}</strong> was accessed on <strong>${loginTime}</strong>.</p>
-          <p style="color: #64748B; font-size: 12px; margin-top: 20px;">If this wasn't you, please update your password immediately inside Settings.</p>
-          <p style="color: #94A3B8; font-size: 11px; margin-top: 14px; border-top: 1px solid #F1F5F9; padding-top: 8px;">— Bistromate • Your Kitchen's Smart Partner</p>
-        </div>
-      `,
+      html: renderLoginAlertEmailHtml({ ownerName, storeName, loginTime }),
     }).catch(() => {});
   }
 }

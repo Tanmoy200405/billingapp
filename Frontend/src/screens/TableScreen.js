@@ -431,8 +431,8 @@ export default function TableScreen({
             onPress={openAddTable}
             className="bg-emerald-600 px-3 py-1.5 rounded-xl flex-row items-center shadow-sm"
           >
-            <Ionicons name="add" size={16} color="#FFFFFF" />
-            <Text className="text-white font-bold text-xs ml-1">+ Table</Text>
+            <Ionicons name="add-circle" size={16} color="#FFFFFF" />
+            <Text className="text-white font-bold text-xs ml-1.5">Add Table</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -495,8 +495,8 @@ export default function TableScreen({
             onPress={openAddArea}
             className="px-3 py-1.5 rounded-full border border-dashed border-blue-400 bg-blue-50/50 flex-row items-center mr-2"
           >
-            <Ionicons name="add" size={14} color="#2563EB" />
-            <Text className="text-xs font-bold text-blue-600 ml-1">+ Area</Text>
+            <Ionicons name="add-circle-outline" size={14} color="#2563EB" />
+            <Text className="text-xs font-bold text-blue-600 ml-1.5">Add Area</Text>
           </TouchableOpacity>
 
           {tables.length > 0 && (

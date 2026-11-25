@@ -18,6 +18,28 @@ import { getCachedData, setCachedData, getMemoryCachedData } from "../utils/loca
 import { useResponsive, ResponsiveContainer } from "../utils/responsive";
 import { REPORTS_CATALOG, REPORT_CATEGORIES } from "../data/reportsCatalog";
 
+function formatInr(val) {
+  const n = Math.round(Number(val) || 0);
+  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function formatSafeDate(val) {
+  if (!val) return "";
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return "";
+    const day = String(d.getDate()).padStart(2, "0");
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    return `${day} ${month} ${year}, ${hours}:${minutes}`;
+  } catch {
+    return String(val);
+  }
+}
+
 export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack }) {
   const { isWide, headerTopPadding } = useResponsive();
   
@@ -344,7 +366,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                     <Ionicons name="cash-outline" size={16} color="#2563EB" />
                   </View>
                   <Text className="text-xl font-black text-slate-900 mt-1">
-                    Rs. {Number(salesData?.summary?.totalSales || 0).toLocaleString("en-IN")}
+                    Rs. {formatInr(salesData?.summary?.totalSales)}
                   </Text>
                   <Text className="text-[10px] text-slate-400 mt-0.5">
                     {salesData?.summary?.totalBills || 0} Bills Generated
@@ -357,7 +379,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                     <Ionicons name="pricetag-outline" size={16} color="#059669" />
                   </View>
                   <Text className="text-xl font-black text-emerald-600 mt-1">
-                    Rs. {Number(salesData?.summary?.totalDiscount || 0).toLocaleString("en-IN")}
+                    Rs. {formatInr(salesData?.summary?.totalDiscount)}
                   </Text>
                   <Text className="text-[10px] text-slate-400 mt-0.5">
                     Diner Savings Given
@@ -370,19 +392,19 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                 <View className="flex-1 bg-emerald-50/80 p-3 rounded-xl border border-emerald-200">
                   <Text className="text-[10px] font-bold text-emerald-800">Cash Collected</Text>
                   <Text className="text-sm font-black text-emerald-950 mt-0.5">
-                    Rs. {Number(salesData?.summary?.totalCash || 0).toLocaleString("en-IN")}
+                    Rs. {formatInr(salesData?.summary?.totalCash)}
                   </Text>
                 </View>
                 <View className="flex-1 bg-blue-50/80 p-3 rounded-xl border border-blue-200">
                   <Text className="text-[10px] font-bold text-blue-800">UPI Received</Text>
                   <Text className="text-sm font-black text-blue-950 mt-0.5">
-                    Rs. {Number(salesData?.summary?.totalUpi || 0).toLocaleString("en-IN")}
+                    Rs. {formatInr(salesData?.summary?.totalUpi)}
                   </Text>
                 </View>
                 <View className="flex-1 bg-slate-100 p-3 rounded-xl border border-slate-300">
                   <Text className="text-[10px] font-bold text-slate-700">GST Collected</Text>
                   <Text className="text-sm font-black text-slate-900 mt-0.5">
-                    Rs. {Number(salesData?.summary?.totalTax || 0).toLocaleString("en-IN")}
+                    Rs. {formatInr(salesData?.summary?.totalTax)}
                   </Text>
                 </View>
               </View>
@@ -396,7 +418,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   <View className="flex-1 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                     <Text className="text-[10px] font-bold text-slate-600">Dine-in / Counter</Text>
                     <Text className="text-sm font-black text-slate-900 mt-0.5">
-                      Rs. {Number(salesData?.summary?.totalCounter || 0).toLocaleString("en-IN")}
+                      Rs. {formatInr(salesData?.summary?.totalCounter)}
                     </Text>
                     <Text className="text-[10px] text-slate-400">
                       {salesData?.summary?.counterOrders || 0} orders
@@ -405,7 +427,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   <View className="flex-1 bg-orange-50/70 p-2.5 rounded-xl border border-orange-200">
                     <Text className="text-[10px] font-bold text-orange-700">Swiggy Delivery</Text>
                     <Text className="text-sm font-black text-orange-950 mt-0.5">
-                      Rs. {Number(salesData?.summary?.totalSwiggy || 0).toLocaleString("en-IN")}
+                      Rs. {formatInr(salesData?.summary?.totalSwiggy)}
                     </Text>
                     <Text className="text-[10px] text-orange-600">
                       {salesData?.summary?.swiggyOrders || 0} orders
@@ -414,7 +436,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   <View className="flex-1 bg-red-50/70 p-2.5 rounded-xl border border-red-200">
                     <Text className="text-[10px] font-bold text-red-700">Zomato Delivery</Text>
                     <Text className="text-sm font-black text-red-950 mt-0.5">
-                      Rs. {Number(salesData?.summary?.totalZomato || 0).toLocaleString("en-IN")}
+                      Rs. {formatInr(salesData?.summary?.totalZomato)}
                     </Text>
                     <Text className="text-[10px] text-red-600">
                       {salesData?.summary?.zomatoOrders || 0} orders
@@ -508,7 +530,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                       </View>
                       <View className="items-end">
                         <Text className="text-xs font-black text-emerald-700">
-                          Rs. {Number(it.totalRevenue || 0).toLocaleString("en-IN")}
+                          Rs. {formatInr(it.totalRevenue)}
                         </Text>
                       </View>
                     </View>
@@ -555,7 +577,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                       </View>
                       <View className="items-end">
                         <Text className="text-xs font-black text-slate-900">
-                          Rs. {Number(inv.grandTotal || 0).toLocaleString("en-IN")}
+                          Rs. {formatInr(inv.grandTotal)}
                         </Text>
                         <Text className="text-[9px] text-emerald-600 font-bold">
                           {inv.paymentStatus || "PAID"}
@@ -842,7 +864,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                 <Text style={{ fontSize: 16, fontWeight: "900", color: "#111827" }}>Bill #{selectedInvoice?.invoiceNumber}</Text>
                 <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>
                   {selectedInvoice?.createdAt || selectedInvoice?.invoiceDate
-                    ? new Date(selectedInvoice.createdAt || selectedInvoice.invoiceDate).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                    ? formatSafeDate(selectedInvoice.createdAt || selectedInvoice.invoiceDate)
                     : ""}
                 </Text>
               </View>
@@ -885,7 +907,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                         ) : null}
                       </View>
                       <Text style={{ flex: 1, fontSize: 12, color: "#374151", fontWeight: "600", textAlign: "center" }}>{qty}</Text>
-                      <Text style={{ flex: 1.5, fontSize: 12, color: "#111827", fontWeight: "800", textAlign: "right" }}>Rs. {total.toLocaleString("en-IN")}</Text>
+                      <Text style={{ flex: 1.5, fontSize: 12, color: "#111827", fontWeight: "800", textAlign: "right" }}>Rs. {formatInr(total)}</Text>
                     </View>
                   );
                 })}
@@ -894,7 +916,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
               <View style={{ backgroundColor: "#F9FAFB", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#E5E7EB", marginBottom: 16 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "#E5E7EB", paddingTop: 10 }}>
                   <Text style={{ color: "#111827", fontSize: 15, fontWeight: "900" }}>Total</Text>
-                  <Text style={{ color: "#2563EB", fontSize: 15, fontWeight: "900" }}>Rs. {Number(selectedInvoice?.grandTotal || 0).toLocaleString("en-IN")}</Text>
+                  <Text style={{ color: "#2563EB", fontSize: 15, fontWeight: "900" }}>Rs. {formatInr(selectedInvoice?.grandTotal)}</Text>
                 </View>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 8 }}>
                   <Text style={{ color: "#6B7280", fontSize: 11 }}>Payment Mode</Text>
@@ -966,7 +988,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   <View style={{ flex: 1.3, backgroundColor: "#ECFDF5", borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "#A7F3D0" }}>
                     <Text style={{ fontSize: 10, fontWeight: "800", color: "#065F46", textTransform: "uppercase" }}>Yearly Category Sales</Text>
                     <Text style={{ fontSize: 20, fontWeight: "900", color: "#064E3B", marginTop: 2 }}>
-                      Rs. {(categorySalesData?.yearlyCategorySummary || categorySalesData?.yearly || []).reduce((acc, c) => acc + (c.totalRevenue || 0), 0).toLocaleString("en-IN")}
+                      Rs. {formatInr((categorySalesData?.yearlyCategorySummary || categorySalesData?.yearly || []).reduce((acc, c) => acc + (c.totalRevenue || 0), 0))}
                     </Text>
                   </View>
                 </View>
@@ -975,17 +997,17 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   <View key={dIdx} style={{ backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 1, borderColor: "#E5E7EB", marginBottom: 12, overflow: "hidden" }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#F8FAFC", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#E2E8F0" }}>
                       <Text style={{ fontSize: 12, fontWeight: "800", color: "#1E293B" }}>
-                        {new Date(day.date).toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}
+                        {formatSafeDate(day.date)}
                       </Text>
                       <Text style={{ fontSize: 12, fontWeight: "800", color: "#059669" }}>
-                        Rs. {(day.categories || []).reduce((acc, c) => acc + (c.totalRevenue || 0), 0).toLocaleString("en-IN")}
+                        Rs. {formatInr((day.categories || []).reduce((acc, c) => acc + (c.totalRevenue || 0), 0))}
                       </Text>
                     </View>
                     <View style={{ padding: 10 }}>
                       {(day.categories || []).map((cat, cIdx) => (
                         <View key={cIdx} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
                           <Text style={{ fontSize: 11, color: "#4B5563" }}>🏷️ {cat.category}</Text>
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#111827" }}>Rs. {Number(cat.totalRevenue || 0).toLocaleString("en-IN")}</Text>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#111827" }}>Rs. {formatInr(cat.totalRevenue)}</Text>
                         </View>
                       ))}
                     </View>
