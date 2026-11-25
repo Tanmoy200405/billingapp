@@ -207,6 +207,27 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// DELETE /api/tables/all/clear
+router.delete("/all/clear", async (req, res) => {
+  try {
+    const occupiedCount = await Table.countDocuments({
+      userId: req.user._id,
+      status: { $in: ["OCCUPIED", "BILLED"] },
+    });
+    if (occupiedCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot clear tables while ${occupiedCount} table(s) have active running orders.`,
+      });
+    }
+    await Table.deleteMany({ userId: req.user._id });
+    await Area.deleteMany({ userId: req.user._id });
+    return res.status(200).json({ success: true, message: "All tables and areas cleared successfully" });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // DELETE /api/tables/:id
 router.delete("/:id", async (req, res) => {
   try {

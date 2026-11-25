@@ -196,6 +196,59 @@ export default function TableScreen({
     );
   };
 
+  const handleDeleteTable = (table) => {
+    if (!table) return;
+    if (table.status === "OCCUPIED" || table.status === "BILLED") {
+      Alert.alert("Cannot Delete", "This table has an active order. Please settle or transfer it first.");
+      return;
+    }
+    Alert.alert(
+      "Delete Table",
+      `Are you sure you want to delete Table ${table.tableNo}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const res = await api.tables.delete(table._id);
+            if (res.success) {
+              setActiveTable(null);
+              setShowTableModal(false);
+              fetchAreasAndTables();
+            } else {
+              Alert.alert("Error", res.message || "Failed to delete table");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAllTables = () => {
+    Alert.alert(
+      "Remove All Tables",
+      "Are you sure you want to remove all tables and areas? This will give you a completely clean, empty layout.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear All",
+          style: "destructive",
+          onPress: async () => {
+            const res = await api.tables.clearAll();
+            if (res.success) {
+              setActiveTable(null);
+              fetchAreasAndTables();
+              Alert.alert("Cleared", "All tables and areas have been removed.");
+            } else {
+              Alert.alert("Notice", res.message || "Could not clear tables");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleExecuteTransfer = async () => {
     if (!activeTable || !targetTableId) {
       Alert.alert("Required", "Please choose a destination table");
@@ -440,11 +493,21 @@ export default function TableScreen({
 
           <TouchableOpacity
             onPress={openAddArea}
-            className="px-3 py-1.5 rounded-full border border-dashed border-blue-400 bg-blue-50/50 flex-row items-center"
+            className="px-3 py-1.5 rounded-full border border-dashed border-blue-400 bg-blue-50/50 flex-row items-center mr-2"
           >
             <Ionicons name="add" size={14} color="#2563EB" />
             <Text className="text-xs font-bold text-blue-600 ml-1">+ Area</Text>
           </TouchableOpacity>
+
+          {tables.length > 0 && (
+            <TouchableOpacity
+              onPress={handleClearAllTables}
+              className="px-3 py-1.5 rounded-full border border-red-200 bg-red-50 flex-row items-center"
+            >
+              <Ionicons name="trash-outline" size={13} color="#DC2626" style={{ marginRight: 4 }} />
+              <Text className="text-xs font-bold text-red-700">Clear All Tables</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </View>
 
@@ -783,6 +846,16 @@ export default function TableScreen({
                     Edit Table Settings
                   </Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleDeleteTable(activeTable)}
+                  className="w-full py-2 items-center flex-row justify-center"
+                >
+                  <Ionicons name="trash-outline" size={14} color="#DC2626" style={{ marginRight: 4 }} />
+                  <Text className="text-xs font-bold text-red-600">
+                    Delete Table {activeTable.tableNo}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -1024,6 +1097,15 @@ export default function TableScreen({
               </View>
 
               <View className="flex-row gap-2">
+                {editingTable ? (
+                  <TouchableOpacity
+                    onPress={() => handleDeleteTable(editingTable)}
+                    className="p-3 bg-red-50 border border-red-200 rounded-xl items-center justify-center"
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                  </TouchableOpacity>
+                ) : null}
+
                 <TouchableOpacity
                   onPress={() => setShowTableModal(false)}
                   className="flex-1 py-3 bg-slate-100 rounded-xl items-center"

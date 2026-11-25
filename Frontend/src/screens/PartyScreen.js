@@ -513,9 +513,9 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
   };
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
-      <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-4">
+      <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-3">
         <ResponsiveContainer maxWidth={1200}>
-          <View className="flex-row items-center justify-between mb-2.5">
+          <View className="flex-row items-center justify-between mb-2">
             <View className="flex-row items-center flex-1 mr-2">
               {!isWide && (
                 <TouchableOpacity onPress={onOpenDrawer} className="mr-2 p-1">
@@ -525,36 +525,39 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
               {onBack && !isWide ? (
                 <TouchableOpacity
                   onPress={onBack}
-                  className="flex-row items-center bg-white/20 px-2.5 py-1 rounded-lg mr-2"
+                  className="flex-row items-center bg-white/20 px-2 py-1 rounded-lg mr-2"
                 >
                   <Ionicons name="arrow-back" size={16} color="#FFFFFF" />
-                  <Text className="text-white text-xs font-bold ml-1">Back</Text>
                 </TouchableOpacity>
               ) : null}
-              <View>
-                <Text className="text-white text-xl font-bold">Customers</Text>
-                <Text className="text-blue-200 text-[11px]">
-                  {parties.length} total · {vipCount} VIP (≥{vipVisitThreshold} visits)
+              <View className="flex-1">
+                <Text className="text-white text-lg font-black tracking-wide" numberOfLines={1}>
+                  Customers & Parties
+                </Text>
+                <Text className="text-blue-100 text-[10px] font-medium" numberOfLines={1}>
+                  {parties.length} total {isVipSchemeActive ? `• ${vipCount} VIP` : ""}
                 </Text>
               </View>
             </View>
-            <View className="flex-row gap-2">
-              <TouchableOpacity
-                onPress={() => {
-                  loadVipOfferConfig();
-                  setVipOfferModalVisible(true);
-                }}
-                className="bg-amber-400 active:bg-amber-500 px-3 py-1.5 rounded-xl flex-row items-center shadow-xs"
-              >
-                <Ionicons name="gift" size={14} color="#78350F" />
-                <Text className="text-amber-950 font-black text-xs ml-1">👑 All VIP Offers</Text>
-              </TouchableOpacity>
+            <View className="flex-row items-center gap-1.5">
+              {isVipSchemeActive ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    loadVipOfferConfig();
+                    setVipOfferModalVisible(true);
+                  }}
+                  className="bg-amber-400 active:bg-amber-500 px-2.5 py-1.5 rounded-xl flex-row items-center shadow-xs"
+                >
+                  <Ionicons name="gift" size={13} color="#78350F" />
+                  <Text className="text-amber-950 font-black text-xs ml-1">VIP Offers</Text>
+                </TouchableOpacity>
+              ) : null}
 
               <TouchableOpacity
                 onPress={openAddPartyModal}
                 className="bg-white px-3 py-1.5 rounded-xl flex-row items-center shadow-xs"
               >
-                <Ionicons name="person-add-outline" size={14} color="#2563EB" />
+                <Ionicons name="person-add" size={14} color="#2563EB" />
                 <Text className="text-blue-600 font-bold text-xs ml-1">+ Add</Text>
               </TouchableOpacity>
             </View>
@@ -752,77 +755,95 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
             return (
               <View
                 style={gridColumns > 1 ? { flex: 1, maxWidth: `${100 / gridColumns - 1}%` } : undefined}
-                className="bg-white rounded-xl p-4 mb-3 border border-gray-200 shadow-sm flex-row items-center justify-between"
+                className="bg-white rounded-2xl p-4 mb-3 border border-slate-200 shadow-xs"
               >
-                <View className="flex-1 pr-3">
-                  <View className="flex-row items-center flex-wrap gap-1.5">
-                    <Text className="text-base font-extrabold text-gray-900">
-                      {item.name || "Customer"}
+                {/* Top Row: Customer Details on Left, Action Buttons on Right */}
+                <View className="flex-row items-start justify-between mb-2.5">
+                  <View className="flex-1 pr-2">
+                    <View className="flex-row items-center flex-wrap gap-1.5">
+                      <Text className="text-base font-extrabold text-slate-900" numberOfLines={1}>
+                        {item.name || "Customer"}
+                      </Text>
+                      {isVip ? (
+                        <View className="bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 flex-row items-center">
+                          <FontAwesome name="star" size={10} color="#B45309" />
+                          <Text className="text-[10px] font-extrabold text-amber-800 ml-1">
+                            VIP ({item.visitCount || 0})
+                          </Text>
+                        </View>
+                      ) : (
+                        <View className="bg-slate-100 px-2 py-0.5 rounded-full">
+                          <Text className="text-[10px] font-semibold text-slate-600">
+                            {visitLabel(item.visitCount)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text className="text-xs text-slate-500 font-medium mt-1">
+                      📞 +91 {item.phone || item.whatsappNumber || "N/A"}
                     </Text>
-                    {isVip ? (
-                      <View className="bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 flex-row items-center">
-                        <FontAwesome name="star" size={10} color="#B45309" />
-                        <Text className="text-[10px] font-extrabold text-amber-800 ml-1">
-                          VIP ({item.visitCount || 0} visits)
-                        </Text>
-                      </View>
-                    ) : (
-                      <View className="bg-gray-100 px-2 py-0.5 rounded-full">
-                        <Text className="text-[10px] font-medium text-gray-600">
-                          {visitLabel(item.visitCount)}
-                        </Text>
-                      </View>
-                    )}
                   </View>
-                  <Text className="text-xs text-gray-600 mt-1">
-                    📞 +91 {item.phone || item.whatsappNumber || "N/A"}
-                  </Text>
-                  <View className="flex-row items-center gap-3 mt-1.5 flex-wrap">
-                    <Text className="text-[11px] text-gray-500">
-                      Spent: <Text className="font-bold text-gray-800">Rs. {item.totalSpent || 0}</Text>
-                    </Text>
-                    {item.balance > 0 ? (
-                      <Text className="text-[11px] text-red-600 font-bold">
-                        Udhar: Rs. {item.balance}
-                      </Text>
-                    ) : null}
-                    {item.customDiscountPercent > 0 ? (
-                      <Text className="text-[11px] text-emerald-700 font-bold">
-                        Perk: {item.customDiscountPercent}% OFF
-                      </Text>
-                    ) : null}
-                    {item.assignedFreebie ? (
-                      <Text className="text-[11px] text-blue-700 font-bold">
-                        Free: {item.assignedFreebie}
-                      </Text>
-                    ) : null}
+
+                  {/* 4 Action Buttons */}
+                  <View className="flex-row items-center gap-1.5">
+                    <TouchableOpacity
+                      onPress={() => openWhatsAppOffer(item)}
+                      className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 items-center justify-center active:bg-emerald-100"
+                    >
+                      <FontAwesome name="whatsapp" size={16} color="#059669" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => openPerksDialog(item)}
+                      className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 items-center justify-center active:bg-amber-100"
+                    >
+                      <Ionicons name="gift-outline" size={16} color="#D97706" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => openEditPartyModal(item)}
+                      className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 items-center justify-center active:bg-blue-100"
+                    >
+                      <Ionicons name="create-outline" size={16} color="#2563EB" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteParty(item)}
+                      className="w-8 h-8 rounded-xl bg-red-50 border border-red-200 items-center justify-center active:bg-red-100"
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                    </TouchableOpacity>
                   </View>
                 </View>
-                <View className="flex-row items-center gap-1.5">
-                  <TouchableOpacity
-                    onPress={() => openWhatsAppOffer(item)}
-                    className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 items-center justify-center"
-                  >
-                    <FontAwesome name="whatsapp" size={16} color="#059669" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => openPerksDialog(item)}
-                    className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 items-center justify-center"
-                  >
-                    <Ionicons name="gift-outline" size={16} color="#D97706" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => openEditPartyModal(item)}
-                    className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 items-center justify-center"
-                  >
-                    <Ionicons name="create-outline" size={16} color="#2563EB" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDeleteParty(item)}
-                    className="w-8 h-8 rounded-lg bg-red-50 border border-red-200 items-center justify-center"
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                  </TouchableOpacity>
+
+                {/* Bottom Row: Stat Chips With Clean Separation */}
+                <View className="flex-row items-center gap-2 pt-2.5 border-t border-slate-100 flex-wrap">
+                  <View className="bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                    <Text className="text-[10px] font-bold text-slate-700">
+                      Spent: <Text className="font-extrabold text-slate-900">Rs. {Number(item.totalSpent || 0).toLocaleString("en-IN")}</Text>
+                    </Text>
+                  </View>
+
+                  {Number(item.balance) > 0 ? (
+                    <View className="bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
+                      <Text className="text-[10px] font-extrabold text-red-700">
+                        Udhar: Rs. {Number(item.balance).toLocaleString("en-IN")}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {Number(item.customDiscountPercent) > 0 ? (
+                    <View className="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                      <Text className="text-[10px] font-extrabold text-emerald-800">
+                        Perk: {item.customDiscountPercent}% OFF
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {item.assignedFreebie ? (
+                    <View className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
+                      <Text className="text-[10px] font-extrabold text-blue-800">
+                        Free: {item.assignedFreebie}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
             );

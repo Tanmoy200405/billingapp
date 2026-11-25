@@ -716,9 +716,10 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
       </View>
 
       {/* ── Search Bar & Filter Strip ── */}
-      <View className="bg-white border-b border-slate-100 px-3 py-2">
-        <ResponsiveContainer maxWidth={1200} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View className="flex-1 flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+      <View className="bg-white border-b border-slate-200 px-3 py-2">
+        <ResponsiveContainer maxWidth={1200}>
+          {/* Row 1: Full-width search bar */}
+          <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 mb-2">
             <Ionicons name="search" size={16} color="#64748B" />
             <TextInput
               className="flex-1 text-xs text-slate-900 ml-2 font-medium"
@@ -734,16 +735,17 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
             ) : null}
           </View>
 
+          {/* Row 2: Category Filter Chips on their own dedicated row */}
           {activeTab === "menu" && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row pb-1">
               {["All", ...categories].map((c) => (
                 <TouchableOpacity
                   key={c}
                   onPress={() => setSelectedCategory(c)}
-                  className={`px-2.5 py-1.5 rounded-lg border mr-1.5 ${selectedCategory === c ? "bg-slate-900 border-slate-900" : "bg-slate-50 border-slate-200"
+                  className={`px-3 py-1.5 rounded-lg border mr-1.5 ${selectedCategory === c ? "bg-slate-900 border-slate-900" : "bg-slate-50 border-slate-200"
                     }`}
                 >
-                  <Text className={`text-[11px] font-bold ${selectedCategory === c ? "text-white" : "text-slate-600"}`}>
+                  <Text className={`text-xs font-bold ${selectedCategory === c ? "text-white" : "text-slate-600"}`}>
                     {c}
                   </Text>
                 </TouchableOpacity>
@@ -752,23 +754,25 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
           )}
 
           {activeTab === "transfers" && (
-            <View className="flex-row gap-1.5">
-              <TouchableOpacity onPress={() => handleOpenTransferModal("INDENT_REQUEST")} className="bg-blue-600 px-2.5 py-1.5 rounded-xl flex-row items-center shadow-xs">
+            <View className="flex-row gap-1.5 pb-1">
+              <TouchableOpacity onPress={() => handleOpenTransferModal("INDENT_REQUEST")} className="bg-blue-600 px-3 py-1.5 rounded-xl flex-row items-center shadow-xs">
                 <Ionicons name="arrow-down-circle" size={14} color="#FFFFFF" />
-                <Text className="text-white text-[11px] font-black ml-1">Indent</Text>
+                <Text className="text-white text-xs font-black ml-1">Indent</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleOpenTransferModal("DAMAGED_RETURN")} className="bg-red-600 px-2.5 py-1.5 rounded-xl flex-row items-center shadow-xs">
-                <Ionicons name="alert-circle" size={14} color="#FFFFFF" />
-                <Text className="text-white text-[11px] font-black ml-1">Damaged Return</Text>
+              <TouchableOpacity onPress={() => handleOpenTransferModal("DAMAGED_RETURN")} className="bg-red-600 px-3 py-1.5 rounded-xl flex-row items-center shadow-xs">
+                <Ionicons name="return-down-back" size={14} color="#FFFFFF" />
+                <Text className="text-white text-xs font-black ml-1">Return</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {activeTab === "po" && (
-            <TouchableOpacity onPress={() => handleOpenPoModal()} className="bg-blue-600 px-3 py-1.5 rounded-xl flex-row items-center shadow-xs">
-              <Ionicons name="add" size={15} color="#FFFFFF" />
-              <Text className="text-white text-[11px] font-black ml-1">+ Raise PO</Text>
-            </TouchableOpacity>
+            <View className="flex-row pb-1">
+              <TouchableOpacity onPress={() => handleOpenPoModal()} className="bg-blue-600 px-3 py-1.5 rounded-xl flex-row items-center shadow-xs">
+                <Ionicons name="add" size={15} color="#FFFFFF" />
+                <Text className="text-white text-xs font-black ml-1">+ Raise PO</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </ResponsiveContainer>
       </View>
@@ -860,7 +864,7 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                           </View>
 
                           {/* Price & Recipe Info */}
-                          <View className="flex-row items-center justify-between py-1.5 border-t border-slate-100">
+                          <View className="flex-row items-center justify-between py-1.5 border-t border-slate-100 flex-wrap gap-1">
                             <Text className="text-xs font-extrabold text-blue-900">
                               Sell: Rs. {item.sellingPrice || 0} {item.costPrice > 0 ? `• Cost: Rs. ${item.costPrice}` : ""}
                             </Text>
@@ -879,27 +883,23 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                             onPress={() => handleOpenItemStats(item)}
                             className="mt-2 pt-1.5 flex-row items-center justify-between"
                           >
-                            <View className={`flex-row items-center px-2 py-1 rounded-xl ${todaySoldQty > 0
+                            <View className={`flex-row items-center px-2 py-1 rounded-xl flex-1 mr-2 ${todaySoldQty > 0
                                 ? "bg-emerald-50 border border-emerald-300"
                                 : "bg-blue-50/60 border border-blue-200"
                               }`}>
                               <Ionicons name={todaySoldQty > 0 ? "flame" : "calendar-outline"} size={13} color={todaySoldQty > 0 ? "#059669" : "#2563EB"} />
-                              <Text className={`text-[11px] font-black ml-1.5 ${todaySoldQty > 0 ? "text-emerald-800" : "text-blue-900"}`}>
+                              <Text className={`text-[11px] font-black ml-1.5 flex-1 ${todaySoldQty > 0 ? "text-emerald-800" : "text-blue-900"}`} numberOfLines={1}>
                                 Sold Today: <Text className="font-black text-xs">{todaySoldQty} {item.unit || "PCS"}</Text>
                                 {todaySoldRev > 0 ? ` (Rs. ${todaySoldRev})` : ""}
                               </Text>
-                              <Ionicons name="stats-chart" size={11} color={todaySoldQty > 0 ? "#059669" : "#2563EB"} style={{ marginLeft: 5 }} />
                             </View>
 
-                            {totalSoldQty > 0 ? (
-                              <Text className="text-[10px] text-slate-500 font-bold ml-2">
-                                Total: {totalSoldQty} sold
+                            <View className="flex-row items-center">
+                              <Text className="text-[10px] text-blue-600 font-bold">
+                                {totalSoldQty > 0 ? `Total: ${totalSoldQty}` : "Daily Stats"}
                               </Text>
-                            ) : (
-                              <Text className="text-[10px] text-blue-600 font-bold ml-2">
-                                Daily Stats →
-                              </Text>
-                            )}
+                              <Ionicons name="chevron-forward" size={11} color="#2563EB" style={{ marginLeft: 2 }} />
+                            </View>
                           </TouchableOpacity>
 
                           {/* Channel Toggles (Dine-in vs Online Delivery) */}

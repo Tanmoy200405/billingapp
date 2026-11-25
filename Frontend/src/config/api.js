@@ -547,6 +547,7 @@ export const api = {
         body: JSON.stringify(payload),
       }),
     delete: (id) => request(`/tables/${id}`, { method: "DELETE" }),
+    clearAll: () => request("/tables/all/clear", { method: "DELETE" }),
     transfer: (sourceTableId, targetTableId) =>
       request("/tables/transfer", {
         method: "POST",

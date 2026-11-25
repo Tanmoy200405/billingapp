@@ -10,11 +10,7 @@ import { invalidateUserCache } from "../services/cacheService.js";
 const router = express.Router();
 router.use(protect);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. CENTRAL KITCHEN & STOCK TRANSFERS
-// ─────────────────────────────────────────────────────────────────────────────
 
-// GET /api/inventory/transfers
 router.get("/transfers", async (req, res) => {
   try {
     const { type, status } = req.query;

@@ -28,14 +28,14 @@ export const config = Object.freeze({
   },
 
   appRelease: {
-    latestVersion: process.env.APP_LATEST_VERSION || "1.2.3",
+    latestVersion: process.env.APP_LATEST_VERSION || "1.2.4",
     minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
     apkUrl:
       process.env.APP_APK_URL ||
       "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk",
     releaseNotes:
       process.env.APP_RELEASE_NOTES ||
-      "Version 1.2.3: Production stability hardening, in-app error boundary recovery to prevent crashes, modern sleek login UI with password visibility toggle and clean error banner, upstream microservice failover protection, table click black screen fix, inventory category deduplication, sales today performance optimization, and bill back navigation fix.",
+      "Version 1.2.4: Fix party screen text overlap, fix inventory screen search and card text overlap, add Clear All Tables option and table delete buttons, and remove legacy predefined tables.",
   },
 
   cloudinary: {
