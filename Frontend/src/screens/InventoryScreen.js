@@ -656,30 +656,38 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
   return (
     <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       {/* ── Top Header ── */}
-      <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-3 shadow-sm">
+      <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-3 sm:px-4 pb-3 shadow-sm">
         <ResponsiveContainer maxWidth={1200}>
-          <View className="flex-row items-center justify-between mb-2">
-            <View className="flex-row items-center flex-1 pr-2">
+          <View className="flex-row items-center justify-between mb-1">
+            <View className="flex-row items-center flex-1 mr-2 overflow-hidden">
               {!isWide && (
-                <TouchableOpacity onPress={onOpenDrawer} className="mr-2 p-1">
+                <TouchableOpacity onPress={onOpenDrawer} className="mr-2 p-1" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="menu" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
               )}
               {onBack && !isWide ? (
-                <TouchableOpacity onPress={onBack} className="flex-row items-center bg-white/20 px-2.5 py-1 rounded-lg mr-2">
-                  <Ionicons name="arrow-back" size={16} color="#FFFFFF" />
-                  <Text className="text-white text-xs font-bold ml-1">Back</Text>
+                <TouchableOpacity onPress={onBack} className="flex-row items-center bg-white/20 px-2 py-1 rounded-lg mr-2 shrink-0">
+                  <Ionicons name="arrow-back" size={15} color="#FFFFFF" />
+                  <Text className="text-white text-xs font-bold ml-0.5">Back</Text>
                 </TouchableOpacity>
               ) : null}
-              <Text className="text-white text-lg font-black tracking-wide">Restaurant Inventory</Text>
-              <View className="bg-white/20 border border-white/30 px-2 py-0.5 rounded-full ml-2">
-                <Text className="text-white text-[10px] font-extrabold">{items.length} items</Text>
+              <View className="flex-row items-center flex-1 shrink">
+                <Text className="text-white text-base sm:text-lg font-black tracking-wide shrink" numberOfLines={1}>
+                  {isWide ? "Restaurant Inventory" : "Inventory"}
+                </Text>
+                <View className="bg-white/20 border border-white/30 px-2 py-0.5 rounded-full ml-1.5 shrink-0">
+                  <Text className="text-white text-[10px] font-extrabold">{items.length}</Text>
+                </View>
               </View>
             </View>
 
-            <TouchableOpacity onPress={handleOpenAdd} className="bg-white px-3 py-1.5 rounded-xl flex-row items-center shadow-xs">
+            <TouchableOpacity
+              onPress={handleOpenAdd}
+              activeOpacity={0.8}
+              className="bg-white px-3 py-1.5 rounded-xl flex-row items-center shrink-0 shadow-xs"
+            >
               <Ionicons name="add-circle" size={16} color="#2563EB" />
-              <Text className="text-blue-600 text-xs font-black ml-1">+ New Item</Text>
+              <Text className="text-blue-600 text-xs font-black ml-1">+ Add Item</Text>
             </TouchableOpacity>
           </View>
         </ResponsiveContainer>
@@ -1153,6 +1161,29 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
           )}
         </ResponsiveContainer>
       </ScrollView>
+
+      {/* Floating Action Button (FAB) for quick add on mobile */}
+      {!isWide && (
+        <TouchableOpacity
+          onPress={handleOpenAdd}
+          activeOpacity={0.85}
+          style={{
+            position: "absolute",
+            bottom: 24,
+            right: 20,
+            zIndex: 99,
+            elevation: 8,
+            shadowColor: "#2563EB",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.35,
+            shadowRadius: 6,
+          }}
+          className="bg-blue-600 px-4 py-3 rounded-full flex-row items-center"
+        >
+          <Ionicons name="add" size={20} color="#FFFFFF" />
+          <Text className="text-white text-xs font-black ml-1">Add Item</Text>
+        </TouchableOpacity>
+      )}
 
       {/* ── Modal 1: Add / Edit Item Modal ── */}
       <Modal visible={modalVisible} animationType="slide" transparent={true} onRequestClose={() => setModalVisible(false)}>
