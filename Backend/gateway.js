@@ -1,16 +1,15 @@
 import http from "http";
-import dotenv from "dotenv";
+import config from "./config/env.js";
+import app from "./app.js";
 import { getAwsMessagingStatus } from "./services/awsMessagingService.js";
 
-dotenv.config();
-
-const PORT = Number(process.env.PORT || 5000);
+const PORT = config.port;
 
 const SERVICE_TARGETS = {
-  core: process.env.CORE_SERVICE_URL || "http://127.0.0.1:5001",
-  billing: process.env.BILLING_SERVICE_URL || "http://127.0.0.1:5002",
-  reports: process.env.REPORTS_SERVICE_URL || "http://127.0.0.1:5003",
-  messaging: process.env.MESSAGING_SERVICE_URL || "http://127.0.0.1:5004",
+  core: config.microservices.coreUrl,
+  billing: config.microservices.billingUrl,
+  reports: config.microservices.reportsUrl,
+  messaging: config.microservices.messagingUrl,
 };
 
 const keepAliveAgent = new http.Agent({
@@ -77,22 +76,24 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, {
       status: "online",
       service: "Billing System API Gateway",
-      architecture: "microservices",
+      architecture: "resilient-microservices",
       timestamp: new Date().toISOString(),
     });
   }
 
   if (urlPath === "/api/health" && req.method === "GET") {
-    const checks = await Promise.all(
-      Object.entries(SERVICE_TARGETS).map(([name, baseUrl]) => checkServiceHealth(name, baseUrl))
-    );
-    const services = Object.fromEntries(checks.map((c) => [c.name, c]));
-    const allHealthy = checks.every((c) => c.healthy);
+    const [core, billing, reports, messaging] = await Promise.all([
+      checkServiceHealth("core", SERVICE_TARGETS.core),
+      checkServiceHealth("billing", SERVICE_TARGETS.billing),
+      checkServiceHealth("reports", SERVICE_TARGETS.reports),
+      checkServiceHealth("messaging", SERVICE_TARGETS.messaging),
+    ]);
 
+    const allHealthy = core.healthy && billing.healthy && reports.healthy && messaging.healthy;
     return sendJson(res, 200, {
-      status: allHealthy ? "healthy" : "degraded",
-      architecture: "microservices",
-      services,
+      status: allHealthy ? "healthy" : "operational_standalone_fallback",
+      architecture: "resilient-gateway",
+      services: { core, billing, reports, messaging },
       awsMessaging: getAwsMessagingStatus(),
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
@@ -100,29 +101,23 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (urlPath === "/api/download-apk" && req.method === "GET") {
-    const githubApkUrl =
-      process.env.APP_APK_URL ||
-      "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
-    res.writeHead(302, { Location: githubApkUrl });
+    res.writeHead(302, { Location: config.appRelease.apkUrl });
     return res.end();
   }
 
   if (urlPath === "/api/app-version" && req.method === "GET") {
-    const defaultApkUrl =
-      "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
     return sendJson(res, 200, {
       success: true,
-      latestVersion: process.env.APP_LATEST_VERSION || "1.2.2",
-      minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
-      apkUrl: process.env.APP_APK_URL || defaultApkUrl,
-      releaseNotes:
-        process.env.APP_RELEASE_NOTES ||
-        "Version 1.2.2: Fix table click black screen, disable predefined tables, deduplicate inventory categories, optimize sales today performance, hide VIP when disabled, and fix finalize bill back navigation.",
+      latestVersion: config.appRelease.latestVersion,
+      minSupportedVersion: config.appRelease.minSupportedVersion,
+      apkUrl: config.appRelease.apkUrl,
+      releaseNotes: config.appRelease.releaseNotes,
       forceUpdate: false,
       timestamp: new Date().toISOString(),
     });
   }
 
+  // Check if target microservice is reachable
   const targetBase = resolveTarget(urlPath);
   let parsedTarget;
   try {
@@ -131,6 +126,7 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 400, { success: false, message: "Invalid request URL" });
   }
 
+  // Attempt proxying to microservice
   const proxyReq = http.request(
     {
       protocol: parsedTarget.protocol,
@@ -147,32 +143,29 @@ const server = http.createServer(async (req, res) => {
       timeout: 25000,
     },
     (proxyRes) => {
-      res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+      res.writeHead(proxyRes.statusCode || 500, proxyRes.headers);
       proxyRes.pipe(res, { end: true });
     }
   );
 
   proxyReq.on("timeout", () => {
-    proxyReq.destroy(new Error("Gateway timeout waiting for upstream service"));
+    proxyReq.destroy(new Error("Gateway timeout"));
   });
 
   proxyReq.on("error", (err) => {
+    // Self-healing fallback: If upstream microservice fails, route seamlessly through in-process app!
     if (!res.headersSent) {
-      sendJson(res, 502, {
-        success: false,
-        message: "Upstream microservice unavailable",
-        target: targetBase,
-        error: err.message,
-      });
+      console.warn(`[Gateway Notice] Upstream at ${targetBase} unreachable (${err.message}). Seamlessly serving via unified core app.`);
+      return app(req, res);
     }
   });
 
   req.pipe(proxyReq, { end: true });
 });
 
-if (process.env.NODE_ENV !== "test") {
+if (config.nodeEnv !== "test") {
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`[API Gateway] Microservices router active on 0.0.0.0:${PORT}`, SERVICE_TARGETS);
+    console.log(`[API Gateway] Resilient router active on 0.0.0.0:${PORT}`);
   });
 }
 

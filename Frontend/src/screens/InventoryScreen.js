@@ -255,7 +255,7 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
         setCategories(unique);
         setCachedData("items_categories", unique);
       }
-    } catch {}
+    } catch { }
   };
 
   const handleOpenItemStats = async (item) => {
@@ -316,9 +316,9 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
       prev.map((it) =>
         it._id === item._id
           ? {
-              ...it,
-              [isDineIn ? "isDineInAvailable" : "isOnlineAvailable"]: newVal,
-            }
+            ...it,
+            [isDineIn ? "isDineInAvailable" : "isOnlineAvailable"]: newVal,
+          }
           : it
       )
     );
@@ -508,14 +508,14 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
     setTransferItems(
       firstItem
         ? [
-            {
-              itemId: firstItem._id,
-              name: firstItem.name,
-              quantity: 10,
-              unit: firstItem.unit || "KG",
-              reason: type === "DAMAGED_RETURN" ? "Damaged Packaging" : "",
-            },
-          ]
+          {
+            itemId: firstItem._id,
+            name: firstItem.name,
+            quantity: 10,
+            unit: firstItem.unit || "KG",
+            reason: type === "DAMAGED_RETURN" ? "Damaged Packaging" : "",
+          },
+        ]
         : []
     );
     setTransferNotes("");
@@ -576,14 +576,14 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
     setPoItems(
       itemToAdd
         ? [
-            {
-              itemId: itemToAdd._id,
-              name: itemToAdd.name,
-              quantity: 25,
-              unit: itemToAdd.unit || "KG",
-              unitPrice: itemToAdd.costPrice || 50,
-            },
-          ]
+          {
+            itemId: itemToAdd._id,
+            name: itemToAdd.name,
+            quantity: 25,
+            unit: itemToAdd.unit || "KG",
+            unitPrice: itemToAdd.costPrice || 50,
+          },
+        ]
         : []
     );
     setPoNotes("");
@@ -701,9 +701,8 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                 <TouchableOpacity
                   key={tab.id}
                   onPress={() => setActiveTab(tab.id)}
-                  className={`flex-row items-center px-3.5 py-2 rounded-xl mr-2 ${
-                    isSelected ? "bg-blue-600 shadow-xs" : "bg-slate-100"
-                  }`}
+                  className={`flex-row items-center px-3.5 py-2 rounded-xl mr-2 ${isSelected ? "bg-blue-600 shadow-xs" : "bg-slate-100"
+                    }`}
                 >
                   <Ionicons name={tab.icon} size={14} color={isSelected ? "#FFFFFF" : "#64748B"} style={{ marginRight: 6 }} />
                   <Text className={`text-xs font-black ${isSelected ? "text-white" : "text-slate-700"}`}>
@@ -741,9 +740,8 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                 <TouchableOpacity
                   key={c}
                   onPress={() => setSelectedCategory(c)}
-                  className={`px-2.5 py-1.5 rounded-lg border mr-1.5 ${
-                    selectedCategory === c ? "bg-slate-900 border-slate-900" : "bg-slate-50 border-slate-200"
-                  }`}
+                  className={`px-2.5 py-1.5 rounded-lg border mr-1.5 ${selectedCategory === c ? "bg-slate-900 border-slate-900" : "bg-slate-50 border-slate-200"
+                    }`}
                 >
                   <Text className={`text-[11px] font-bold ${selectedCategory === c ? "text-white" : "text-slate-600"}`}>
                     {c}
@@ -831,139 +829,136 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                     const todaySoldRev = soldData?.todayRevenue || 0;
 
                     return (
-                    <View
-                      key={item._id}
-                      style={{ width: isWide ? "48.8%" : "100%" }}
-                      className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs justify-between"
-                    >
-                      <View>
-                        {/* Title & Type Badge */}
-                        <View className="flex-row items-center justify-between mb-2">
-                          <View className="flex-row items-center flex-1 mr-2">
-                            <SafeProductImage uri={item.imageUrl} />
-                            <View className="flex-1">
-                              <Text className="text-sm font-black text-slate-900" numberOfLines={1}>
-                                {item.name}
+                      <View
+                        key={item._id}
+                        style={{ width: isWide ? "48.8%" : "100%" }}
+                        className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs justify-between"
+                      >
+                        <View>
+                          {/* Title & Type Badge */}
+                          <View className="flex-row items-center justify-between mb-2">
+                            <View className="flex-row items-center flex-1 mr-2">
+                              <SafeProductImage uri={item.imageUrl} />
+                              <View className="flex-1">
+                                <Text className="text-sm font-black text-slate-900" numberOfLines={1}>
+                                  {item.name}
+                                </Text>
+                                <Text className="text-[10px] text-slate-500">
+                                  {item.category || "General"} • {item.unit || "PCS"}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View className="items-end">
+                              <Text className={`text-xs font-black ${(item.stock || 0) <= (item.lowStockThreshold || 5) ? "text-red-600" : "text-emerald-700"}`}>
+                                {item.stock || 0} {item.unit || "PCS"}
                               </Text>
-                              <Text className="text-[10px] text-slate-500">
-                                {item.category || "General"} • {item.unit || "PCS"}
+                              <Text className="text-[9px] text-slate-400">
+                                {(item.stock || 0) <= (item.lowStockThreshold || 5) ? "⚠️ Low Stock" : "In Stock"}
                               </Text>
                             </View>
                           </View>
 
-                          <View className="items-end">
-                            <Text className={`text-xs font-black ${(item.stock || 0) <= (item.lowStockThreshold || 5) ? "text-red-600" : "text-emerald-700"}`}>
-                              {item.stock || 0} {item.unit || "PCS"}
+                          {/* Price & Recipe Info */}
+                          <View className="flex-row items-center justify-between py-1.5 border-t border-slate-100">
+                            <Text className="text-xs font-extrabold text-blue-900">
+                              Sell: Rs. {item.sellingPrice || 0} {item.costPrice > 0 ? `• Cost: Rs. ${item.costPrice}` : ""}
                             </Text>
-                            <Text className="text-[9px] text-slate-400">
-                              {(item.stock || 0) <= (item.lowStockThreshold || 5) ? "⚠️ Low Stock" : "In Stock"}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* Price & Recipe Info */}
-                        <View className="flex-row items-center justify-between py-1.5 border-t border-slate-100">
-                          <Text className="text-xs font-extrabold text-blue-900">
-                            Sell: Rs. {item.sellingPrice || 0} {item.costPrice > 0 ? `• Cost: Rs. ${item.costPrice}` : ""}
-                          </Text>
-                          {item.recipe && item.recipe.length > 0 ? (
-                            <View className="bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                              <Text className="text-[9.5px] font-black text-blue-700">
-                                🍳 {item.recipe.length} Ingredients
-                              </Text>
-                            </View>
-                          ) : null}
-                        </View>
-
-                        {/* Daily Selling & Sells Today Count */}
-                        <TouchableOpacity
-                          activeOpacity={0.75}
-                          onPress={() => handleOpenItemStats(item)}
-                          className="mt-2 pt-1.5 flex-row items-center justify-between"
-                        >
-                          <View className={`flex-row items-center px-2 py-1 rounded-xl ${
-                            todaySoldQty > 0
-                              ? "bg-emerald-50 border border-emerald-300"
-                              : "bg-blue-50/60 border border-blue-200"
-                          }`}>
-                            <Ionicons name={todaySoldQty > 0 ? "flame" : "calendar-outline"} size={13} color={todaySoldQty > 0 ? "#059669" : "#2563EB"} />
-                            <Text className={`text-[11px] font-black ml-1.5 ${todaySoldQty > 0 ? "text-emerald-800" : "text-blue-900"}`}>
-                              Sold Today: <Text className="font-black text-xs">{todaySoldQty} {item.unit || "PCS"}</Text>
-                              {todaySoldRev > 0 ? ` (Rs. ${todaySoldRev})` : ""}
-                            </Text>
-                            <Ionicons name="stats-chart" size={11} color={todaySoldQty > 0 ? "#059669" : "#2563EB"} style={{ marginLeft: 5 }} />
+                            {item.recipe && item.recipe.length > 0 ? (
+                              <View className="bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                                <Text className="text-[9.5px] font-black text-blue-700">
+                                  🍳 {item.recipe.length} Ingredients
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
 
-                          {totalSoldQty > 0 ? (
-                            <Text className="text-[10px] text-slate-500 font-bold ml-2">
-                              Total: {totalSoldQty} sold
-                            </Text>
-                          ) : (
-                            <Text className="text-[10px] text-blue-600 font-bold ml-2">
-                              Daily Stats →
-                            </Text>
-                          )}
-                        </TouchableOpacity>
-
-                        {/* Channel Toggles (Dine-in vs Online Delivery) */}
-                        {activeTab === "menu" && (
-                          <View className="flex-row items-center gap-2 mt-2 pt-2 border-t border-slate-100">
-                            <TouchableOpacity
-                              onPress={() => handleToggleChannel(item, "dineIn")}
-                              className={`flex-1 py-1.5 px-2 rounded-xl border flex-row items-center justify-center ${
-                                item.isDineInAvailable !== false ? "bg-emerald-50 border-emerald-300" : "bg-slate-100 border-slate-200 opacity-60"
-                              }`}
-                            >
-                              <Ionicons name="restaurant-outline" size={13} color={item.isDineInAvailable !== false ? "#059669" : "#64748B"} />
-                              <Text className={`text-[10px] font-black ml-1.5 ${item.isDineInAvailable !== false ? "text-emerald-800" : "text-slate-600"}`}>
-                                Dine-in: {item.isDineInAvailable !== false ? "ON" : "OFF"}
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              onPress={() => handleToggleChannel(item, "online")}
-                              className={`flex-1 py-1.5 px-2 rounded-xl border flex-row items-center justify-center ${
-                                item.isOnlineAvailable !== false ? "bg-orange-50 border-orange-300" : "bg-slate-100 border-slate-200 opacity-60"
-                              }`}
-                            >
-                              <Ionicons name="bicycle-outline" size={13} color={item.isOnlineAvailable !== false ? "#EA580C" : "#64748B"} />
-                              <Text className={`text-[10px] font-black ml-1.5 ${item.isOnlineAvailable !== false ? "text-orange-800" : "text-slate-600"}`}>
-                                Online: {item.isOnlineAvailable !== false ? "ON" : "OFF"}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Card Action Buttons */}
-                      <View className="flex-row items-center gap-2 mt-2.5 pt-2 border-t border-slate-100">
-                        {item.itemType !== "RAW_MATERIAL" && (
+                          {/* Daily Selling & Sells Today Count */}
                           <TouchableOpacity
-                            onPress={() => handleOpenRecipeModal(item)}
-                            className="flex-1 bg-blue-600 py-2 rounded-xl flex-row items-center justify-center shadow-xs"
+                            activeOpacity={0.75}
+                            onPress={() => handleOpenItemStats(item)}
+                            className="mt-2 pt-1.5 flex-row items-center justify-between"
                           >
-                            <Ionicons name="list-circle-outline" size={14} color="#FFFFFF" />
-                            <Text className="text-white text-xs font-black ml-1">
-                              {item.recipe?.length > 0 ? "Edit Recipe" : "+ Add Recipe"}
-                            </Text>
+                            <View className={`flex-row items-center px-2 py-1 rounded-xl ${todaySoldQty > 0
+                                ? "bg-emerald-50 border border-emerald-300"
+                                : "bg-blue-50/60 border border-blue-200"
+                              }`}>
+                              <Ionicons name={todaySoldQty > 0 ? "flame" : "calendar-outline"} size={13} color={todaySoldQty > 0 ? "#059669" : "#2563EB"} />
+                              <Text className={`text-[11px] font-black ml-1.5 ${todaySoldQty > 0 ? "text-emerald-800" : "text-blue-900"}`}>
+                                Sold Today: <Text className="font-black text-xs">{todaySoldQty} {item.unit || "PCS"}</Text>
+                                {todaySoldRev > 0 ? ` (Rs. ${todaySoldRev})` : ""}
+                              </Text>
+                              <Ionicons name="stats-chart" size={11} color={todaySoldQty > 0 ? "#059669" : "#2563EB"} style={{ marginLeft: 5 }} />
+                            </View>
+
+                            {totalSoldQty > 0 ? (
+                              <Text className="text-[10px] text-slate-500 font-bold ml-2">
+                                Total: {totalSoldQty} sold
+                              </Text>
+                            ) : (
+                              <Text className="text-[10px] text-blue-600 font-bold ml-2">
+                                Daily Stats →
+                              </Text>
+                            )}
                           </TouchableOpacity>
-                        )}
 
-                        <TouchableOpacity
-                          onPress={() => handleOpenEdit(item)}
-                          className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200"
-                        >
-                          <Ionicons name="pencil" size={14} color="#2563EB" />
-                        </TouchableOpacity>
+                          {/* Channel Toggles (Dine-in vs Online Delivery) */}
+                          {activeTab === "menu" && (
+                            <View className="flex-row items-center gap-2 mt-2 pt-2 border-t border-slate-100">
+                              <TouchableOpacity
+                                onPress={() => handleToggleChannel(item, "dineIn")}
+                                className={`flex-1 py-1.5 px-2 rounded-xl border flex-row items-center justify-center ${item.isDineInAvailable !== false ? "bg-emerald-50 border-emerald-300" : "bg-slate-100 border-slate-200 opacity-60"
+                                  }`}
+                              >
+                                <Ionicons name="restaurant-outline" size={13} color={item.isDineInAvailable !== false ? "#059669" : "#64748B"} />
+                                <Text className={`text-[10px] font-black ml-1.5 ${item.isDineInAvailable !== false ? "text-emerald-800" : "text-slate-600"}`}>
+                                  Dine-in: {item.isDineInAvailable !== false ? "ON" : "OFF"}
+                                </Text>
+                              </TouchableOpacity>
 
-                        <TouchableOpacity
-                          onPress={() => handleDeleteItem(item)}
-                          className="px-3 py-2 rounded-xl bg-red-50 border border-red-200"
-                        >
-                          <Ionicons name="trash" size={14} color="#DC2626" />
-                        </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => handleToggleChannel(item, "online")}
+                                className={`flex-1 py-1.5 px-2 rounded-xl border flex-row items-center justify-center ${item.isOnlineAvailable !== false ? "bg-orange-50 border-orange-300" : "bg-slate-100 border-slate-200 opacity-60"
+                                  }`}
+                              >
+                                <Ionicons name="bicycle-outline" size={13} color={item.isOnlineAvailable !== false ? "#EA580C" : "#64748B"} />
+                                <Text className={`text-[10px] font-black ml-1.5 ${item.isOnlineAvailable !== false ? "text-orange-800" : "text-slate-600"}`}>
+                                  Online: {item.isOnlineAvailable !== false ? "ON" : "OFF"}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Card Action Buttons */}
+                        <View className="flex-row items-center gap-2 mt-2.5 pt-2 border-t border-slate-100">
+                          {item.itemType !== "RAW_MATERIAL" && (
+                            <TouchableOpacity
+                              onPress={() => handleOpenRecipeModal(item)}
+                              className="flex-1 bg-blue-600 py-2 rounded-xl flex-row items-center justify-center shadow-xs"
+                            >
+                              <Ionicons name="list-circle-outline" size={14} color="#FFFFFF" />
+                              <Text className="text-white text-xs font-black ml-1">
+                                {item.recipe?.length > 0 ? "Edit Recipe" : "+ Add Recipe"}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+
+                          <TouchableOpacity
+                            onPress={() => handleOpenEdit(item)}
+                            className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200"
+                          >
+                            <Ionicons name="pencil" size={14} color="#2563EB" />
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={() => handleDeleteItem(item)}
+                            className="px-3 py-2 rounded-xl bg-red-50 border border-red-200"
+                          >
+                            <Ionicons name="trash" size={14} color="#DC2626" />
+                          </TouchableOpacity>
+                        </View>
                       </View>
-                    </View>
                     );
                   })}
                 </View>
@@ -1004,14 +999,12 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                     <View className="flex-row items-center justify-between mb-2">
                       <View className="flex-row items-center">
                         <View
-                          className={`px-2 py-0.5 rounded-md mr-2 ${
-                            trf.type === "DAMAGED_RETURN" ? "bg-red-100" : trf.type === "SUPPLY_DISPATCH" ? "bg-emerald-100" : "bg-blue-100"
-                          }`}
+                          className={`px-2 py-0.5 rounded-md mr-2 ${trf.type === "DAMAGED_RETURN" ? "bg-red-100" : trf.type === "SUPPLY_DISPATCH" ? "bg-emerald-100" : "bg-blue-100"
+                            }`}
                         >
                           <Text
-                            className={`text-[9.5px] font-black ${
-                              trf.type === "DAMAGED_RETURN" ? "text-red-800" : trf.type === "SUPPLY_DISPATCH" ? "text-emerald-800" : "text-blue-800"
-                            }`}
+                            className={`text-[9.5px] font-black ${trf.type === "DAMAGED_RETURN" ? "text-red-800" : trf.type === "SUPPLY_DISPATCH" ? "text-emerald-800" : "text-blue-800"
+                              }`}
                           >
                             {trf.type}
                           </Text>
@@ -1020,9 +1013,8 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                       </View>
 
                       <View
-                        className={`px-2 py-0.5 rounded-full border ${
-                          trf.status === "RECEIVED" ? "bg-emerald-50 border-emerald-300" : trf.status === "DISPATCHED" ? "bg-blue-50 border-blue-300" : "bg-slate-100 border-slate-300"
-                        }`}
+                        className={`px-2 py-0.5 rounded-full border ${trf.status === "RECEIVED" ? "bg-emerald-50 border-emerald-300" : trf.status === "DISPATCHED" ? "bg-blue-50 border-blue-300" : "bg-slate-100 border-slate-300"
+                          }`}
                       >
                         <Text className="text-[10px] font-black text-slate-700">{trf.status}</Text>
                       </View>
@@ -1119,9 +1111,8 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                         </Text>
                       </View>
                       <View
-                        className={`px-2 py-0.5 rounded-full border ${
-                          po.status === "RECEIVED" ? "bg-emerald-50 border-emerald-300" : po.status === "RAISED" ? "bg-blue-50 border-blue-300" : "bg-slate-100 border-slate-300"
-                        }`}
+                        className={`px-2 py-0.5 rounded-full border ${po.status === "RECEIVED" ? "bg-emerald-50 border-emerald-300" : po.status === "RAISED" ? "bg-blue-50 border-blue-300" : "bg-slate-100 border-slate-300"
+                          }`}
                       >
                         <Text className="text-[10px] font-black text-slate-700">{po.status}</Text>
                       </View>
@@ -1187,9 +1178,8 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                     <TouchableOpacity
                       key={t.id}
                       onPress={() => setFormItemType(t.id)}
-                      className={`flex-1 py-1.5 rounded-xl items-center border ${
-                        formItemType === t.id ? "bg-blue-600 border-blue-600 shadow-xs" : "bg-slate-100 border-slate-200"
-                      }`}
+                      className={`flex-1 py-1.5 rounded-xl items-center border ${formItemType === t.id ? "bg-blue-600 border-blue-600 shadow-xs" : "bg-slate-100 border-slate-200"
+                        }`}
                     >
                       <Text className={`text-[11px] font-bold ${formItemType === t.id ? "text-white" : "text-slate-700"}`}>
                         {t.label}
@@ -1262,9 +1252,8 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                       <TouchableOpacity
                         key={u}
                         onPress={() => setFormUnit(u)}
-                        className={`py-1.5 px-2.5 rounded-lg border ${
-                          formUnit === u ? "bg-blue-600 border-blue-600" : "bg-slate-100 border-slate-300"
-                        }`}
+                        className={`py-1.5 px-2.5 rounded-lg border ${formUnit === u ? "bg-blue-600 border-blue-600" : "bg-slate-100 border-slate-300"
+                          }`}
                       >
                         <Text className={`text-xs font-bold ${formUnit === u ? "text-white" : "text-slate-700"}`}>
                           {u}
@@ -1612,9 +1601,8 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
                   {itemStatsData.stats.dailyBreakdown.map((day, idx) => (
                     <View
                       key={day.date}
-                      className={`flex-row justify-between items-center py-2 ${
-                        idx < itemStatsData.stats.dailyBreakdown.length - 1 ? "border-b border-gray-100" : ""
-                      }`}
+                      className={`flex-row justify-between items-center py-2 ${idx < itemStatsData.stats.dailyBreakdown.length - 1 ? "border-b border-gray-100" : ""
+                        }`}
                     >
                       <View className="flex-row items-center">
                         <Ionicons name="time-outline" size={14} color="#6B7280" />

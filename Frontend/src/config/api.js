@@ -181,8 +181,17 @@ const request = async (endpoint, options = {}) => {
         data.message = `Request failed with status ${response.status}`;
       }
 
-      if (data && data.error && data.message && !data.message.includes(data.error)) {
-        data.message = `${data.message} (${data.error})`;
+      if (data && data.message) {
+        const msgStr = String(data.message);
+        if (
+          msgStr.includes("ECONNREFUSED") ||
+          msgStr.includes("Upstream microservice") ||
+          msgStr.includes("microservice unavailable")
+        ) {
+          data.message = "Server is undergoing maintenance. Please try again in a few moments.";
+        } else if (data.error && !msgStr.includes(data.error) && !String(data.error).includes("ECONNREFUSED")) {
+          data.message = `${data.message} (${data.error})`;
+        }
       }
 
       if (response.ok && data?.success !== false) {
@@ -199,24 +208,26 @@ const request = async (endpoint, options = {}) => {
 
       return data;
     } catch (error) {
+      const rawErr = String(error?.message || "");
       const isNetworkOrConnectError =
         error?.name !== "AbortError" &&
-        (String(error?.message || "").includes("Failed to connect") ||
-         String(error?.message || "").includes("ConnectException") ||
-         String(error?.message || "").includes("Network request failed") ||
-         String(error?.message || "").includes("ECONNREFUSED") ||
-         String(error?.message || "").includes("ENETUNREACH"));
+        (rawErr.includes("Failed to connect") ||
+         rawErr.includes("ConnectException") ||
+         rawErr.includes("Network request failed") ||
+         rawErr.includes("ECONNREFUSED") ||
+         rawErr.includes("ENETUNREACH") ||
+         rawErr.includes("java.net."));
 
       if (retriesLeft > 0 && isNetworkOrConnectError) {
         if (timeoutId) clearTimeout(timeoutId);
-        // Wait 600ms before retrying transient network hiccup
-        await new Promise((r) => setTimeout(r, 600));
+        // Wait 800ms before retrying transient network hiccup
+        await new Promise((r) => setTimeout(r, 800));
         return executeFetchWithRetry(retriesLeft - 1);
       }
 
       let userMsg = error?.name === "AbortError"
         ? "Request timed out. Please check your connection."
-        : error?.message || "Network connection error";
+        : rawErr || "Network connection error";
 
       if (isNetworkOrConnectError) {
         userMsg = "Unable to connect to server. Please check your internet connection.";

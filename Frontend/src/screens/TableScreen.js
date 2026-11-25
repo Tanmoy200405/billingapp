@@ -396,16 +396,14 @@ export default function TableScreen({
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
           <TouchableOpacity
             onPress={() => setSelectedAreaId("ALL")}
-            className={`px-3.5 py-1.5 rounded-full mr-2 border ${
-              selectedAreaId === "ALL"
+            className={`px-3.5 py-1.5 rounded-full mr-2 border ${selectedAreaId === "ALL"
                 ? "bg-blue-600 border-blue-600"
                 : "bg-slate-100 border-slate-200"
-            }`}
+              }`}
           >
             <Text
-              className={`text-xs font-bold ${
-                selectedAreaId === "ALL" ? "text-white" : "text-slate-700"
-              }`}
+              className={`text-xs font-bold ${selectedAreaId === "ALL" ? "text-white" : "text-slate-700"
+                }`}
             >
               All Areas ({tables.length})
             </Text>
@@ -421,20 +419,18 @@ export default function TableScreen({
               <TouchableOpacity
                 key={area._id}
                 onPress={() => setSelectedAreaId(area._id)}
-                className={`px-3.5 py-1.5 rounded-full mr-2 border flex-row items-center ${
-                  isSelected
+                className={`px-3.5 py-1.5 rounded-full mr-2 border flex-row items-center ${isSelected
                     ? "bg-blue-600 border-blue-600"
                     : "bg-slate-100 border-slate-200"
-                }`}
+                  }`}
               >
                 <View
                   style={{ backgroundColor: area.color || "#2563EB" }}
                   className="w-2 h-2 rounded-full mr-1.5"
                 />
                 <Text
-                  className={`text-xs font-bold ${
-                    isSelected ? "text-white" : "text-slate-700"
-                  }`}
+                  className={`text-xs font-bold ${isSelected ? "text-white" : "text-slate-700"
+                    }`}
                 >
                   {area.name} ({countInArea}){rateStr}
                 </Text>
@@ -466,9 +462,8 @@ export default function TableScreen({
             <TouchableOpacity
               key={tab.key}
               onPress={() => setSelectedStatus(tab.key)}
-              className={`flex-1 py-1.5 rounded-xl items-center mr-1 ${
-                isSelected ? "bg-white shadow-sm" : ""
-              }`}
+              className={`flex-1 py-1.5 rounded-xl items-center mr-1 ${isSelected ? "bg-white shadow-sm" : ""
+                }`}
             >
               <Text
                 style={{ color: isSelected ? tab.color : "#64748B" }}
@@ -829,11 +824,10 @@ export default function TableScreen({
                       <TouchableOpacity
                         key={t._id}
                         onPress={() => setTargetTableId(t._id)}
-                        className={`p-3 rounded-xl border mb-2 flex-row justify-between items-center ${
-                          isSelected
+                        className={`p-3 rounded-xl border mb-2 flex-row justify-between items-center ${isSelected
                             ? "bg-blue-50 border-blue-600"
                             : "bg-white border-slate-200"
-                        }`}
+                          }`}
                       >
                         <View>
                           <Text className="font-extrabold text-sm text-slate-900">
@@ -867,9 +861,8 @@ export default function TableScreen({
                 <TouchableOpacity
                   onPress={handleExecuteTransfer}
                   disabled={transferring || !targetTableId}
-                  className={`flex-1 py-3 rounded-xl items-center flex-row justify-center ${
-                    targetTableId ? "bg-amber-600 active:bg-amber-700" : "bg-slate-300"
-                  }`}
+                  className={`flex-1 py-3 rounded-xl items-center flex-row justify-center ${targetTableId ? "bg-amber-600 active:bg-amber-700" : "bg-slate-300"
+                    }`}
                 >
                   {transferring ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -997,9 +990,8 @@ export default function TableScreen({
                       <TouchableOpacity
                         key={a._id}
                         onPress={() => setTableFormAreaId(a._id)}
-                        className={`px-3 py-1.5 rounded-full mr-2 border ${
-                          isSelected ? "bg-blue-600 border-blue-600" : "bg-slate-100 border-slate-200"
-                        }`}
+                        className={`px-3 py-1.5 rounded-full mr-2 border ${isSelected ? "bg-blue-600 border-blue-600" : "bg-slate-100 border-slate-200"
+                          }`}
                       >
                         <Text className={`text-xs font-bold ${isSelected ? "text-white" : "text-slate-700"}`}>
                           {a.name}
@@ -1019,9 +1011,8 @@ export default function TableScreen({
                       <TouchableOpacity
                         key={cap}
                         onPress={() => setTableFormCapacity(String(cap))}
-                        className={`flex-1 py-2 rounded-xl border items-center ${
-                          isSelected ? "bg-blue-600 border-blue-600" : "bg-slate-100 border-slate-200"
-                        }`}
+                        className={`flex-1 py-2 rounded-xl border items-center ${isSelected ? "bg-blue-600 border-blue-600" : "bg-slate-100 border-slate-200"
+                          }`}
                       >
                         <Text className={`text-xs font-black ${isSelected ? "text-white" : "text-slate-700"}`}>
                           {cap}

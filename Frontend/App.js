@@ -27,6 +27,7 @@ import {
   markUpdateSeen,
 } from "./src/services/updateService";
 import UpdateModal from "./src/components/UpdateModal";
+import ErrorBoundary from "./src/components/ErrorBoundary";
 import Toast from "react-native-toast-message";
 
 const NAV_TABS = [
@@ -190,7 +191,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
-      <StatusBar style={currentScreen === "main" ? "light" : "dark"} />
+      <ErrorBoundary>
+        <StatusBar style={currentScreen === "main" ? "light" : "dark"} />
       {currentScreen === "loading" && (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#FFFFFF" }}>
           <ActivityIndicator size="large" color="#2563EB" />
@@ -507,6 +509,7 @@ export default function App() {
         }}
       />
       <Toast />
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }

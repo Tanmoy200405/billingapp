@@ -76,7 +76,7 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
     if (user?.vipVisitThreshold && user.vipVisitThreshold >= 1) {
       setVipVisitThreshold(user.vipVisitThreshold);
       setVipInputText(String(user.vipVisitThreshold));
-      AsyncStorage.setItem("party_vip_threshold", String(user.vipVisitThreshold)).catch(() => {});
+      AsyncStorage.setItem("party_vip_threshold", String(user.vipVisitThreshold)).catch(() => { });
       return;
     }
     AsyncStorage.getItem("party_vip_threshold").then((val) => {
@@ -87,7 +87,7 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
           setVipInputText(String(parsed));
         }
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [user?.vipVisitThreshold]);
 
   const updateVipThreshold = async (newVal, showConfirm = true) => {
@@ -98,7 +98,7 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
     }
     setVipVisitThreshold(num);
     setVipInputText(String(num));
-    AsyncStorage.setItem("party_vip_threshold", String(num)).catch(() => {});
+    AsyncStorage.setItem("party_vip_threshold", String(num)).catch(() => { });
     setSavingVipThreshold(true);
     try {
       const res = await api.auth.updateProfile({ vipVisitThreshold: num });
@@ -239,7 +239,7 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
           );
         }
       } finally {
-        FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(() => {});
+        FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(() => { });
       }
     } catch (err) {
       Alert.alert("Import Error", err.message || "Failed to import party list from PDF.");
@@ -515,194 +515,190 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
     <View style={{ flex: 1 }} className="flex-1 bg-slate-50">
       <View style={{ paddingTop: headerTopPadding }} className="bg-blue-600 px-4 pb-4">
         <ResponsiveContainer maxWidth={1200}>
-        <View className="flex-row items-center justify-between mb-2.5">
-          <View className="flex-row items-center flex-1 mr-2">
-            {!isWide && (
-              <TouchableOpacity onPress={onOpenDrawer} className="mr-2 p-1">
-                <Ionicons name="menu" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-            {onBack && !isWide ? (
+          <View className="flex-row items-center justify-between mb-2.5">
+            <View className="flex-row items-center flex-1 mr-2">
+              {!isWide && (
+                <TouchableOpacity onPress={onOpenDrawer} className="mr-2 p-1">
+                  <Ionicons name="menu" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+              {onBack && !isWide ? (
+                <TouchableOpacity
+                  onPress={onBack}
+                  className="flex-row items-center bg-white/20 px-2.5 py-1 rounded-lg mr-2"
+                >
+                  <Ionicons name="arrow-back" size={16} color="#FFFFFF" />
+                  <Text className="text-white text-xs font-bold ml-1">Back</Text>
+                </TouchableOpacity>
+              ) : null}
+              <View>
+                <Text className="text-white text-xl font-bold">Customers</Text>
+                <Text className="text-blue-200 text-[11px]">
+                  {parties.length} total · {vipCount} VIP (≥{vipVisitThreshold} visits)
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row gap-2">
               <TouchableOpacity
-                onPress={onBack}
-                className="flex-row items-center bg-white/20 px-2.5 py-1 rounded-lg mr-2"
+                onPress={() => {
+                  loadVipOfferConfig();
+                  setVipOfferModalVisible(true);
+                }}
+                className="bg-amber-400 active:bg-amber-500 px-3 py-1.5 rounded-xl flex-row items-center shadow-xs"
               >
-                <Ionicons name="arrow-back" size={16} color="#FFFFFF" />
-                <Text className="text-white text-xs font-bold ml-1">Back</Text>
+                <Ionicons name="gift" size={14} color="#78350F" />
+                <Text className="text-amber-950 font-black text-xs ml-1">👑 All VIP Offers</Text>
               </TouchableOpacity>
-            ) : null}
-            <View>
-              <Text className="text-white text-xl font-bold">Customers</Text>
-              <Text className="text-blue-200 text-[11px]">
-                {parties.length} total · {vipCount} VIP (≥{vipVisitThreshold} visits)
-              </Text>
+
+              <TouchableOpacity
+                onPress={openAddPartyModal}
+                className="bg-white px-3 py-1.5 rounded-xl flex-row items-center shadow-xs"
+              >
+                <Ionicons name="person-add-outline" size={14} color="#2563EB" />
+                <Text className="text-blue-600 font-bold text-xs ml-1">+ Add</Text>
+              </TouchableOpacity>
             </View>
           </View>
-          <View className="flex-row gap-2">
+          <View className="flex-row gap-2 mb-2.5">
             <TouchableOpacity
-              onPress={() => {
-                loadVipOfferConfig();
-                setVipOfferModalVisible(true);
-              }}
-              className="bg-amber-400 active:bg-amber-500 px-3 py-1.5 rounded-xl flex-row items-center shadow-xs"
+              onPress={handleImportPdf}
+              disabled={importingPdf}
+              className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-2.5 rounded-xl flex-row items-center justify-center"
             >
-              <Ionicons name="gift" size={14} color="#78350F" />
-              <Text className="text-amber-950 font-black text-xs ml-1">👑 All VIP Offers</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={openAddPartyModal}
-              className="bg-white px-3 py-1.5 rounded-xl flex-row items-center shadow-xs"
-            >
-              <Ionicons name="person-add-outline" size={14} color="#2563EB" />
-              <Text className="text-blue-600 font-bold text-xs ml-1">+ Add</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        <View className="flex-row gap-2 mb-2.5">
-          <TouchableOpacity
-            onPress={handleImportPdf}
-            disabled={importingPdf}
-            className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-2.5 rounded-xl flex-row items-center justify-center"
-          >
-            {importingPdf ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="cloud-upload-outline" size={15} color="#FFFFFF" />
-                <Text className="text-white font-bold text-xs ml-1.5">Import PDF</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleDownloadPartyReport}
-            disabled={downloadingReport}
-            className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-2.5 rounded-xl flex-row items-center justify-center"
-          >
-            {downloadingReport ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="document-text-outline" size={15} color="#FFFFFF" />
-                <Text className="text-white font-bold text-xs ml-1.5">Download PDF</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          {isVipSchemeActive && vipCount > 0 ? (
-            <TouchableOpacity
-              onPress={handleBulkVipOffer}
-              disabled={bulkSending}
-              className="flex-1 bg-amber-400 active:bg-amber-500 py-2 px-2.5 rounded-xl flex-row items-center justify-center shadow-xs"
-            >
-              {bulkSending ? (
-                <ActivityIndicator size="small" color="#78350f" />
+              {importingPdf ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <FontAwesome name="whatsapp" size={15} color="#78350f" />
-                  <Text className="text-amber-900 font-extrabold text-xs ml-1">VIP Offer</Text>
+                  <Ionicons name="cloud-upload-outline" size={15} color="#FFFFFF" />
+                  <Text className="text-white font-bold text-xs ml-1.5">Import PDF</Text>
                 </>
               )}
             </TouchableOpacity>
-          ) : null}
-        </View>
-        <View className="flex-row bg-white rounded-xl px-3 py-2 items-center">
-          <Ionicons name="search" size={18} color="#9CA3AF" />
-          <TextInput
-            className="flex-1 ml-2 text-sm text-gray-800"
-            placeholder="Search by customer name or phone..."
-            placeholderTextColor="#9CA3AF"
-            value={search}
-            onChangeText={setSearch}
-            onSubmitEditing={loadParties}
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => { setSearch(""); loadParties(); }}>
-              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+            <TouchableOpacity
+              onPress={handleDownloadPartyReport}
+              disabled={downloadingReport}
+              className="flex-1 bg-white/20 hover:bg-white/30 border border-white/30 py-2 px-2.5 rounded-xl flex-row items-center justify-center"
+            >
+              {downloadingReport ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="document-text-outline" size={15} color="#FFFFFF" />
+                  <Text className="text-white font-bold text-xs ml-1.5">Download PDF</Text>
+                </>
+              )}
             </TouchableOpacity>
-          ) : null}
-        </View>
+            {isVipSchemeActive && vipCount > 0 ? (
+              <TouchableOpacity
+                onPress={handleBulkVipOffer}
+                disabled={bulkSending}
+                className="flex-1 bg-amber-400 active:bg-amber-500 py-2 px-2.5 rounded-xl flex-row items-center justify-center shadow-xs"
+              >
+                {bulkSending ? (
+                  <ActivityIndicator size="small" color="#78350f" />
+                ) : (
+                  <>
+                    <FontAwesome name="whatsapp" size={15} color="#78350f" />
+                    <Text className="text-amber-900 font-extrabold text-xs ml-1">VIP Offer</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <View className="flex-row bg-white rounded-xl px-3 py-2 items-center">
+            <Ionicons name="search" size={18} color="#9CA3AF" />
+            <TextInput
+              className="flex-1 ml-2 text-sm text-gray-800"
+              placeholder="Search by customer name or phone..."
+              placeholderTextColor="#9CA3AF"
+              value={search}
+              onChangeText={setSearch}
+              onSubmitEditing={loadParties}
+            />
+            {search ? (
+              <TouchableOpacity onPress={() => { setSearch(""); loadParties(); }}>
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </ResponsiveContainer>
       </View>
       {isVipSchemeActive ? (
         <View className="bg-white border-b border-gray-200 px-3 py-2">
           <ResponsiveContainer maxWidth={1200}>
-          <View className="flex-row items-center justify-between flex-wrap gap-2 mb-1">
-            <View className="flex-row">
-              {[
-                { key: "all", label: "All Customers" },
-                { key: "vip", label: "VIP Only" },
-              ].map((t) => (
-                <TouchableOpacity
-                  key={t.key}
-                  onPress={() => setFilterType(t.key)}
-                  className={`px-3 py-1.5 rounded-full mr-2 ${
-                    filterType === t.key ? "bg-blue-600" : "bg-gray-100"
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-bold ${
-                      filterType === t.key ? "text-white" : "text-gray-600"
-                    }`}
+            <View className="flex-row items-center justify-between flex-wrap gap-2 mb-1">
+              <View className="flex-row">
+                {[
+                  { key: "all", label: "All Customers" },
+                  { key: "vip", label: "VIP Only" },
+                ].map((t) => (
+                  <TouchableOpacity
+                    key={t.key}
+                    onPress={() => setFilterType(t.key)}
+                    className={`px-3 py-1.5 rounded-full mr-2 ${filterType === t.key ? "bg-blue-600" : "bg-gray-100"
+                      }`}
                   >
-                    {t.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View className="flex-row items-center flex-wrap gap-1">
-              <Text className="text-[11px] font-bold text-gray-500 mr-1">VIP Criteria (visits ≥):</Text>
-              {[2, 3, 5].map((threshold) => (
-                <TouchableOpacity
-                  key={threshold}
-                  onPress={() => updateVipThreshold(threshold)}
-                  className={`px-2 py-1 rounded-md border ${
-                    vipVisitThreshold === threshold
-                      ? "bg-amber-100 border-amber-400"
-                      : "bg-gray-50 border-gray-200"
-                  }`}
-                >
-                  <Text
-                    className={`text-[10px] font-bold ${
-                      vipVisitThreshold === threshold ? "text-amber-800" : "text-gray-600"
-                    }`}
+                    <Text
+                      className={`text-xs font-bold ${filterType === t.key ? "text-white" : "text-gray-600"
+                        }`}
+                    >
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View className="flex-row items-center flex-wrap gap-1">
+                <Text className="text-[11px] font-bold text-gray-500 mr-1">VIP Criteria (visits ≥):</Text>
+                {[2, 3, 5].map((threshold) => (
+                  <TouchableOpacity
+                    key={threshold}
+                    onPress={() => updateVipThreshold(threshold)}
+                    className={`px-2 py-1 rounded-md border ${vipVisitThreshold === threshold
+                        ? "bg-amber-100 border-amber-400"
+                        : "bg-gray-50 border-gray-200"
+                      }`}
                   >
-                    {threshold}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              <View className="flex-row items-center bg-gray-100 border border-gray-300 rounded-lg px-1.5 py-0.5 ml-1">
-                <TextInput
-                  style={{ width: 42, height: 26, paddingVertical: 0, textAlign: "center", fontSize: 12, fontWeight: "700", color: "#1F2937" }}
-                  keyboardType="numeric"
-                  value={vipInputText}
-                  onChangeText={(txt) => {
-                    const clean = txt.replace(/[^0-9]/g, "");
-                    setVipInputText(clean);
-                  }}
-                  onSubmitEditing={() => {
-                    Keyboard.dismiss();
-                    updateVipThreshold(vipInputText || 3, true);
-                  }}
-                  maxLength={3}
-                  placeholder="3"
-                  placeholderTextColor="#9CA3AF"
-                  returnKeyType="done"
-                />
-                <TouchableOpacity
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    updateVipThreshold(vipInputText || 3, true);
-                  }}
-                  disabled={savingVipThreshold}
-                  className="bg-amber-500 px-2 py-1 rounded ml-1"
-                >
-                  <Text className="text-[10px] font-extrabold text-white">
-                    {savingVipThreshold ? "..." : "Set"}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      className={`text-[10px] font-bold ${vipVisitThreshold === threshold ? "text-amber-800" : "text-gray-600"
+                        }`}
+                    >
+                      {threshold}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <View className="flex-row items-center bg-gray-100 border border-gray-300 rounded-lg px-1.5 py-0.5 ml-1">
+                  <TextInput
+                    style={{ width: 42, height: 26, paddingVertical: 0, textAlign: "center", fontSize: 12, fontWeight: "700", color: "#1F2937" }}
+                    keyboardType="numeric"
+                    value={vipInputText}
+                    onChangeText={(txt) => {
+                      const clean = txt.replace(/[^0-9]/g, "");
+                      setVipInputText(clean);
+                    }}
+                    onSubmitEditing={() => {
+                      Keyboard.dismiss();
+                      updateVipThreshold(vipInputText || 3, true);
+                    }}
+                    maxLength={3}
+                    placeholder="3"
+                    placeholderTextColor="#9CA3AF"
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      updateVipThreshold(vipInputText || 3, true);
+                    }}
+                    disabled={savingVipThreshold}
+                    className="bg-amber-500 px-2 py-1 rounded ml-1"
+                  >
+                    <Text className="text-[10px] font-extrabold text-white">
+                      {savingVipThreshold ? "..." : "Set"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
           </ResponsiveContainer>
         </View>
       ) : null}
@@ -1002,16 +998,14 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
                       <TouchableOpacity
                         key={t}
                         onPress={() => setPartyFormType(t)}
-                        className={`flex-1 py-2 rounded-xl border items-center ${
-                          partyFormType === t
+                        className={`flex-1 py-2 rounded-xl border items-center ${partyFormType === t
                             ? "bg-blue-600 border-blue-600"
                             : "bg-gray-100 border-gray-300"
-                        }`}
+                          }`}
                       >
                         <Text
-                          className={`text-xs font-bold capitalize ${
-                            partyFormType === t ? "text-white" : "text-gray-700"
-                          }`}
+                          className={`text-xs font-bold capitalize ${partyFormType === t ? "text-white" : "text-gray-700"
+                            }`}
                         >
                           {t}
                         </Text>
@@ -1191,16 +1185,14 @@ export default function PartyScreen({ user, isActive = true, onProfileUpdated, o
                       <TouchableOpacity
                         key={num}
                         onPress={() => setVipOfferThreshold(num)}
-                        className={`flex-1 py-2 rounded-xl items-center border ${
-                          vipOfferThreshold === num
+                        className={`flex-1 py-2 rounded-xl items-center border ${vipOfferThreshold === num
                             ? "bg-amber-500 border-amber-600 shadow-xs"
                             : "bg-gray-100 border-gray-300"
-                        }`}
+                          }`}
                       >
                         <Text
-                          className={`text-xs font-black ${
-                            vipOfferThreshold === num ? "text-white" : "text-gray-700"
-                          }`}
+                          className={`text-xs font-black ${vipOfferThreshold === num ? "text-white" : "text-gray-700"
+                            }`}
                         >
                           {num}+ Visits
                         </Text>

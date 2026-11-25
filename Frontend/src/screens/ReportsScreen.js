@@ -29,11 +29,23 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
   const [downloading, setDownloading] = useState(false);
 
   // Cached overview data
-  const [salesData, setSalesData] = useState(() => getMemoryCachedData("reports_sales_today"));
-  const [inventoryItems, setInventoryItems] = useState(() => getMemoryCachedData("items_all") || []);
-  const [parties, setParties] = useState(() => getMemoryCachedData("parties_all") || []);
-  const [topItemsData, setTopItemsData] = useState(() => getMemoryCachedData("reports_topItems_365")?.topItems || []);
-  const [overallTopData, setOverallTopData] = useState(() => getMemoryCachedData("reports_topItems_365")?.overallTop || []);
+  const [salesData, setSalesData] = useState(() => getMemoryCachedData("reports_sales_today") || null);
+  const [inventoryItems, setInventoryItems] = useState(() => {
+    const c = getMemoryCachedData("items_all");
+    return Array.isArray(c) ? c : [];
+  });
+  const [parties, setParties] = useState(() => {
+    const c = getMemoryCachedData("parties_all");
+    return Array.isArray(c) ? c : [];
+  });
+  const [topItemsData, setTopItemsData] = useState(() => {
+    const c = getMemoryCachedData("reports_topItems_365");
+    return Array.isArray(c?.topItems) ? c.topItems : [];
+  });
+  const [overallTopData, setOverallTopData] = useState(() => {
+    const c = getMemoryCachedData("reports_topItems_365");
+    return Array.isArray(c?.overallTop) ? c.overallTop : [];
+  });
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   // Reports Directory Hub State
@@ -84,9 +96,9 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
       }).catch(() => {});
 
       api.reports.getTopItems(`days=${topDays}`).then((r) => {
-        if (r?.success && r.topItems) {
-          setTopItemsData(r.topItems);
-          if (r.overallTop) setOverallTopData(r.overallTop);
+        if (r?.success) {
+          if (Array.isArray(r.topItems)) setTopItemsData(r.topItems);
+          if (Array.isArray(r.overallTop)) setOverallTopData(r.overallTop);
           setCachedData(`reports_topItems_${topDays}`, r);
         }
       }).catch(() => {});
@@ -459,12 +471,12 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                   </TouchableOpacity>
                 </View>
 
-                {overallTopData.length === 0 ? (
+                {(!Array.isArray(overallTopData) || overallTopData.length === 0) ? (
                   <View className="py-4 items-center">
                     <Text className="text-xs text-slate-400">No dish sales recorded yet in this period</Text>
                   </View>
                 ) : (
-                  overallTopData.slice(0, 4).map((it, idx) => (
+                  (Array.isArray(overallTopData) ? overallTopData : []).slice(0, 4).map((it, idx) => (
                     <View
                       key={idx}
                       className="flex-row items-center justify-between py-2 border-b border-slate-100 last:border-b-0"
@@ -819,6 +831,11 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
       {/* ── Modal 1: Bill Detail Modal ── */}
       <Modal visible={!!selectedInvoice} animationType="slide" transparent={true} onRequestClose={() => setSelectedInvoice(null)}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: isWide ? "center" : "flex-end", alignItems: isWide ? "center" : "stretch", padding: isWide ? 24 : 0 }}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setSelectedInvoice(null)}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+          />
           <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: isWide ? 24 : 0, borderBottomRightRadius: isWide ? 24 : 0, maxHeight: "88%", width: "100%", maxWidth: isWide ? 560 : undefined }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 18, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }}>
               <View>
@@ -906,7 +923,12 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
         transparent={true}
         onRequestClose={() => setShowCategoryModal(false)}
       >
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: isWide ? "center" : "flex-end", alignItems: isWide ? "center" : "stretch", padding: isWide ? 24 : 0 }}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: isWide ? "center" : "flex-end", alignItems: isWide ? "center" : "stretch", padding: isWide ? 24 : 0 }}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowCategoryModal(false)}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+          />
           <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: isWide ? 24 : 0, borderBottomRightRadius: isWide ? 24 : 0, maxHeight: "90%", flex: 1, width: "100%", maxWidth: isWide ? 680 : undefined }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 18, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", backgroundColor: "#2563EB", borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
               <View style={{ flex: 1 }}>
@@ -982,8 +1004,13 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
         animationType="slide"
         onRequestClose={() => setActiveReportModal(null)}
       >
-        <View className="flex-1 bg-black/60 justify-center items-center px-3 py-6">
-          <View style={{ width: "100%", maxWidth: 840, maxHeight: "90%" }} className="bg-white rounded-3xl p-5 shadow-2xl flex-1">
+        <View style={{ flex: 1, backgroundColor: "rgba(0, 0, 0, 0.55)", justifyContent: "center", alignItems: "center", padding: 16 }}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setActiveReportModal(null)}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+          <View style={{ width: "100%", maxWidth: 840, maxHeight: "90%", backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 20, elevation: 10, flex: 1 }}>
             <View className="flex-row items-center justify-between pb-3 border-b border-gray-200">
               <View className="flex-row items-center flex-1 mr-2">
                 <View style={{ backgroundColor: "#EFF6FF" }} className="w-9 h-9 rounded-xl items-center justify-center mr-2.5">
@@ -1010,7 +1037,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
               </View>
             ) : reportResultData ? (
               <ScrollView className="flex-1 pt-3" showsVerticalScrollIndicator={false}>
-                {reportResultData.summary && reportResultData.summary.length > 0 && (
+                {Array.isArray(reportResultData.summary) && reportResultData.summary.length > 0 && (
                   <View className="flex-row flex-wrap gap-2 mb-4">
                     {reportResultData.summary.map((kpi, idx) => (
                       <View
@@ -1038,24 +1065,24 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
 
                 <View className="border border-gray-200 rounded-2xl overflow-hidden mb-4 bg-white shadow-xs">
                   <View className="bg-slate-900 flex-row px-3 py-2.5">
-                    {reportResultData.columns.map((col) => (
+                    {(reportResultData.columns || []).map((col) => (
                       <Text
-                        key={col.key}
+                        key={col?.key || Math.random()}
                         style={{
                           flex: 1,
-                          textAlign: col.align || "left",
+                          textAlign: col?.align || "left",
                           color: "#FFFFFF",
                           fontSize: 11,
                           fontWeight: "800",
                         }}
                         numberOfLines={1}
                       >
-                        {col.label}
+                        {col?.label || ""}
                       </Text>
                     ))}
                   </View>
 
-                  {reportResultData.rows.length === 0 ? (
+                  {(!reportResultData.rows || !Array.isArray(reportResultData.rows) || reportResultData.rows.length === 0) ? (
                     <View className="py-8 items-center justify-center">
                       <Ionicons name="file-tray-outline" size={28} color="#94A3B8" />
                       <Text className="text-xs text-gray-400 mt-2 font-medium">
@@ -1063,7 +1090,7 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                       </Text>
                     </View>
                   ) : (
-                    reportResultData.rows.map((row, rIdx) => (
+                    (reportResultData.rows || []).map((row, rIdx) => (
                       <View
                         key={rIdx}
                         style={{
@@ -1073,19 +1100,21 @@ export default function ReportsScreen({ isActive = true, onOpenDrawer, onBack })
                         }}
                         className="flex-row items-center px-3 py-2.5"
                       >
-                        {reportResultData.columns.map((col) => (
+                        {(reportResultData.columns || []).map((col) => (
                           <Text
-                            key={col.key}
+                            key={col?.key || Math.random()}
                             style={{
                               flex: 1,
-                              textAlign: col.align || "left",
+                              textAlign: col?.align || "left",
                               color: "#1E293B",
                               fontSize: 11,
-                              fontWeight: col.align === "right" ? "700" : "500",
+                              fontWeight: col?.align === "right" ? "700" : "500",
                             }}
                             numberOfLines={1}
                           >
-                            {row[col.key] !== undefined && row[col.key] !== null ? String(row[col.key]) : "--"}
+                            {row && col?.key && row[col.key] !== undefined && row[col.key] !== null
+                              ? String(row[col.key])
+                              : "--"}
                           </Text>
                         ))}
                       </View>

@@ -1,14 +1,10 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 import compression from "compression";
 import cookieParser from "cookie-parser";
-import path from "path";
-import fs from "fs";
-
-dotenv.config();
-
 import mongoose from "mongoose";
+
+import config from "./config/env.js";
 import connectDB from "./config/dbConnect.js";
 import authRoutes from "./routes/authRoutes.js";
 import partyRoutes from "./routes/partyRoutes.js";
@@ -24,19 +20,27 @@ import { initAllWhatsAppSessions } from "./services/whatsappService.js";
 import { startQueueWorker } from "./services/jobQueueService.js";
 import { getAwsMessagingStatus } from "./services/awsMessagingService.js";
 
-connectDB().catch((err) =>
-  console.warn("Initial DB connection attempt notice:", err.message)
-);
+// Prevent unhandled errors from terminating the Node process
+process.on("uncaughtException", (err) => {
+  console.error("[Fatal Error Caught]", err?.stack || err?.message || err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[Unhandled Promise Rejection]", reason?.stack || reason?.message || reason);
+});
+
+// Initial Database Connection
+connectDB().catch((err) => {
+  console.warn("[Database Connection Warning]", err.message);
+});
 
 if (!process.env.VERCEL) {
-  initAllWhatsAppSessions().catch((err) =>
-    console.warn("WhatsApp initialization notice:", err.message)
-  );
+  initAllWhatsAppSessions().catch((err) => {
+    console.warn("[WhatsApp Service Notice]", err.message);
+  });
   startQueueWorker();
 }
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
 app.use(
   cors({
@@ -51,11 +55,12 @@ app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 app.use(express.raw({ type: "application/pdf", limit: "100mb" }));
 app.use(cookieParser());
 
+// Root API Health & Identification
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "online",
-    service: "Billing System API",
-    version: "1.0.0",
+    service: "Bistromate Billing API",
+    version: config.appRelease.latestVersion,
     timestamp: new Date().toISOString(),
   });
 });
@@ -68,7 +73,7 @@ app.get("/api/health", (req, res) => {
     database: {
       status: dbState,
       readyState: mongoose.connection.readyState,
-      hasUri: Boolean(process.env.MONGODB_URI),
+      hasUri: Boolean(config.database.uri),
     },
     awsMessaging: getAwsMessagingStatus(),
     uptime: process.uptime(),
@@ -77,27 +82,22 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/download-apk", (req, res) => {
-  const githubApkUrl =
-    process.env.APP_APK_URL ||
-    "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
-  return res.redirect(302, githubApkUrl);
+  return res.redirect(302, config.appRelease.apkUrl);
 });
 
 app.get("/api/app-version", (req, res) => {
-  const defaultApkUrl = "https://github.com/jayeetamajumdar15-dev/billingapp/raw/main/BillingApp-release.apk";
   res.status(200).json({
     success: true,
-    latestVersion: process.env.APP_LATEST_VERSION || "1.2.2",
-    minSupportedVersion: process.env.APP_MIN_VERSION || "1.0.0",
-    apkUrl: process.env.APP_APK_URL || defaultApkUrl,
-    releaseNotes:
-      process.env.APP_RELEASE_NOTES ||
-      "Version 1.2.2: Fix table click black screen, disable predefined tables, deduplicate inventory categories, optimize sales today performance, hide VIP when disabled, and fix finalize bill back navigation.",
+    latestVersion: config.appRelease.latestVersion,
+    minSupportedVersion: config.appRelease.minSupportedVersion,
+    apkUrl: config.appRelease.apkUrl,
+    releaseNotes: config.appRelease.releaseNotes,
     forceUpdate: false,
     timestamp: new Date().toISOString(),
   });
 });
 
+// Database Connection Middleware Guard
 app.use(async (req, res, next) => {
   try {
     await connectDB();
@@ -113,6 +113,7 @@ app.use(async (req, res, next) => {
   }
 });
 
+// Primary Domain API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/parties", partyRoutes);
 app.use("/api/items", itemRoutes);
@@ -124,17 +125,18 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/tables", tableRoutes);
 app.use("/api/inventory", inventoryRoutes);
 
+// Global Error Handler
 app.use((err, req, res, next) => {
-  console.error("Server Error:", err.stack || err.message);
+  console.error("[API Error Handler]", err.stack || err.message);
   res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
   });
 });
 
-if (process.env.NODE_ENV !== "test") {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Billing API server running on port ${PORT} (0.0.0.0)`);
+if (config.nodeEnv !== "test") {
+  app.listen(config.port, "0.0.0.0", () => {
+    console.log(`[Bistromate API] Server active on port ${config.port} (0.0.0.0)`);
   });
 }
 
