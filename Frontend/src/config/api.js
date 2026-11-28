@@ -489,6 +489,11 @@ export const api = {
         body: JSON.stringify(payload),
       }),
     importPdfFile: (fileOrUri) => uploadPdfFile("/items/import-pdf", fileOrUri),
+    seedStarter: (force = false) =>
+      request("/items/seed-starter", {
+        method: "POST",
+        body: JSON.stringify({ force }),
+      }),
   },
   invoices: {
     getAll: (params = "") => request(`/invoices${params ? `?${params}` : ""}`),

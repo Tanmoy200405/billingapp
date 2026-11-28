@@ -86,6 +86,7 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
   const [quickItemPrice, setQuickItemPrice] = useState("");
   const [quickItemCategory, setQuickItemCategory] = useState("General");
   const [savingQuickItem, setSavingQuickItem] = useState(false);
+  const [seedingStarter, setSeedingStarter] = useState(false);
 
   // Table & Dine-in States
   const [selectedTable, setSelectedTable] = useState(initialTable || null);
@@ -322,7 +323,14 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       setCachedData("parties_customers", pRes.parties || []);
     }
     if (iRes && iRes.success && Array.isArray(iRes.items)) {
-      const mergedItems = await applyOfflineItemOpsToList(iRes.items);
+      let activeItems = iRes.items;
+      if (activeItems.length === 0) {
+        const seedRes = await api.items.seedStarter().catch(() => null);
+        if (seedRes?.success && Array.isArray(seedRes.items) && seedRes.items.length > 0) {
+          activeItems = seedRes.items;
+        }
+      }
+      const mergedItems = await applyOfflineItemOpsToList(activeItems);
       const sorted = [...mergedItems].sort((a, b) =>
         String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
           numeric: true,
@@ -331,6 +339,30 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
       );
       setItems(sorted);
       setCachedData("items_all", sorted);
+    }
+  };
+
+  const handleSeedStarter = async () => {
+    setSeedingStarter(true);
+    try {
+      const res = await api.items.seedStarter();
+      if (res?.success && Array.isArray(res.items)) {
+        const sorted = [...res.items].sort((a, b) =>
+          String(a?.name || "").localeCompare(String(b?.name || ""), undefined, {
+            numeric: true,
+            sensitivity: "base",
+          })
+        );
+        setItems(sorted);
+        setCachedData("items_all", sorted);
+        showPosNotice("Success", "Loaded starter restaurant food menu!");
+      } else {
+        showPosNotice("Notice", res?.message || "Could not load menu");
+      }
+    } catch (e) {
+      showPosNotice("Error", e.message || "Failed to load starter menu");
+    } finally {
+      setSeedingStarter(false);
     }
   };
 
@@ -873,9 +905,10 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
     gstin: user?.gstin || "",
   };
 
-  const categories = ["All", ...new Set(items.map((i) => i.category || "General").filter(Boolean))];
+  const foodItems = items.filter((i) => i.itemType !== "RAW_MATERIAL");
+  const categories = ["All", ...new Set(foodItems.map((i) => i.category || "General").filter(Boolean))];
 
-  const filteredItems = items
+  const filteredItems = foodItems
     .filter((i) => {
       const matchSearch = itemSearch
         ? i.name?.toLowerCase().includes(itemSearch.toLowerCase()) ||
@@ -1190,16 +1223,40 @@ export default function InvoiceScreen({ user, onBack, onInvoiceSaved, editingInv
                 contentContainerStyle={{ padding: 6, paddingBottom: isWide ? 110 : 145 }}
                 ListEmptyComponent={
                   <View className="items-center justify-center py-16 px-4">
-                    <FontAwesome5 name="box-open" size={36} color="#CBD5E1" />
-                    <Text className="text-gray-500 font-bold text-xs mt-3 text-center">
-                      No food items match "{itemSearch || selectedCategory}"
+                    <FontAwesome5 name="utensils" size={36} color="#CBD5E1" />
+                    <Text className="text-gray-700 font-black text-sm mt-3 text-center">
+                      {foodItems.length === 0 ? "No Food Items in Menu" : `No food items match "${itemSearch || selectedCategory}"`}
                     </Text>
-                    <TouchableOpacity
-                      onPress={() => setShowQuickItemModal(true)}
-                      className="mt-3 bg-blue-600 px-3 py-1.5 rounded-lg"
-                    >
-                      <Text className="text-white text-xs font-bold">+ Add Food Item</Text>
-                    </TouchableOpacity>
+                    <Text className="text-gray-400 font-medium text-xs mt-1 text-center max-w-xs">
+                      {foodItems.length === 0
+                        ? "Get your POS menu ready in 1 click with standard restaurant dishes!"
+                        : "Try a different search term or category"}
+                    </Text>
+                    <View className="flex-row items-center gap-2 mt-4">
+                      {foodItems.length === 0 && (
+                        <TouchableOpacity
+                          onPress={handleSeedStarter}
+                          disabled={seedingStarter}
+                          className="bg-emerald-600 px-3.5 py-2 rounded-xl flex-row items-center shadow-xs"
+                        >
+                          {seedingStarter ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <>
+                              <Ionicons name="sparkles" size={15} color="#FFFFFF" />
+                              <Text className="text-white text-xs font-black ml-1.5">Load Starter Menu</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        onPress={() => setShowQuickItemModal(true)}
+                        className="bg-blue-600 px-3.5 py-2 rounded-xl flex-row items-center shadow-xs"
+                      >
+                        <Ionicons name="add" size={15} color="#FFFFFF" />
+                        <Text className="text-white text-xs font-black ml-1">+ Add Food Item</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 }
                 renderItem={({ item }) => {

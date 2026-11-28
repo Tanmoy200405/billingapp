@@ -5,6 +5,7 @@ import Category from "../models/Category.js";
 import Invoice from "../models/Invoice.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { getCache, setCache, invalidateUserCache } from "../services/cacheService.js";
+import { seedStarterCatalog } from "../services/starterCatalogService.js";
 
 const require = createRequire(import.meta.url);
 const { PDFParse } = require("pdf-parse");
@@ -21,7 +22,9 @@ router.get("/", async (req, res) => {
 
     if (isUnfiltered) {
       const cached = getCache(cacheKey);
-      if (cached) return res.status(200).json(cached);
+      if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
+        return res.status(200).json(cached);
+      }
     }
 
     const filter = { userId: req.user._id };
@@ -43,10 +46,19 @@ router.get("/", async (req, res) => {
       filter.$expr = { $lte: ["$stock", "$lowStockThreshold"] };
     }
 
-    const items = await Item.find(filter)
+    let items = await Item.find(filter)
       .collation({ locale: "en", numericOrdering: true })
       .sort({ name: 1 })
       .lean();
+
+    // If merchant has NO items yet, automatically seed standard restaurant food items & inventory materials
+    if (items.length === 0 && isUnfiltered) {
+      await seedStarterCatalog(req.user._id).catch(() => {});
+      items = await Item.find(filter)
+        .collation({ locale: "en", numericOrdering: true })
+        .sort({ name: 1 })
+        .lean();
+    }
 
     items.sort((a, b) =>
       String(a.name || "").localeCompare(String(b.name || ""), undefined, {
@@ -71,6 +83,31 @@ router.get("/", async (req, res) => {
       success: false,
       message: "Failed to fetch items",
       error: error.message,
+    });
+  }
+});
+
+router.post("/seed-starter", async (req, res) => {
+  try {
+    const { force = false } = req.body || {};
+    const result = await seedStarterCatalog(req.user._id, force);
+    invalidateUserCache(req.user._id);
+
+    const items = await Item.find({ userId: req.user._id })
+      .collation({ locale: "en", numericOrdering: true })
+      .sort({ name: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      ...result,
+      items,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to seed starter items",
+      error: err.message,
     });
   }
 });

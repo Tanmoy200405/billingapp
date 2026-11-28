@@ -86,6 +86,7 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
   const [savingCategory, setSavingCategory] = useState(false);
   const [pendingItemOps, setPendingItemOps] = useState([]);
   const [syncingOfflineItems, setSyncingOfflineItems] = useState(false);
+  const [seedingStarter, setSeedingStarter] = useState(false);
 
   // ── Form State for Add / Edit Item ──
   const [formName, setFormName] = useState("");
@@ -180,7 +181,14 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
 
       const res = await api.items.getAll(queryString);
       if (res.success && Array.isArray(res.items)) {
-        const merged = await applyOfflineItemOpsToList(res.items);
+        let activeItems = res.items;
+        if (activeItems.length === 0 && isUnfiltered) {
+          const seedRes = await api.items.seedStarter().catch(() => null);
+          if (seedRes?.success && Array.isArray(seedRes.items) && seedRes.items.length > 0) {
+            activeItems = seedRes.items;
+          }
+        }
+        const merged = await applyOfflineItemOpsToList(activeItems);
         const sorted = sortItemsNaturally(merged);
         setItems(sorted);
         if (isUnfiltered) {
@@ -256,6 +264,28 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
         setCachedData("items_categories", unique);
       }
     } catch { }
+  };
+
+  const handleSeedStarter = async (force = false) => {
+    setSeedingStarter(true);
+    try {
+      const res = await api.items.seedStarter(force);
+      if (res?.success) {
+        if (Array.isArray(res.items)) {
+          const sorted = sortItemsNaturally(res.items);
+          setItems(sorted);
+          setCachedData("items_all", sorted);
+        }
+        await Promise.all([loadCategories(), loadSalesSummary()]);
+        showNotice("Success", res.message || "Loaded starter food items and inventory!");
+      } else {
+        showNotice("Notice", res?.message || "Could not load starter items");
+      }
+    } catch (e) {
+      showNotice("Error", e.message || "Failed to load starter items");
+    } finally {
+      setSeedingStarter(false);
+    }
   };
 
   const handleOpenItemStats = async (item) => {
@@ -644,7 +674,7 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
     if (activeTab === "recipe") {
       return it.itemType !== "RAW_MATERIAL";
     }
-    return true; // "menu" shows all finished goods & dishes
+    return it.itemType !== "RAW_MATERIAL"; // "menu" shows food dishes & finished goods
   });
 
   const lowStockRawCount = items.filter(
@@ -681,14 +711,28 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
               </View>
             </View>
 
-            <TouchableOpacity
-              onPress={handleOpenAdd}
-              activeOpacity={0.8}
-              className="bg-white px-3 py-1.5 rounded-xl flex-row items-center shrink-0 shadow-xs"
-            >
-              <Ionicons name="add-circle" size={16} color="#2563EB" />
-              <Text className="text-blue-600 text-xs font-black ml-1">+ Add Item</Text>
-            </TouchableOpacity>
+            <View className="flex-row items-center gap-2">
+              <TouchableOpacity
+                onPress={() => {
+                  loadItems();
+                  loadCategories();
+                  loadSalesSummary();
+                }}
+                disabled={loading}
+                activeOpacity={0.8}
+                className="bg-white/20 p-2 rounded-xl flex-row items-center shrink-0 border border-white/30"
+              >
+                <Ionicons name="cloud-download-outline" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleOpenAdd}
+                activeOpacity={0.8}
+                className="bg-white px-3 py-1.5 rounded-xl flex-row items-center shrink-0 shadow-xs"
+              >
+                <Ionicons name="add-circle" size={16} color="#2563EB" />
+                <Text className="text-blue-600 text-xs font-black ml-1">+ Add Item</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ResponsiveContainer>
       </View>
@@ -820,14 +864,38 @@ export default function InventoryScreen({ user, isActive = true, onOpenDrawer, o
               )}
 
               {displayedItems.length === 0 ? (
-                <View className="py-16 items-center">
-                  <Ionicons name="cube-outline" size={44} color="#CBD5E1" />
-                  <Text className="text-xs text-slate-500 mt-2 font-bold">
-                    No {activeTab === "raw" ? "raw materials" : "dishes"} found
+                <View className="py-16 items-center px-4">
+                  <Ionicons name={activeTab === "raw" ? "cube-outline" : "fast-food-outline"} size={48} color="#94A3B8" />
+                  <Text className="text-sm text-slate-800 mt-3 font-black text-center">
+                    {activeTab === "raw" ? "No Raw Materials in Inventory" : "No Food Dishes in Menu"}
                   </Text>
-                  <TouchableOpacity onPress={handleOpenAdd} className="mt-3 bg-blue-600 px-4 py-2 rounded-xl">
-                    <Text className="text-white text-xs font-black">+ Add {activeTab === "raw" ? "Raw Material" : "Dish"}</Text>
-                  </TouchableOpacity>
+                  <Text className="text-xs text-slate-500 mt-1 mb-4 text-center max-w-xs">
+                    {items.length === 0
+                      ? "Start your kitchen in 1 tap by loading standard restaurant food items & raw inventory materials!"
+                      : `You haven't added any ${activeTab === "raw" ? "raw materials" : "dishes"} yet.`}
+                  </Text>
+                  <View className="flex-row items-center gap-2">
+                    {items.length === 0 && (
+                      <TouchableOpacity
+                        onPress={() => handleSeedStarter(false)}
+                        disabled={seedingStarter}
+                        className="bg-emerald-600 px-4 py-2.5 rounded-xl flex-row items-center shadow-xs"
+                      >
+                        {seedingStarter ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+                            <Text className="text-white text-xs font-black ml-1.5">Load Starter Menu & Inventory</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity onPress={handleOpenAdd} className="bg-blue-600 px-4 py-2.5 rounded-xl flex-row items-center">
+                      <Ionicons name="add" size={16} color="#FFFFFF" />
+                      <Text className="text-white text-xs font-black ml-1">+ Add {activeTab === "raw" ? "Raw Material" : "Dish"}</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ) : (
                 <View className={isWide ? "flex-row flex-wrap justify-between gap-y-3" : "flex-col gap-y-3"}>
