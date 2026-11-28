@@ -14,7 +14,6 @@ import {
   renderOtpEmailHtml,
   renderLoginAlertEmailHtml,
 } from "../services/awsMessagingService.js";
-import { seedStarterCatalog } from "../services/starterCatalogService.js";
 const router = express.Router();
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
@@ -373,7 +372,6 @@ router.post("/verify-otp", async (req, res) => {
         whatsappNumber: cleanPhone,
         password: defaultPassword,
       });
-      seedStarterCatalog(existingUser._id).catch(() => {});
     }
     const token = generateToken(existingUser._id);
     dispatchLoginNotifications(existingUser).catch(() => {});
@@ -457,7 +455,6 @@ router.post("/register", async (req, res) => {
       address: address ? address.trim() : undefined,
       upiId: upiId ? upiId.trim() : undefined,
     });
-    seedStarterCatalog(user._id).catch(() => {});
     const token = generateToken(user._id);
 
     // Send Welcome notification asynchronously from Company WhatsApp & Company Email
@@ -550,7 +547,6 @@ router.post("/login", async (req, res) => {
           whatsappNumber: p10,
           password: defaultPassword,
         });
-        seedStarterCatalog(user._id).catch(() => {});
       }
       if (!user) {
         return res.status(401).json({

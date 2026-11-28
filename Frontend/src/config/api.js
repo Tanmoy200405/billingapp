@@ -157,7 +157,7 @@ const request = async (endpoint, options = {}) => {
     const timeoutMs =
       endpoint.includes("import") || endpoint.includes("pdf") || endpoint.includes("whatsapp")
         ? 45000
-        : 15000;
+        : 30000;
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
@@ -489,11 +489,6 @@ export const api = {
         body: JSON.stringify(payload),
       }),
     importPdfFile: (fileOrUri) => uploadPdfFile("/items/import-pdf", fileOrUri),
-    seedStarter: (force = false) =>
-      request("/items/seed-starter", {
-        method: "POST",
-        body: JSON.stringify({ force }),
-      }),
   },
   invoices: {
     getAll: (params = "") => request(`/invoices${params ? `?${params}` : ""}`),
